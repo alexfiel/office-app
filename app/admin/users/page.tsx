@@ -1,28 +1,26 @@
 import { AppSidebar } from "@/components/app-sidebar"
-import { ChartAreaInteractive } from "@/components/chart-area-interactive"
-import { DataTable } from "@/components/data-table"
-import { SectionCards } from "@/components/section-cards"
 import { SiteHeader } from "@/components/site-header"
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar"
-
-import data from "./data.json"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
+import { AdminUsersManager } from "@/components/admin-users-manager";
 
-export default async function Home() {
+export default async function AdminUsersPage() {
   const session = await auth();
   if (!session?.user) {
     redirect("/login");
+  }
+
+  const role = (session.user as any).role;
+  if (role !== "ADMIN") {
+    redirect("/"); // Non-admins are redirected back to homepage
   }
 
   const user = {
     name: session.user.name || "User",
     email: session.user.email || "",
     avatar: "",
-    role: (session.user as any).role || "USER",
+    role: role,
   };
 
   return (
@@ -37,16 +35,12 @@ export default async function Home() {
       <AppSidebar variant="inset" user={user} />
       <SidebarInset>
         <SiteHeader />
-        <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-              <SectionCards />
-              <div className="px-4 lg:px-6">
-                <ChartAreaInteractive />
-              </div>
-              <DataTable data={data} />
-            </div>
+        <div className="flex flex-1 flex-col p-6 lg:p-10">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold tracking-tight">Admin - Users</h1>
+            <p className="text-muted-foreground mt-2">View and update user roles across the application.</p>
           </div>
+          <AdminUsersManager />
         </div>
       </SidebarInset>
     </SidebarProvider>
