@@ -15,16 +15,107 @@ datasource db {
 }
 
 model User {
-  id    String @id @default(cuid())
-  name  String
-  email String @unique
-  password String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  role Role @default(USER)
+  id                 String               @id @default(cuid())
+  name               String
+  email              String               @unique
+  password           String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  role               Role                 @default(USER)
+  
+  // Relations
+  notarialDocuments  NotarialDocument[]
+  transferTaxes      TransferTax[]
+  transferTaxDetails TransferTaxDetails[]
+  realProperties     RealProperty[]
 }
 
 enum Role {
   USER
-  ADMIN 
+  ADMIN
+}
+
+model RealProperty {
+  id                 String               @id @default(cuid())
+  pin                String
+  owner              String
+  taxdecnumber       String
+  tctOct             String
+  location           String
+  lotNumber          String
+  area               Float
+  marketValue        Decimal
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  documentUrl        String?              // Added for your file upload
+
+  // Relations
+  userId             String
+  user               User                 @relation(fields: [userId], references: [id])
+  transferTaxDetails TransferTaxDetails[]
+}
+
+model NotarialDocument {
+  id             String        @id @default(cuid())
+  documentName   String
+  documentType   String
+  documentNumber String
+  notarialDate   DateTime
+  notarizedBy    String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  document_url   String
+  
+  // Relations
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  // Added back-relation for TransferTax
+  transferTaxes  TransferTax[] 
+}
+
+model TransferTax {
+  id                 String               @id @default(cuid())
+  transferee         String
+  transferor         String
+  transactionType   String
+  considerationvalue Decimal
+  totalmarketvalue   Decimal
+  taxbase            Decimal
+  taxdue             Decimal
+  surcharge          Decimal
+  interest           Decimal
+  totalamountdue     Decimal
+  paymentstatus      String
+  transactionDate    DateTime             @default(now())
+  createdAt          DateTime             @default(now())
+  validuntil         String
+  updatedAt          DateTime             @updatedAt
+
+  // Relations
+  notarialDocument   NotarialDocument     @relation(fields: [notarialDocumentId], references: [id])
+  notarialDocumentId String
+  userId             String
+  user               User                 @relation(fields: [userId], references: [id])
+  // Added back-relation for TransferTaxDetails
+  details            TransferTaxDetails[] 
+}
+
+model TransferTaxDetails {
+  id             String       @id @default(cuid())
+  taxdecnumber   String
+  lotNumber      String
+  owner          String
+  marketValue    Decimal
+  area           Float
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  transferTax    TransferTax  @relation(fields: [transferTaxId], references: [id])
+  transferTaxId  String
+  realProperty   RealProperty @relation(fields: [realPropertyId], references: [id])
+  realPropertyId String
+  // Added the missing User relation field
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
 }

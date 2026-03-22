@@ -2,6 +2,9 @@
 
 import * as React from "react"
 import {
+  IconApps,
+  IconBuilding,
+  IconCalculatorFilled,
   IconCamera,
   IconChartBar,
   IconDashboard,
@@ -12,6 +15,7 @@ import {
   IconFolder,
   IconHelp,
   IconInnerShadowTop,
+  IconInvoice,
   IconListDetails,
   IconReport,
   IconSearch,
@@ -32,34 +36,46 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { EyeClosedIcon } from "lucide-react"
 
 const data = {
   navMain: [
     {
-      title: "Dashboard",
-      url: "#",
+      title: "Accomplishment Dashboard",
+      url: "/",
       icon: IconDashboard,
     },
     {
-      title: "Lifecycle",
+      title: "Accomplishment Report",
       url: "#",
       icon: IconListDetails,
     },
     {
-      title: "Analytics",
+      title: "Create New Accomplishment",
       url: "#",
-      icon: IconChartBar,
+      icon: IconFileWord,
     },
     {
-      title: "Projects",
-      url: "#",
-      icon: IconFolder,
+      title: "AddPropertyDetails",
+      url: "/realproperty",
+      icon: IconApps,
     },
     {
-      title: "Team",
-      url: "#",
-      icon: IconUsers,
+      title: "View Property List",
+      url: "/viewPropertyList",
+      icon: IconBuilding,
     },
+    {
+      title: "View Transfer Tax List",
+      url: "/viewTransferTaxList",
+      icon: IconListDetails,
+    },
+    {
+      title: "Compute Transfer Tax",
+      url: "/transfertax",
+      icon: IconCalculatorFilled,
+    },
+
   ],
   navClouds: [
     {
@@ -143,6 +159,23 @@ const data = {
       icon: IconFileWord,
     },
   ],
+  inventory: [
+    {
+      name: "xxx",
+      url: "#",
+      icon: IconDatabase,
+    },
+    {
+      name: "Reports",
+      url: "#",
+      icon: IconReport,
+    },
+    {
+      name: "Word Assistant",
+      url: "#",
+      icon: IconFileWord,
+    },
+  ],
 }
 
 export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sidebar> & { user: any }) {
@@ -155,8 +188,8 @@ export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sideb
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="#">
-                <IconInnerShadowTop className="!size-5" />
+              <a href="/">
+                <img src="/cto_logo.png" alt="CTO Logo" className="size-6 object-contain" />
                 <span className="text-base font-semibold">CTO-TAGBILARAN APP</span>
               </a>
             </SidebarMenuButton>
@@ -166,6 +199,7 @@ export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sideb
       <SidebarContent>
         <NavMain items={data.navMain} />
         <NavDocuments items={data.documents} />
+        <NavDocuments items={data.inventory} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
