@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import Link from "next/link"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import QRCode from "react-qr-code"
+import InvoicePreview from "@/components/invoice/invoice-preview"
 
 type TransferTaxRecord = {
     id: string;
@@ -30,6 +31,9 @@ type TransferTaxRecord = {
     details?: any[];
     notarialDocument?: {
         document_url: string;
+        documentNumber?: string;
+        documentType?: string;
+        notarizedBy?: string;
     };
     user?: {
         name: string;
@@ -41,6 +45,55 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedItem, setSelectedItem] = useState<TransferTaxRecord | null>(null);
+    const [previewData, setPreviewData] = useState<any>(null);
+
+    const handlePreview = () => {
+        if (!selectedItem) return;
+
+        const docNum = selectedItem.notarialDocument?.documentNumber || "";
+        const parsedDocNo = docNum.split(",")[0]?.replace("Doc: ", "") || "N/A";
+        const parsedPageNo = docNum.split(",")[1]?.replace(" Page: ", "") || "N/A";
+        const parsedBookNo = docNum.split(",")[2]?.replace(" Book: ", "") || "N/A";
+
+        setPreviewData({
+                transferee: selectedItem.transferee || "JUAN DELA CRUZ",
+                transferor: selectedItem.transferor || "JUAN DELA CRUZ",
+                computationDate: new Date(selectedItem.transactionDate).toLocaleDateString(),
+                validityDate: selectedItem.validuntil || "N/A",
+                transactionId: selectedItem.id,
+                qrValue: `ID: ${selectedItem.id}\nNew Owner: ${selectedItem.transferee}\nAmount Due: P ${Number(selectedItem.totalamountdue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nValidity Date: ${selectedItem.validuntil || "N/A"}`,
+                properties: selectedItem.details ? selectedItem.details.map((d: any) => ({
+                    tdNo: d.taxdecnumber,
+                    lotNo: d.lotNumber,
+                    marketValue: d.marketValue
+                })) : [],
+                totalMarketValue: selectedItem.totalmarketvalue,
+                documentInfo: {
+                    type: selectedItem.notarialDocument?.documentType || "N/A",
+                    docNo: parsedDocNo,
+                    pageNo: parsedPageNo,
+                    bookNo: parsedBookNo,
+                    notarizedBy: selectedItem.notarialDocument?.notarizedBy || "N/A",
+                },
+                transactionInfo: {
+                    type: selectedItem.transactionType,
+                    consideration: selectedItem.considerationvalue,
+                    daysFromNotarial: "N/A",
+                    validityDate: selectedItem.validuntil,
+                },
+                computation: {
+                    taxBase: selectedItem.taxbase,
+                    taxRate: 0.75,
+                    basicTaxDue: selectedItem.taxdue,
+                    surcharge: selectedItem.surcharge,
+                    interest: selectedItem.interest,
+                    totalAmountDue: selectedItem.totalamountdue,
+                },
+                preparedBy: currentUser?.name || "USER",
+                preparedByRole: currentUser?.role || "ROLE",
+        });
+        setSelectedItem(null);
+    }
 
     const fetchTaxes = async () => {
         try {
@@ -84,8 +137,16 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
        item.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    if (previewData) {
+        return (
+            <div className="absolute inset-0 z-50 bg-gray-50 overflow-auto rounded-tl-xl md:rounded-tl-none">
+                <InvoicePreview data={previewData} onBack={() => setPreviewData(null)} />
+            </div>
+        )
+    }
+
     return (
-        <div className="p-4">
+        <div className="p-4 relative">
             <div className="mb-4 flex gap-4">
                 <div className="flex items-end space-x-2">
                     <Field>
@@ -329,8 +390,23 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Print-only Signatures */}
+                            <div className="hidden print:grid grid-cols-2 gap-12 mt-16 pt-8 break-inside-avoid">
+                                <div>
+                                    <p className="text-xs mb-8">Prepared by:</p>
+                                    <p className="font-bold border-b border-black w-[80%] pb-1 uppercase">{currentUser?.name || "USER"}</p>
+                                    <p className="text-xs mt-1">{currentUser?.role || "Designation"}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs mb-8">Approved by:</p>
+                                    <p className="font-bold border-b border-black w-[80%] pb-1 uppercase"></p>
+                                    <p className="text-xs mt-1">City Treasurer / Authorized Personnel</p>
+                                </div>
+                            </div>
+
                             <div className="flex justify-end gap-2 print:hidden">
-                                <Button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700">🖨️ Print Summary</Button>
+                                <Button onClick={handlePreview} className="bg-blue-600 hover:bg-blue-700">🖨️ Print Summary</Button>
                                 <Button variant="outline" onClick={() => setSelectedItem(null)}>Close</Button>
                             </div>
                         </div>

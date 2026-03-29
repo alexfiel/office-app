@@ -19,6 +19,11 @@ export async function GET(req: Request) {
         const query = searchParams.get("query");
         const tdNo = searchParams.get("taxdecnumber");
         const pin = searchParams.get("pin");
+        
+        // Pagination params
+        const page = parseInt(searchParams.get("page") || "1");
+        const limit = parseInt(searchParams.get("limit") || "10");
+        const skip = (page - 1) * limit;
 
         // BASE FILTER: ALWAYS SCOPE TO CURRENT USER
         const whereClause: any = {};
@@ -29,6 +34,7 @@ export async function GET(req: Request) {
             whereClause.OR = [
                 { taxdecnumber: { contains: query, mode: "insensitive" } },
                 { pin: { contains: query, mode: "insensitive" } },
+                { owner: { contains: query, mode: "insensitive" } },
             ];
         } else if (tdNo || pin) {
             // SPECIFIC FIELD SEARCH (LEGACY SUPPORT)
@@ -36,13 +42,26 @@ export async function GET(req: Request) {
             if (pin) whereClause.pin = { contains: pin, mode: "insensitive" };
         }
 
-        // FETCH RECORDS (ORDERED BY TAX DEC NUMBER)
-        const taxDecs = await prisma.realProperty.findMany({
-            where: whereClause,
-            orderBy: { taxdecnumber: "asc" },
-        });
+        // FETCH DATA AND TOTAL COUNT IN PARALLEL
+        const [taxDecs, totalCount] = await Promise.all([
+            prisma.realProperty.findMany({
+                where: whereClause,
+                orderBy: { taxdecnumber: "asc" },
+                skip: skip,
+                take: limit,
+            }),
+            prisma.realProperty.count({ where: whereClause }),
+        ]);
 
-        return NextResponse.json(taxDecs, { status: 200 });
+        return NextResponse.json({
+            data: taxDecs,
+            pagination: {
+                total: totalCount,
+                page,
+                limit,
+                totalPages: Math.ceil(totalCount / limit),
+            }
+        }, { status: 200 });
 
     } catch (error: any) {
         console.error('ERROR FETCHING TAX DEC OR PIN:', error);

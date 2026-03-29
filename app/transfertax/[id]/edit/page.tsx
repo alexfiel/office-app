@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import EditTransferTaxForm from "@/components/transfertax/EditTransferTaxForm";
+import EditTransferTaxView from "@/components/transfertax/EditTransferTaxView";
 
 export default async function EditTransferTaxPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth();
@@ -61,11 +61,9 @@ export default async function EditTransferTaxPage({ params }: { params: Promise<
             <AppSidebar variant="inset" user={user} />
             <SidebarInset>
                 <SiteHeader />
-                <div className="flex flex-1 flex-col p-6 lg:p-10">
-                    <div className="border rounded-lg p-6 bg-white shadow-sm">
-                        {/* We use JSON.parse(JSON.stringify) to pass data cleanly back to the Client Component */}
-                        <EditTransferTaxForm initialData={JSON.parse(JSON.stringify(data))} />
-                    </div>
+                <div className="flex flex-1 flex-col p-6 lg:p-10 relative">
+                    {/* We use JSON.parse(JSON.stringify) to pass data cleanly back to the Client Component */}
+                    <EditTransferTaxView initialData={JSON.parse(JSON.stringify(data))} />
                 </div>
             </SidebarInset>
         </SidebarProvider>

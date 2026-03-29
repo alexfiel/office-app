@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { Field } from "@/components/ui/field"
 import { toast } from "sonner"
 import dynamic from "next/dynamic"
 import QRCode from "react-qr-code"
+import { useSession } from "next-auth/react"
 
 const UploadForm = dynamic(() => import("../uploadForm.tsx/page"), { ssr: false })
 
@@ -25,7 +26,8 @@ type RealPropertyInfo = {
     tctOct: string;
 }
 
-export default function TransferTaxForm() {
+export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any) => void }) {
+    const { data: session } = useSession()
     const [activeTab, setActiveTab] = useState("documents")
 
     const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
@@ -45,8 +47,16 @@ export default function TransferTaxForm() {
     const [consideration, setConsideration] = useState<number | "">("")
 
     const [searchTerm, setSearchTerm] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [searchResults, setSearchResults] = useState<RealPropertyInfo[]>([])
     const [isLoading, setIsLoading] = useState(false)
+    
+    // Pagination state
+    const [page, setPage] = useState(1)
+    const [limit, setLimit] = useState(10)
+    const [totalPages, setTotalPages] = useState(1)
+    const [total, setTotal] = useState(0)
+
     const [cart, setCart] = useState<RealPropertyInfo[]>([])
     const [parties, setParties] = useState({ prevOwner: "", newOwner: "" })
     const [isSuccess, setIsSuccess] = useState(false)
@@ -58,27 +68,49 @@ export default function TransferTaxForm() {
         }
     }
 
-    const handleSearch = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!searchTerm) return
+    // Debounce effect
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm)
+            setPage(1) // Reset to page 1 on new search
+        }, 500)
+        return () => clearTimeout(timer)
+    }, [searchTerm])
+
+    const fetchProperties = async (currentPage: number, search: string) => {
+        if (!search && searchResults.length === 0) return
 
         setIsLoading(true)
         try {
-            const queryParam = `?query=${encodeURIComponent(searchTerm)}`
-            const res = await fetch(`/api/realproperty${queryParam}`)
+            const queryParam = search ? `&query=${encodeURIComponent(search)}` : ''
+            const res = await fetch(`/api/realproperty?page=${currentPage}&limit=${limit}${queryParam}`)
+            
             if (!res.ok) throw new Error("Failed to search")
-            const data: RealPropertyInfo[] = await res.json()
-            setSearchResults(data)
-            if (data.length === 0) {
+            
+            const result = await res.json()
+            setSearchResults(result.data)
+            setTotal(result.pagination.total)
+            setTotalPages(result.pagination.totalPages)
+
+            if (search && result.data.length === 0) {
                 toast.error("No properties found.")
-            } else {
-                toast.success(`Found ${data.length} properties.`)
             }
         } catch (error: unknown) {
             toast.error(error instanceof Error ? error.message : "Failed to search")
         } finally {
             setIsLoading(false)
         }
+    }
+
+    useEffect(() => {
+        if (debouncedSearch) {
+            fetchProperties(page, debouncedSearch)
+        }
+    }, [page, debouncedSearch, limit])
+
+    const handleSearch = async (e: React.FormEvent) => {
+        e.preventDefault()
+        fetchProperties(1, searchTerm)
     }
 
     const addToCart = (property: RealPropertyInfo) => {
@@ -273,6 +305,48 @@ export default function TransferTaxForm() {
     };
 
 
+    const handlePreview = () => {
+        if (onPreview) {
+            onPreview({
+                transferee: parties.newOwner || "JUAN DELA CRUZ",
+                transferor: parties.prevOwner || "JUAN DELA CRUZ",
+                computationDate: new Date().toLocaleDateString(),
+                validityDate: validityDate || new Date().toLocaleDateString(),
+                transactionId: savedTxId || "PREVIEW",
+                qrValue: `ID: ${savedTxId || "PREVIEW"}\nTransferee: ${parties.newOwner || "JUAN DELA CRUZ"}\nAmount Due: P ${totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nValidity Date: ${validityDate || new Date().toLocaleDateString()}`,
+                properties: cart.map(p => ({
+                    tdNo: p.taxdecnumber,
+                    lotNo: p.lotNumber,
+                    marketValue: p.marketValue
+                })),
+                totalMarketValue,
+                documentInfo: {
+                    type: documentInfo.type || "Deed of Absolute Sale",
+                    docNo: documentInfo.docNo || "123456789",
+                    pageNo: documentInfo.pageNo || "123456789",
+                    bookNo: documentInfo.bookNo || "123456789",
+                    notarizedBy: documentInfo.notarizedBy || "ATTY. JUAN DE LA CRUZ",
+                },
+                transactionInfo: {
+                    type: transactionType || "DEED OF ABSOLUTE SALE",
+                    consideration: transactionType === "Deed of Sale" ? Number(consideration || 0) : 0,
+                    daysFromNotarial,
+                    validityDate: validityDate || new Date().toLocaleDateString(),
+                },
+                computation: {
+                    taxBase,
+                    taxRate: 0.75,
+                    basicTaxDue: taxDue,
+                    surcharge,
+                    interest,
+                    totalAmountDue,
+                },
+                preparedBy: (session?.user as any)?.name || "USER",
+                preparedByRole: (session?.user as any)?.role || "ROLE",
+            });
+        }
+    };
+
     //----------------- END OF HANDLE SUBMIT ------------------
     return (
         <div className="mx-auto max-w-5xl space-y-6 print:space-y-0 print:m-0 print:p-0">
@@ -281,11 +355,11 @@ export default function TransferTaxForm() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className={`grid w-full grid-cols-6 gap-2 print:hidden ${isSuccess ? 'hidden' : ''}`}>
                     <TabsTrigger value="documents">1. Documents</TabsTrigger>
-                    <TabsTrigger value="transaction">2. Transaction</TabsTrigger>
-                    <TabsTrigger value="search">3. Search</TabsTrigger>
-                    <TabsTrigger value="cart">4. Market Value</TabsTrigger>
-                    <TabsTrigger value="parties">5. Parties</TabsTrigger>
-                    <TabsTrigger value="summary">6. Summary</TabsTrigger>
+                    <TabsTrigger value="transaction" disabled={!(documentInfo.type && documentInfo.date)}>2. Transaction</TabsTrigger>
+                    <TabsTrigger value="search" disabled={!(documentInfo.type && documentInfo.date && transactionType)}>3. Search</TabsTrigger>
+                    <TabsTrigger value="cart" disabled={!(documentInfo.type && documentInfo.date && transactionType)}>4. Market Value</TabsTrigger>
+                    <TabsTrigger value="parties" disabled={!(documentInfo.type && documentInfo.date && transactionType && cart.length > 0)}>5. Parties</TabsTrigger>
+                    <TabsTrigger value="summary" disabled={!(documentInfo.type && documentInfo.date && transactionType && cart.length > 0 && parties.prevOwner && parties.newOwner)}>6. Summary</TabsTrigger>
                 </TabsList>
 
                 {/* Tab 1: Documents */}
@@ -369,7 +443,7 @@ export default function TransferTaxForm() {
                             */}
                         </CardContent>
                         <CardFooter className="flex justify-end">
-                            <Button onClick={() => setActiveTab("transaction")}>Next: Transaction Type</Button>
+                            <Button onClick={() => setActiveTab("transaction")} disabled={!(documentInfo.type && documentInfo.date)}>Next: Transaction Type</Button>
                         </CardFooter>
                     </Card>
                 </TabsContent>
@@ -383,7 +457,9 @@ export default function TransferTaxForm() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex flex-col gap-3">
-                                {["Deed of Sale", "Deed of Donation", "Deed of Extrajudicial Settlement"].map((type) => (
+                                {["Deed of Sale", "Deed of Donation", "Deed of Extrajudicial Settlement"]
+                                    .filter(type => transactionType ? type === transactionType : true)
+                                    .map((type) => (
                                     <label key={type} className="flex items-center gap-2 cursor-pointer border p-4 rounded-md hover:bg-muted/50 transition-colors">
                                         <input
                                             type="radio"
@@ -397,6 +473,16 @@ export default function TransferTaxForm() {
                                     </label>
                                 ))}
                             </div>
+                            {transactionType && (
+                                <div className="flex justify-end">
+                                    <Button variant="ghost" size="sm" onClick={() => {
+                                        setTransactionType("")
+                                        setConsideration("")
+                                    }} className="text-xs text-muted-foreground underline">
+                                        Change Transaction Type
+                                    </Button>
+                                </div>
+                            )}
 
                             {transactionType === "Deed of Sale" && (
                                 <div className="mt-4 p-4 border rounded-md bg-muted/20">
@@ -427,58 +513,116 @@ export default function TransferTaxForm() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Search Property</CardTitle>
-                            <CardDescription>Search for a Tax Declaration or PIN to add to the transaction cart.</CardDescription>
+                            <CardDescription>Search for a Tax Declaration, PIN, or Owner to add to the transaction cart.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <form onSubmit={handleSearch} className="flex items-end gap-2">
-                                <Field className="flex-1 max-w-sm">
-                                    <Label>Tax Dec Number or PIN</Label>
-                                    <Input
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        placeholder="Enter TD No. or PIN"
-                                    />
-                                </Field>
-                                <Button type="submit" disabled={isLoading}>
-                                    {isLoading ? "Searching..." : "Search"}
-                                </Button>
+                            <form onSubmit={handleSearch} className="flex items-end justify-between gap-4">
+                                <div className="flex items-end gap-2 flex-1">
+                                    <Field className="flex-1 max-w-sm">
+                                        <Label>Tax Dec Number, PIN, or Owner</Label>
+                                        <Input
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            placeholder="Enter TD No., PIN, or Owner"
+                                        />
+                                    </Field>
+                                    <Button type="submit" disabled={isLoading}>
+                                        {isLoading ? "Searching..." : "Search"}
+                                    </Button>
+                                </div>
+                                <div className="text-sm font-medium text-gray-500">
+                                    Total: <span className="text-gray-900 font-bold">{total.toLocaleString()}</span>
+                                </div>
                             </form>
 
                             {searchResults.length > 0 && (
-                                <div className="mt-4 overflow-x-auto">
-                                    <table className="min-w-full border">
-                                        <thead>
-                                            <tr className="bg-muted">
-                                                <th className="border px-4 py-2 text-left">ID</th>
-                                                <th className="border px-4 py-2 text-left">TD No</th>
-                                                <th className="border px-4 py-2 text-left">PIN</th>
-                                                <th className="border px-4 py-2 text-left">Owner Name</th>
-                                                <th className="border px-4 py-2 text-left">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {searchResults.map((item) => (
-                                                <tr key={item.id}>
-                                                    <td className="border px-4 py-2">{item.id}</td>
-                                                    <td className="border px-4 py-2">{item.taxdecnumber}</td>
-                                                    <td className="border px-4 py-2">{item.pin}</td>
-                                                    <td className="border px-4 py-2">{item.owner}</td>
-                                                    <td className="border px-4 py-2 text-center">
-                                                        <Button size="sm" onClick={() => addToCart(item)}>
-                                                            Select
-                                                        </Button>
-                                                    </td>
+                                <div className="mt-4">
+                                    <div className="overflow-x-auto border rounded-xl shadow-sm">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">TD No</th>
+                                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">PIN</th>
+                                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Owner Name</th>
+                                                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-100">
+                                                {searchResults.map((item) => {
+                                                    const isAdded = cart.some(c => c.id === item.id);
+                                                    return (
+                                                    <tr key={item.id} className={`hover:bg-gray-50 ${isAdded ? 'bg-green-50/50 text-muted-foreground' : ''}`}>
+                                                        <td className="px-4 py-2 text-sm">{item.taxdecnumber}</td>
+                                                        <td className="px-4 py-2 text-sm text-gray-600">{item.pin}</td>
+                                                        <td className="px-4 py-2 text-sm text-gray-600">{item.owner}</td>
+                                                        <td className="px-4 py-2 text-right">
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant={isAdded ? "outline" : "ghost"}
+                                                                className={isAdded ? "border-green-200 text-green-700 bg-green-50" : "text-primary hover:text-primary-dark"}
+                                                                onClick={() => !isAdded && addToCart(item)}
+                                                                disabled={isAdded}
+                                                            >
+                                                                {isAdded ? "Added ✓" : "Select"}
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                )})}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="mt-4 flex items-center justify-between bg-gray-50 p-3 rounded-lg border">
+                                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                                            <span>Show</span>
+                                            <select 
+                                                value={limit} 
+                                                onChange={(e) => {
+                                                    setLimit(Number(e.target.value));
+                                                    setPage(1);
+                                                }}
+                                                className="border rounded px-1 py-0.5"
+                                            >
+                                                <option value={10}>10</option>
+                                                <option value={20}>20</option>
+                                                <option value={50}>50</option>
+                                            </select>
+                                            <span>per page</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-sm text-gray-600">
+                                                Page <strong>{page}</strong> of <strong>{totalPages}</strong>
+                                            </span>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={page === 1 || isLoading}
+                                                    onClick={() => setPage(prev => prev - 1)}
+                                                    className="bg-white"
+                                                >
+                                                    Previous
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={page === totalPages || isLoading}
+                                                    onClick={() => setPage(prev => prev + 1)}
+                                                    className="bg-white"
+                                                >
+                                                    Next
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </CardContent>
-                        <CardFooter className="flex justify-between">
+                        <CardFooter className="flex justify-between border-t pt-4">
                             <Button variant="outline" onClick={() => setActiveTab("transaction")}>Back</Button>
                             <Button onClick={() => setActiveTab("cart")} disabled={cart.length === 0}>
-                                Next: View Cart
+                                Next: View Computation
                             </Button>
                         </CardFooter>
                     </Card>
@@ -665,7 +809,7 @@ export default function TransferTaxForm() {
                                     </div>
                                     {savedTxId && (
                                         <div className="flex flex-col items-center">
-                                            <QRCode value={`ID: ${savedTxId}\nNew Owner: ${parties.newOwner}\nAmount Due: P ${totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} size={80} level="M" />
+                                            <QRCode value={`ID: ${savedTxId}\nNew Owner: ${parties.newOwner}\nAmount Due: P ${totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nValidity Date: ${validityDate || new Date().toLocaleDateString()}`} size={80} level="M" />
                                             <span className="text-[10px] mt-1 text-muted-foreground break-all max-w-[80px] text-center">{savedTxId.slice(-8)}</span>
                                         </div>
                                     )}
@@ -817,7 +961,33 @@ export default function TransferTaxForm() {
 
                             </div>
 
+                            {/* Print-only Signatures */}
+                            <div className="hidden print:grid grid-cols-2 gap-12 mt-16 pt-8 break-inside-avoid">
+                                <div>
+                                    <p className="text-xs mb-8">Prepared by:</p>
+                                    <p className="font-bold border-b border-black w-[80%] pb-1 uppercase">{(session?.user as any)?.name || "USER"}</p>
+                                    <p className="text-xs mt-1">{(session?.user as any)?.role || "Designation"}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs mb-8">Approved by:</p>
+                                    <p className="font-bold border-b border-black w-[80%] pb-1 uppercase"></p>
+                                    <p className="text-xs mt-1">City Treasurer / Authorized Personnel</p>
+                                </div>
+                            </div>
 
+                            {/* Print-only Signatures */}
+                            <div className="hidden print:grid grid-cols-2 gap-12 mt-16 pt-8 break-inside-avoid">
+                                <div>
+                                    <p className="text-xs mb-8">Prepared by:</p>
+                                    <p className="font-bold border-b border-black w-[80%] pb-1 uppercase">{(session?.user as any)?.name || "USER"}</p>
+                                    <p className="text-xs mt-1">{(session?.user as any)?.role || "Designation"}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs mb-8">Approved by:</p>
+                                    <p className="font-bold border-b border-black w-[80%] pb-1 uppercase"></p>
+                                    <p className="text-xs mt-1">City Treasurer / Authorized Personnel</p>
+                                </div>
+                            </div>
 
                         </CardContent>
                         {/* Tab 6: Summary Footer */}
@@ -825,14 +995,20 @@ export default function TransferTaxForm() {
                             {!isSuccess ? (
                                 <>
                                     <Button variant="outline" onClick={() => setActiveTab("parties")}>Back</Button>
-                                    <Button onClick={handleSubmit} disabled={isLoading} className="min-w-[150px]">
-                                        {isLoading ? "Saving..." : "Submit Transaction"}
-                                    </Button>
+                                    <div className="space-x-2">
+                                        <Button variant="outline" onClick={handlePreview}>👁️ Preview Invoice</Button>
+                                        <Button onClick={handleSubmit} disabled={isLoading} className="min-w-[150px]">
+                                            {isLoading ? "Saving..." : "Submit Transaction"}
+                                        </Button>
+                                    </div>
                                 </>
                             ) : (
                                 <>
                                     <Button variant="outline" onClick={handleReset}>Start New Transaction</Button>
-                                    <Button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 min-w-[150px]">🖨️ Print PDF</Button>
+                                    <div className="space-x-2">
+                                        <Button variant="outline" onClick={handlePreview}>👁️ Preview Invoice</Button>
+                                        <Button onClick={handlePreview} className="bg-blue-600 hover:bg-blue-700 min-w-[150px]">🖨️ Print PDF</Button>
+                                    </div>
                                 </>
                             )}
                         </CardFooter>

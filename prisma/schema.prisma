@@ -37,12 +37,17 @@ enum Role {
 
 model RealProperty {
   id                 String               @id @default(cuid())
+  objid              String               @unique
   pin                String
-  owner              String
   taxdecnumber       String
-  tctOct             String
-  location           String
-  lotNumber          String
+  owner              String
+  rputype            String
+  barangay           String
+  classcode          String
+  lotNumber          String?
+  blockNumber        String?
+  surveyno           String?
+  tctOct             String?
   area               Float
   marketValue        Decimal
   createdAt          DateTime             @default(now())

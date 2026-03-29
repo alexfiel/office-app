@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import QRCode from "react-qr-code"
+import { useSession } from "next-auth/react"
 
 const UploadForm = dynamic(() => import("../uploadForm.tsx/page"), { ssr: false })
 
@@ -26,8 +27,9 @@ type RealPropertyInfo = {
     tctOct: string;
 }
 
-export default function EditTransferTaxForm({ initialData }: { initialData: any }) {
+export default function EditTransferTaxForm({ initialData, onPreview }: { initialData: any, onPreview?: (data: any) => void }) {
     const router = useRouter();
+    const { data: session } = useSession();
     const [activeTab, setActiveTab] = useState("documents")
     const [isLoading, setIsLoading] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
@@ -247,6 +249,48 @@ export default function EditTransferTaxForm({ initialData }: { initialData: any 
         }
     };
 
+    const handlePreview = () => {
+        if (onPreview) {
+            onPreview({
+                transferee: parties.newOwner || "JUAN DELA CRUZ",
+                transferor: parties.prevOwner || "JUAN DELA CRUZ",
+                computationDate: new Date().toLocaleDateString(),
+                validityDate: validityDate || new Date().toLocaleDateString(),
+                transactionId: initialData.id || "PREVIEW",
+                qrValue: `ID: ${initialData.id || "PREVIEW"}\nTransferee: ${parties.newOwner || "JUAN DELA CRUZ"}\nAmount Due: P ${totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nValidity Date: ${validityDate || new Date().toLocaleDateString()}`,
+                properties: cart.map(p => ({
+                    tdNo: p.taxdecnumber,
+                    lotNo: p.lotNumber,
+                    marketValue: p.marketValue
+                })),
+                totalMarketValue,
+                documentInfo: {
+                    type: documentInfo.type || "Deed of Absolute Sale",
+                    docNo: documentInfo.docNo || "123456789",
+                    pageNo: documentInfo.pageNo || "123456789",
+                    bookNo: documentInfo.bookNo || "123456789",
+                    notarizedBy: documentInfo.notarizedBy || "ATTY. JUAN DE LA CRUZ",
+                },
+                transactionInfo: {
+                    type: transactionType || "DEED OF ABSOLUTE SALE",
+                    consideration: transactionType === "Deed of Sale" ? Number(consideration || 0) : 0,
+                    daysFromNotarial,
+                    validityDate: validityDate || new Date().toLocaleDateString(),
+                },
+                computation: {
+                    taxBase,
+                    taxRate: 0.75,
+                    basicTaxDue: taxDue,
+                    surcharge,
+                    interest,
+                    totalAmountDue,
+                },
+                preparedBy: (session?.user as any)?.name || "USER",
+                preparedByRole: (session?.user as any)?.role || "ROLE",
+            });
+        }
+    };
+
     //----------------- END OF HANDLE SUBMIT ------------------
     return (
         <div className="mx-auto max-w-5xl space-y-6 print:space-y-0 print:m-0 print:p-0">
@@ -255,11 +299,11 @@ export default function EditTransferTaxForm({ initialData }: { initialData: any 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className={`grid w-full grid-cols-6 gap-2 print:hidden ${isSuccess ? 'hidden' : ''}`}>
                     <TabsTrigger value="documents">1. Documents</TabsTrigger>
-                    <TabsTrigger value="transaction">2. Transaction</TabsTrigger>
-                    <TabsTrigger value="search">3. Search</TabsTrigger>
-                    <TabsTrigger value="cart">4. Market Value</TabsTrigger>
-                    <TabsTrigger value="parties">5. Parties</TabsTrigger>
-                    <TabsTrigger value="summary">6. Summary</TabsTrigger>
+                    <TabsTrigger value="transaction" disabled={!(documentInfo.type && documentInfo.date)}>2. Transaction</TabsTrigger>
+                    <TabsTrigger value="search" disabled={!(documentInfo.type && documentInfo.date && transactionType)}>3. Search</TabsTrigger>
+                    <TabsTrigger value="cart" disabled={!(documentInfo.type && documentInfo.date && transactionType)}>4. Market Value</TabsTrigger>
+                    <TabsTrigger value="parties" disabled={!(documentInfo.type && documentInfo.date && transactionType && cart.length > 0)}>5. Parties</TabsTrigger>
+                    <TabsTrigger value="summary" disabled={!(documentInfo.type && documentInfo.date && transactionType && cart.length > 0 && parties.prevOwner && parties.newOwner)}>6. Summary</TabsTrigger>
                 </TabsList>
 
                 {/* Tab 1: Documents */}
@@ -329,7 +373,7 @@ export default function EditTransferTaxForm({ initialData }: { initialData: any 
                             )}
                         </CardContent>
                         <CardFooter className="flex justify-end">
-                            <Button onClick={() => setActiveTab("transaction")}>Next: Transaction Type</Button>
+                            <Button onClick={() => setActiveTab("transaction")} disabled={!(documentInfo.type && documentInfo.date)}>Next: Transaction Type</Button>
                         </CardFooter>
                     </Card>
                 </TabsContent>
@@ -343,7 +387,9 @@ export default function EditTransferTaxForm({ initialData }: { initialData: any 
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex flex-col gap-3">
-                                {["Deed of Sale", "Deed of Donation", "Deed of Extrajudicial Settlement"].map((type) => (
+                                {["Deed of Sale", "Deed of Donation", "Deed of Extrajudicial Settlement"]
+                                    .filter(type => transactionType ? type === transactionType : true)
+                                    .map((type) => (
                                     <label key={type} className="flex items-center gap-2 cursor-pointer border p-4 rounded-md hover:bg-muted/50 transition-colors">
                                         <input
                                             type="radio"
@@ -357,6 +403,16 @@ export default function EditTransferTaxForm({ initialData }: { initialData: any 
                                     </label>
                                 ))}
                             </div>
+                            {transactionType && (
+                                <div className="flex justify-end">
+                                    <Button variant="ghost" size="sm" onClick={() => {
+                                        setTransactionType("")
+                                        setConsideration("")
+                                    }} className="text-xs text-muted-foreground underline">
+                                        Change Transaction Type
+                                    </Button>
+                                </div>
+                            )}
 
                             {transactionType === "Deed of Sale" && (
                                 <div className="mt-4 p-4 border rounded-md bg-muted/20">
@@ -417,19 +473,27 @@ export default function EditTransferTaxForm({ initialData }: { initialData: any 
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {searchResults.map((item) => (
-                                                <tr key={item.id}>
+                                            {searchResults.map((item) => {
+                                                const isAdded = cart.some(c => c.id === item.id);
+                                                return (
+                                                <tr key={item.id} className={isAdded ? "bg-green-50/50 text-muted-foreground" : ""}>
                                                     <td className="border px-4 py-2">{item.id}</td>
                                                     <td className="border px-4 py-2">{item.taxdecnumber}</td>
                                                     <td className="border px-4 py-2">{item.pin}</td>
                                                     <td className="border px-4 py-2">{item.owner}</td>
                                                     <td className="border px-4 py-2 text-center">
-                                                        <Button size="sm" onClick={() => addToCart(item)}>
-                                                            Select
+                                                        <Button 
+                                                            size="sm" 
+                                                            onClick={() => !isAdded && addToCart(item)}
+                                                            disabled={isAdded}
+                                                            variant={isAdded ? "outline" : "default"}
+                                                            className={isAdded ? "border-green-200 text-green-700 bg-green-50" : ""}
+                                                        >
+                                                            {isAdded ? "Added ✓" : "Select"}
                                                         </Button>
                                                     </td>
                                                 </tr>
-                                            ))}
+                                            )})}
                                         </tbody>
                                     </table>
                                 </div>
@@ -749,19 +813,39 @@ export default function EditTransferTaxForm({ initialData }: { initialData: any 
                                 </div>
                             </div>
 
+                            {/* Print-only Signatures */}
+                            <div className="hidden print:grid grid-cols-2 gap-12 mt-16 pt-8 break-inside-avoid">
+                                <div>
+                                    <p className="text-xs mb-8">Prepared by:</p>
+                                    <p className="font-bold border-b border-black w-[80%] pb-1 uppercase">{(session?.user as any)?.name || "USER"}</p>
+                                    <p className="text-xs mt-1">{(session?.user as any)?.role || "Designation"}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs mb-8">Approved by:</p>
+                                    <p className="font-bold border-b border-black w-[80%] pb-1 uppercase"></p>
+                                    <p className="text-xs mt-1">City Treasurer / Authorized Personnel</p>
+                                </div>
+                            </div>
+
                         </CardContent>
                         <CardFooter className="flex justify-between print:hidden">
                             {!isSuccess ? (
                                 <>
                                     <Button variant="outline" onClick={() => setActiveTab("parties")}>Back</Button>
-                                    <Button onClick={handleSubmit} disabled={isLoading} className="min-w-[150px]">
-                                        {isLoading ? "Updating..." : "Update Transaction"}
-                                    </Button>
+                                    <div className="space-x-2">
+                                        <Button variant="outline" onClick={handlePreview}>👁️ Preview Invoice</Button>
+                                        <Button onClick={handleSubmit} disabled={isLoading} className="min-w-[150px]">
+                                            {isLoading ? "Updating..." : "Update Transaction"}
+                                        </Button>
+                                    </div>
                                 </>
                             ) : (
                                 <>
                                     <Button variant="outline" onClick={() => router.push("/viewTransferTaxList")}>Back to List</Button>
-                                    <Button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 min-w-[150px]">🖨️ Print PDF</Button>
+                                    <div className="space-x-2">
+                                        <Button variant="outline" onClick={handlePreview}>👁️ Preview Invoice</Button>
+                                        <Button onClick={handlePreview} className="bg-blue-600 hover:bg-blue-700 min-w-[150px]">🖨️ Print PDF</Button>
+                                    </div>
                                 </>
                             )}
                         </CardFooter>
