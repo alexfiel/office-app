@@ -34,6 +34,7 @@ type TransferTaxRecord = {
         documentNumber?: string;
         documentType?: string;
         notarizedBy?: string;
+        notarialDate?: string;
     };
     user?: {
         name: string;
@@ -74,6 +75,7 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
                     pageNo: parsedPageNo,
                     bookNo: parsedBookNo,
                     notarizedBy: selectedItem.notarialDocument?.notarizedBy || "N/A",
+                    date: selectedItem.notarialDocument?.notarialDate ? new Date(selectedItem.notarialDocument.notarialDate).toLocaleDateString() : "N/A",
                 },
                 transactionInfo: {
                     type: selectedItem.transactionType,

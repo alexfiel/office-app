@@ -270,6 +270,7 @@ export default function EditTransferTaxForm({ initialData, onPreview }: { initia
                     pageNo: documentInfo.pageNo || "123456789",
                     bookNo: documentInfo.bookNo || "123456789",
                     notarizedBy: documentInfo.notarizedBy || "ATTY. JUAN DE LA CRUZ",
+                    date: documentInfo.date || new Date().toLocaleDateString(),
                 },
                 transactionInfo: {
                     type: transactionType || "DEED OF ABSOLUTE SALE",

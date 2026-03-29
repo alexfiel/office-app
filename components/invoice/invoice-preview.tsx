@@ -28,10 +28,10 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
             });
             const margin = 12.7; // 0.5 inches in mm
             const pageHeight = pdf.internal.pageSize.getHeight();
-            
+
             const printableWidthMM = pdfWidth - (2 * margin);
             const printableHeightMM = pageHeight - (2 * margin);
-            
+
             const scale = img.width / printableWidthMM;
             const pixelHeightPerPage = printableHeightMM * scale;
 
@@ -47,24 +47,24 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
 
             while (remainingHeight > 0) {
                 if (!isFirstPage) pdf.addPage();
-                
+
                 const sliceHeight = Math.min(pixelHeightPerPage, remainingHeight);
                 const sliceCanvas = document.createElement("canvas");
                 sliceCanvas.width = canvas.width;
                 sliceCanvas.height = sliceHeight;
                 const sliceCtx = sliceCanvas.getContext("2d");
-                
+
                 sliceCtx?.drawImage(
-                    canvas, 
-                    0, currentY, canvas.width, sliceHeight, 
+                    canvas,
+                    0, currentY, canvas.width, sliceHeight,
                     0, 0, sliceCanvas.width, sliceHeight
                 );
-                
+
                 const sliceDataUrl = sliceCanvas.toDataURL("image/png");
                 const sliceHeightMM = sliceHeight / scale;
-                
+
                 pdf.addImage(sliceDataUrl, 'PNG', margin, margin, printableWidthMM, sliceHeightMM);
-                
+
                 remainingHeight -= sliceHeight;
                 currentY += sliceHeight;
                 isFirstPage = false;
@@ -93,6 +93,7 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
             pageNo: "123456789",
             bookNo: "123456789",
             notarizedBy: "ATTY. JUAN DE LA CRUZ",
+            notarizedDate: "12/25/2026",
         },
         transactionInfo: {
             type: "DEED OF ABSOLUTE SALE",
@@ -200,6 +201,7 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
                                 <p className="text-sm text-muted-foreground">Page No: {invoice.documentInfo.pageNo || "N/A"}</p>
                                 <p className="text-sm text-muted-foreground">Book No: {invoice.documentInfo.bookNo || "N/A"}</p>
                                 <p className="text-sm text-muted-foreground">Notarized By: {invoice.documentInfo.notarizedBy || "N/A"}</p>
+                                <p className="text-sm text-muted-foreground">Date: {invoice.documentInfo.date || "N/A"}</p>
 
                             </div>
                             <div>
