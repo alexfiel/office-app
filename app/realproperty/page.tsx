@@ -4,7 +4,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { AddPropertyDetails } from "@/components/addPropertyDetails"
-import { SavedPropertyDetails } from "@/components/savedPropertyDetails"
+
 
 export default async function RealPropertyPage() {
   const session = await auth();
@@ -38,7 +38,7 @@ export default async function RealPropertyPage() {
           </div>
           <div className="flex-1 space-y-4">
             <AddPropertyDetails />
-            <SavedPropertyDetails />
+
           </div>
         </div>
       </SidebarInset>

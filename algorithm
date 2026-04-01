@@ -1,0 +1,74 @@
+Algorithm for Complex Transfer Tax Computation for complex 
+
+create a function that will be called by the system to compute the transfer tax
+
+
+Deed of Absolute Sale on a Portion of Land
+
+Requirements:
+1. Owner of the property are all alive and signed the notarized document
+    User add the following information:
+        Notarial Documents such as Doc No., Page No., Book No., Notarized By, Notarized Date
+        Transaction Info such as Type, Consideration, Days From Notarial
+2. search for the property in the database
+3. if the property is found in the database, get the following information:
+    Owner Name
+    tax dec number
+    lot number 
+    area 
+    market value
+    assessed value
+4. Add the data to the transaction list temporary storage (cookies) for computation
+5. User select in the transaction list the property that will be included in the computation
+6. A prompt will be shown asking for the following information:
+    how many area or sq.m. is being transferred
+    compute the new market value of the portion = market value / area * area being transferred
+    assign new lot number for the portion
+    assign new tax dec number for the portion
+7. Add the portion to the transaction list for computation
+8. Add the parties involved such as transferee and transferor
+9. User will input the consideration amount base on the notarized document
+10. Compute the transfer tax for the portion
+11. Save the computaion to the transafer tax list 
+12. User can print the computation sheet
+
+-- end of file --
+
+Deed of Extrajudicial Settlement 
+
+1. Search for the property in the database
+2. If found get the following information:
+    Owner Name
+    tax dec number
+    lot number 
+    area 
+    market value
+3. Determine among the owners who are deceased 
+4. In the owner list to determine multiple owner, the system will count the number of owner by the ';' separator
+    User can select the owner who are deceased and the system will compute the share of the deceased owner
+5. To compute the share of the of the deceased owner, the system will divide the market value by the number of owners
+6. System will add the share of the deceased owner to the transferee
+7. User will click the add to computation button to add the property to the transaction list for computation
+8. System will loop back to step 2 if the user wants to add more properties to the transaction list for computation
+9. System will update the owner of the properties transferred to heirs and remove the deceased owner from the owner list
+10. System will compute the transfer tax for the share of the deceased owner
+11. System will generate report for the computation of the transfer tax for the share of the deceased owner
+
+Sub computation for extrajudicial settlement - with Deed of Sale on a Portion of Land
+1. System will select from the previous computation the property that will be included in the computation
+2. User will select the property/ies that will be included in the computation
+3. System will compute the transfer tax base on the market value of the portion or consideration whichever is higher
+4. use the rate of 75% of 1 % = 0.0075
+5. System will generate report for the computation of the transfer tax for the extradjudicial settlement with simultaneous of sale
+
+
+Sub Computation of extrajudicial settlement with waiver of rights on a portion of land
+1. System will select from the previous computation the property that will be included in the computation
+2. Determine from the owner list who will waive their rights
+3. transfer the rights of the waiver to the transferee
+4. compute transfertax 
+5. System will generate report 
+
+
+
+    

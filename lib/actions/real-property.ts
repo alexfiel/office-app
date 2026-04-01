@@ -19,8 +19,13 @@ export async function createRealProperty(prevState: any, formData: FormData) {
         // These were missing and caused the error:
         taxdecnumber: formData.get("taxdecnumber") as string,
         tctOct: formData.get("tctOct") as string,
-        location: formData.get("location") as string,
+        barangay: formData.get("location") as string, // Map form 'location' to schema 'barangay'
         lotNumber: formData.get("lotNumber") as string,
+
+        // Add required missing fields
+        objid: crypto.randomUUID(), // Generate a unique objid
+        rputype: "Unknown", // Default or extract from form if added later
+        classcode: "Unknown", // Default or extract from form if added later
 
         // Numbers/Decimals
         area: Number(formData.get("area")),
@@ -39,9 +44,10 @@ export async function createRealProperty(prevState: any, formData: FormData) {
   }
 }
 
-export async function getRealProperties() {
+export async function getRealProperties(limit: number = 100) {
   try {
     const properties = await prisma.realProperty.findMany({
+      take: limit,
       orderBy: {
         createdAt: 'desc'
       }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -62,6 +63,14 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
     const [isSuccess, setIsSuccess] = useState(false)
     const [savedTxId, setSavedTxId] = useState<string | null>(null)
 
+    // Portion Modal States
+    const [isPortionModalOpen, setIsPortionModalOpen] = useState(false)
+    const [selectedPropertyForCart, setSelectedPropertyForCart] = useState<RealPropertyInfo | null>(null)
+    const [transferMode, setTransferMode] = useState<"whole" | "portion">("whole")
+    const [portionArea, setPortionArea] = useState<number | "">("")
+    const [portionLotNumber, setPortionLotNumber] = useState("")
+    const [portionTaxDec, setPortionTaxDec] = useState("")
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             setDocuments(Array.from(e.target.files))
@@ -115,17 +124,73 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
 
     const addToCart = (property: RealPropertyInfo) => {
         if (cart.find(item => item.id === property.id)) {
-            toast.warning("Property is already in the cart")
+            toast.warning("Whole property is already in the cart")
             return
         }
-        setCart([...cart, property])
+        
+        setSelectedPropertyForCart(property)
+        setTransferMode("whole")
+        setPortionArea("")
+        setPortionLotNumber("")
+        setPortionTaxDec(`${property.taxdecnumber}-PORTION`)
+        setIsPortionModalOpen(true)
+    }
 
-        if (cart.length === 0) {
-            setParties(prev => ({ ...prev, prevOwner: property.owner }))
+    const confirmAddToCart = () => {
+        if (!selectedPropertyForCart) return;
+
+        let propertyToAdd = { ...selectedPropertyForCart };
+
+        if (transferMode === "whole") {
+            if (cart.find(item => item.id.startsWith(`${propertyToAdd.id}-portion`))) {
+                toast.error("Cannot add whole property when portions are already in the cart.");
+                return;
+            }
         }
 
-        toast.success("Added property to cart")
-    }
+        if (transferMode === "portion") {
+            const parsedArea = Number(portionArea);
+            if (!parsedArea || parsedArea <= 0 || parsedArea > propertyToAdd.area) {
+                toast.error("Invalid portion area. It must be greater than 0 and less than or equal to the total area.");
+                return;
+            }
+            if (!portionLotNumber.trim() || !portionTaxDec.trim()) {
+                toast.error("Please provide a new lot number and tax declaration number for the portion.");
+                return;
+            }
+
+            const uniqueId = `${propertyToAdd.id}-portion-${portionLotNumber}`;
+            if (cart.find(item => item.id === uniqueId || item.lotNumber === portionLotNumber)) {
+                toast.error("A portion with this lot number is already in the cart.");
+                return;
+            }
+
+            const originalMarketValue = typeof propertyToAdd.marketValue === 'string' 
+                ? parseFloat(propertyToAdd.marketValue) 
+                : propertyToAdd.marketValue;
+            
+            const newMarketValue = (originalMarketValue / propertyToAdd.area) * parsedArea;
+
+            propertyToAdd = {
+                ...propertyToAdd,
+                id: uniqueId, // Unique ID for the portion
+                area: parsedArea,
+                marketValue: newMarketValue,
+                lotNumber: portionLotNumber,
+                taxdecnumber: portionTaxDec,
+            };
+        }
+
+        setCart([...cart, propertyToAdd]);
+
+        if (cart.length === 0) {
+            setParties(prev => ({ ...prev, prevOwner: propertyToAdd.owner }));
+        }
+
+        setIsPortionModalOpen(false);
+        setSelectedPropertyForCart(null);
+        toast.success("Added property to cart");
+    };
 
     const removeFromCart = (id: string) => {
         setCart(cart.filter(item => item.id !== id))
@@ -256,7 +321,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                     validUntil: safeValidityDate,
                 },
                 transferTaxDetails: cart.map(item => ({
-                    id: item.id,
+                    id: item.id.replace(/-portion.*/, ""),
                     taxdecnumber: item.taxdecnumber,
                     lotNumber: item.lotNumber,
                     owner: item.owner,
@@ -274,8 +339,8 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
             const data = await res.json();
 
             if (!res.ok) {
-                // If Zod fails again, this will show you why in the console
-                console.error("Validation Error:", data.errors);
+                // Determine if there are specific backend validation details
+                console.error("Backend Error payload:", data);
                 throw new Error(data.error || "Failed to save transaction");
             }
 
@@ -352,6 +417,96 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
     return (
         <div className="mx-auto max-w-5xl space-y-6 print:space-y-0 print:m-0 print:p-0">
             <h1 className="text-3xl font-bold print:hidden">New Transfer Tax Transaction</h1>
+
+            {/* Portion Transfer Modal */}
+            <Dialog open={isPortionModalOpen} onOpenChange={setIsPortionModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Add Property to Computation</DialogTitle>
+                        <DialogDescription>
+                            Are you transferring the whole property or a portion of it?
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {selectedPropertyForCart && (
+                        <div className="space-y-4 py-4">
+                            <div className="flex gap-4">
+                                <label className="flex items-center gap-2">
+                                    <input 
+                                        type="radio" 
+                                        name="transferMode" 
+                                        value="whole" 
+                                        checked={transferMode === "whole"} 
+                                        onChange={() => setTransferMode("whole")} 
+                                        className="size-4"
+                                    />
+                                    <span>Whole Property</span>
+                                </label>
+                                <label className="flex items-center gap-2">
+                                    <input 
+                                        type="radio" 
+                                        name="transferMode" 
+                                        value="portion" 
+                                        checked={transferMode === "portion"} 
+                                        onChange={() => setTransferMode("portion")} 
+                                        className="size-4"
+                                    />
+                                    <span>Portion of Land</span>
+                                </label>
+                            </div>
+
+                            {transferMode === "portion" && (
+                                <div className="space-y-4 border p-4 rounded-md bg-muted/20">
+                                    <div className="text-sm text-muted-foreground mb-4">
+                                        <p>Original Area: <strong>{selectedPropertyForCart.area} sq.m.</strong></p>
+                                        <p>Original MV: <strong>P {Number(selectedPropertyForCart.marketValue).toLocaleString()}</strong></p>
+                                        <p>Previous Lot No: <strong>{selectedPropertyForCart.lotNumber}</strong></p>
+                                    </div>
+                                    <Field>
+                                        <Label>Area Transferred (sq.m.)</Label>
+                                        <Input
+                                            type="number"
+                                            value={portionArea}
+                                            onChange={(e) => setPortionArea(Number(e.target.value))}
+                                            placeholder={`Max: ${selectedPropertyForCart.area}`}
+                                        />
+                                    </Field>
+                                    <Field>
+                                        <Label>New Lot Number</Label>
+                                        <Input
+                                            value={portionLotNumber}
+                                            onChange={(e) => setPortionLotNumber(e.target.value)}
+                                            placeholder="Assign new lot number"
+                                        />
+                                    </Field>
+                                    <Field>
+                                        <Label>New Tax Dec Number</Label>
+                                        <Input
+                                            value={portionTaxDec}
+                                            onChange={(e) => setPortionTaxDec(e.target.value)}
+                                            placeholder="Assign new TD number"
+                                        />
+                                    </Field>
+                                    
+                                    {portionArea && Number(portionArea) > 0 && (
+                                        <div className="pt-2 text-sm">
+                                            New Computed Market Value: <br />
+                                            <strong className="text-primary text-lg">
+                                                P {((Number(selectedPropertyForCart.marketValue) / selectedPropertyForCart.area) * Number(portionArea)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </strong>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsPortionModalOpen(false)}>Cancel</Button>
+                        <Button onClick={confirmAddToCart}>Confirm & Add to Cart</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className={`grid w-full grid-cols-6 gap-2 print:hidden ${isSuccess ? 'hidden' : ''}`}>

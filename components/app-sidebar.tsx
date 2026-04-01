@@ -17,10 +17,12 @@ import {
   IconInnerShadowTop,
   IconInvoice,
   IconListDetails,
+  IconEyeDotted,
   IconReport,
   IconSearch,
   IconSettings,
   IconUsers,
+  IconBuildingSkyscraper,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -55,76 +57,10 @@ const data = {
       url: "#",
       icon: IconFileWord,
     },
-    {
-      title: "AddPropertyDetails",
-      url: "/realproperty",
-      icon: IconApps,
-    },
-    {
-      title: "View Property List",
-      url: "/viewPropertyList",
-      icon: IconBuilding,
-    },
-    {
-      title: "View Transfer Tax List",
-      url: "/viewTransferTaxList",
-      icon: IconListDetails,
-    },
-    {
-      title: "Compute Transfer Tax",
-      url: "/transfertax",
-      icon: IconCalculatorFilled,
-    },
+
 
   ],
-  navClouds: [
-    {
-      title: "Capture",
-      icon: IconCamera,
-      isActive: true,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Proposal",
-      icon: IconFileDescription,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Prompts",
-      icon: IconFileAi,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-  ],
+
   navSecondary: [
     {
       title: "Settings",
@@ -142,40 +78,29 @@ const data = {
       icon: IconSearch,
     },
   ],
-  documents: [
+  transfertax: [
     {
-      name: "Data Library",
-      url: "#",
-      icon: IconDatabase,
+      title: "AddPropertyDetails",
+      url: "/realproperty",
+      icon: IconApps,
     },
     {
-      name: "Reports",
-      url: "#",
-      icon: IconReport,
+      title: "View Property List",
+      url: "/viewPropertyList",
+      icon: IconBuildingSkyscraper,
     },
     {
-      name: "Word Assistant",
-      url: "#",
-      icon: IconFileWord,
-    },
-  ],
-  inventory: [
-    {
-      name: "xxx",
-      url: "#",
-      icon: IconDatabase,
+      title: "View Transfer Tax List",
+      url: "/viewTransferTaxList",
+      icon: IconEyeDotted,
     },
     {
-      name: "Reports",
-      url: "#",
-      icon: IconReport,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: IconFileWord,
+      title: "Compute Transfer Tax",
+      url: "/transfertax",
+      icon: IconCalculatorFilled,
     },
   ],
+
 }
 
 export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sidebar> & { user: any }) {
@@ -198,8 +123,7 @@ export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sideb
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
-        <NavDocuments items={data.inventory} />
+        <NavDocuments items={data.transfertax} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
