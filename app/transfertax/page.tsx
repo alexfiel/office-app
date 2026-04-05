@@ -18,6 +18,7 @@ export default async function TransferTaxPage() {
         email: session.user.email || "",
         avatar: "",
         role: (session.user as any).role || "USER",
+        designation: (session.user as any).designation || "DESIGNATION",
     };
 
     return (

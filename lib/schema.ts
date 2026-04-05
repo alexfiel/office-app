@@ -31,6 +31,7 @@ export const transferTaxSchema = z.object({
     paymentStatus: z.string().default("UNPAID"),
     transactionDate: z.coerce.date().optional(),
     validUntil: z.string().default("N/A"),
+    dayselapsed: numberField.default(0),
 });
 
 export const transferTaxDetailSchema = z.object({

@@ -19,6 +19,7 @@ model User {
   name               String
   email              String               @unique
   password           String
+  designation        String
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   role               Role                 @default(USER)
@@ -92,6 +93,7 @@ model TransferTax {
   totalamountdue     Decimal
   paymentstatus      String
   transactionDate    DateTime             @default(now())
+  dayselapsed        Int                  @default(0)
   createdAt          DateTime             @default(now())
   validuntil         String
   updatedAt          DateTime             @updatedAt
@@ -123,4 +125,13 @@ model TransferTaxDetails {
   // Added the missing User relation field
   userId         String
   user           User         @relation(fields: [userId], references: [id])
+}
+
+model OfficeSignature {
+  id        String   @id @default(cuid())
+  name      String
+  designation String
+  signatureUrl String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

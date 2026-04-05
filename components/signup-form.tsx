@@ -25,21 +25,22 @@ export function SignupForm({
     e.preventDefault()
     setError(null)
     setLoading(true)
-    
+
     const formData = new FormData(e.currentTarget)
     const name = formData.get("name") as string
     const email = formData.get("email") as string
     const password = formData.get("password") as string
+    const designation = formData.get("designation") as string
 
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, designation }),
       });
 
       const responseBody = await res.json();
-      
+
       if (!res.ok) {
         throw new Error(responseBody.message || "Failed to create account");
       }
@@ -100,13 +101,17 @@ export function SignupForm({
                 <FieldLabel htmlFor="password">Password</FieldLabel>
                 <Input id="password" name="password" type="password" required />
               </Field>
+              <Field>
+                <FieldLabel htmlFor="designation">Designation</FieldLabel>
+                <Input id="designation" name="designation" type="text" required />
+              </Field>
               {error && <p className="text-sm text-red-500">{error}</p>}
               <Field>
                 <Button type="submit" disabled={loading}>
                   {loading ? "Signing up..." : "Sign Up"}
                 </Button>
               </Field>
-              
+
               <FieldDescription className="text-center mt-4">
                 Already have an account? <a href="/login">Login</a>
               </FieldDescription>

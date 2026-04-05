@@ -215,6 +215,7 @@ export default function EditTransferTaxForm({ initialData, onPreview }: { initia
                     paymentStatus: initialData?.paymentstatus || "PENDING",
                     transactionDate: initialData?.transactionDate || new Date().toISOString(),
                     validUntil: safeValidityDate,
+                    dayselapsed: safeNum(daysFromNotarial),
                 },
                 transferTaxDetails: cart.map(item => ({
                     id: item.id,
@@ -275,7 +276,7 @@ export default function EditTransferTaxForm({ initialData, onPreview }: { initia
                 transactionInfo: {
                     type: transactionType || "DEED OF ABSOLUTE SALE",
                     consideration: transactionType === "Deed of Sale" ? Number(consideration || 0) : 0,
-                    daysFromNotarial,
+                    dayselapsed: daysFromNotarial,
                     validityDate: validityDate || new Date().toLocaleDateString(),
                 },
                 computation: {
@@ -287,7 +288,7 @@ export default function EditTransferTaxForm({ initialData, onPreview }: { initia
                     totalAmountDue,
                 },
                 preparedBy: (session?.user as any)?.name || "USER",
-                preparedByRole: (session?.user as any)?.role || "ROLE",
+                preparedByDesignation: (session?.user as any)?.designation || "DESIGNATION",
             });
         }
     };

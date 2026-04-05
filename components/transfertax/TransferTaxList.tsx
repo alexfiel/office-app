@@ -26,6 +26,7 @@ type TransferTaxRecord = {
     paymentstatus: string;
     transactionDate: string;
     validuntil: string;
+    dayselapsed: number;
     createdAt: string;
     userId: string;
     details?: any[];
@@ -80,7 +81,7 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
                 transactionInfo: {
                     type: selectedItem.transactionType,
                     consideration: selectedItem.considerationvalue,
-                    daysFromNotarial: "N/A",
+                    dayselapsed: selectedItem.dayselapsed || 0,
                     validityDate: selectedItem.validuntil,
                 },
                 computation: {
@@ -92,7 +93,7 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
                     totalAmountDue: selectedItem.totalamountdue,
                 },
                 preparedBy: currentUser?.name || "USER",
-                preparedByRole: currentUser?.role || "ROLE",
+                preparedByDesignation: currentUser?.designation || "DESIGNATION",
         });
         setSelectedItem(null);
     }
@@ -398,7 +399,7 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
                                 <div>
                                     <p className="text-xs mb-8">Prepared by:</p>
                                     <p className="font-bold border-b border-black w-[80%] pb-1 uppercase">{currentUser?.name || "USER"}</p>
-                                    <p className="text-xs mt-1">{currentUser?.role || "Designation"}</p>
+                                    <p className="text-xs mt-1">{currentUser?.designation || "Designation"}</p>
                                 </div>
                                 <div>
                                     <p className="text-xs mb-8">Approved by:</p>

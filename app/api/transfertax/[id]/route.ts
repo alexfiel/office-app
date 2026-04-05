@@ -165,6 +165,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
                 paymentstatus: transferTaxInfo.paymentStatus ?? transferTaxInfo.paymentstatus,
                 transactionDate: transferTaxInfo.transactionDate ?? new Date(),
                 validuntil: transferTaxInfo.validUntil ?? "N/A",
+                dayselapsed: transferTaxInfo.dayselapsed ?? transferTaxInfo.dayselapsed,
 
                 details: {
                     create: transferTaxDetails.map((detail: any) => ({

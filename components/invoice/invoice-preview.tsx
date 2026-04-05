@@ -99,7 +99,7 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
         transactionInfo: {
             type: "DEED OF ABSOLUTE SALE",
             consideration: 100000.00,
-            daysFromNotarial: 100,
+            dayselapsed: 100,
             validityDate: "12/25/2026",
         },
         computation: {
@@ -111,7 +111,7 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
             totalAmountDue: 123456.23,
         },
         preparedBy: "USER",
-        preparedByRole: "ROLE",
+        preparedByDesignation: "DESIGNATION",
     };
 
 
@@ -137,7 +137,7 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
                         {/* Header Image */}
                         <div className="w-full mb-8 text-center pb-6 border-b-2 border-gray-200">
                             <div className="w-full flex justify-center items-center mb-6 min-h-[100px]">
-                                <img src="/header.png" alt="Logo" style={{ width: '800px', height: '100px' }} />
+                                <img src="/header.png" alt="Logo" style={{ width: '550px', height: '80px' }} />
                             </div>
                             <h1 className="text-2xl font-black tracking-widest text-slate-800 uppercase">RPT Transfer Tax Computation Sheet</h1>
                         </div>
@@ -212,8 +212,9 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
                             </div>
                         </div>
 
-                        {/* Document & Transaction Info */}
-                        <div className="grid grid-cols-2 gap-10 mb-10 py-8 border-y border-dashed border-slate-300">
+
+                        {/* Computation and Signatures */}
+                        <div className="flex gap-10 items-stretch pb-4">
                             <div>
                                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-5">Document Details</h3>
                                 <div className="space-y-3 text-sm">
@@ -224,42 +225,18 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
                                     <div className="grid grid-cols-3"><span className="text-slate-500 font-medium tracking-wide">Notary Public</span> <span className="col-span-2 font-semibold text-slate-900">{invoice.documentInfo.notarizedBy || "N/A"}</span></div>
                                     <div className="grid grid-cols-3"><span className="text-slate-500 font-medium tracking-wide">Notarized Date</span> <span className="col-span-2 font-semibold text-slate-900">{invoice.documentInfo.notarizedDate || invoice.documentInfo.date || "N/A"}</span></div>
                                 </div>
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-5">Transaction Details</h3>
-                                <div className="space-y-3 text-sm">
-                                    <div className="grid grid-cols-3"><span className="text-slate-500 font-medium tracking-wide">Transaction</span> <span className="col-span-2 font-semibold text-slate-900">{invoice.transactionInfo.type || "N/A"}</span></div>
-                                    <div className="grid grid-cols-3"><span className="text-slate-500 font-medium tracking-wide">Consideration</span> <span className="col-span-2 font-semibold text-slate-900">₱ {Number(invoice.transactionInfo.consideration || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                                    <div className="grid grid-cols-3"><span className="text-slate-500 font-medium tracking-wide">Days Elapsed</span> <span className="col-span-2 font-semibold text-slate-900">{invoice.transactionInfo.daysFromNotarial} days</span></div>
-                                    <div className="grid grid-cols-3"><span className="text-slate-500 font-medium tracking-wide">Valid Until</span> <span className="col-span-2 font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded inline-block w-fit">{invoice.transactionInfo.validityDate}</span></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Computation and Signatures */}
-                        <div className="flex gap-10 items-stretch pb-4">
-                            <div className="w-1/2 flex flex-col justify-between pr-4">
+                                <hr className="my-5" />
                                 <div>
-                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Signatories</h3>
-
-                                    <div className="space-y-12">
-                                        <div>
-                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-8">Prepared by:</p>
-                                            <div className="border-b-2 border-slate-900 w-[85%] pb-1">
-                                                <p className="font-bold text-slate-900 text-lg uppercase truncate">{invoice.preparedBy}</p>
-                                            </div>
-                                            <p className="text-xs font-semibold text-slate-500 mt-2 truncate uppercase tracking-widest">{invoice.preparedByRole}</p>
-                                        </div>
-
-                                        <div>
-                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-8">Approved by:</p>
-                                            <div className="border-b-2 border-slate-900 w-[85%] pb-1 h-7">
-                                            </div>
-                                            <p className="text-xs font-semibold text-slate-500 mt-2 uppercase tracking-widest">City Treasurer / Authorized Personnel</p>
-                                        </div>
+                                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-5">Transaction Details</h3>
+                                    <div className="space-y-3 text-sm">
+                                        <div className="grid grid-cols-3"><span className="text-slate-500 font-medium tracking-wide">Transaction</span> <span className="col-span-2 font-semibold text-slate-900">{invoice.transactionInfo.type || "N/A"}</span></div>
+                                        <div className="grid grid-cols-3"><span className="text-slate-500 font-medium tracking-wide">Consideration</span> <span className="col-span-2 font-semibold text-slate-900">₱ {Number(invoice.transactionInfo.consideration || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                                        <div className="grid grid-cols-3"><span className="text-slate-500 font-medium tracking-wide">Days Elapsed</span> <span className="col-span-2 font-semibold text-slate-900">{invoice.transactionInfo.dayselapsed} days</span></div>
+                                        <div className="grid grid-cols-3"><span className="text-slate-500 font-medium tracking-wide">Valid Until</span> <span className="col-span-2 font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded inline-block w-fit">{invoice.transactionInfo.validityDate}</span></div>
                                     </div>
                                 </div>
                             </div>
+
 
                             <div className="w-1/2 p-7 rounded-2xl border-2 border-slate-200 bg-slate-50/80 flex flex-col justify-center shadow-inner relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-1 bg-primary h-full"></div>
@@ -289,7 +266,7 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
                                         <span className="font-bold text-slate-900">₱ {Number(invoice.computation.basicTaxDue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
 
-                                    {invoice.transactionInfo.daysFromNotarial > 60 && (
+                                    {invoice.transactionInfo.dayselapsed > 60 && (
                                         <div className="pt-3 pb-2">
                                             <div className="flex items-center gap-2 mb-3">
                                                 <span className="px-3 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-700 uppercase tracking-widest border border-red-200">Late Penalty Applied</span>
@@ -316,12 +293,40 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
                                 </div>
                             </div>
                         </div>
+                        {/* Document & Transaction Info */}
+                        <div className="grid grid-cols-2 gap-10 mb-10 py-8 border-y border-dashed border-slate-300">
+
+
+                            <div>
+                                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-8">Prepared by:</p>
+                                <div className="border-b-2 border-slate-900 w-[85%] pb-1">
+                                    <p className="font-bold text-slate-900 text-lg uppercase truncate">{invoice.preparedBy}</p>
+                                </div>
+                                <p className="text-xs font-semibold text-slate-500 mt-2 truncate uppercase tracking-widest">{invoice.preparedByDesignation}</p>
+                            </div>
+
+
+
+                            <div className="space-y-12">
+
+
+                                <div>
+                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-8">Approved by:</p>
+                                    <div className="border-b-2 border-slate-900 w-[85%] pb-1 h-7">
+                                    </div>
+                                    <p className="text-xs font-semibold text-slate-500 mt-2 uppercase tracking-widest">City Treasurer / Authorized Personnel</p>
+                                </div>
+                            </div>
+                        </div>
+
+
+
 
                     </CardContent>
                 </Card>
 
 
             </div>
-        </div>
+        </div >
     )
 }

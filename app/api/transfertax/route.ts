@@ -34,6 +34,7 @@ export async function POST(req: Request) {
                 paymentstatus: transferTaxInfo.paymentStatus,
                 transactionDate: transferTaxInfo.transactionDate ?? new Date(),
                 validuntil: transferTaxInfo.validUntil ?? "N/A",
+                dayselapsed: transferTaxInfo.dayselapsed ?? 0,
 
                 // Connect the main record to the User
                 user: { connect: { id: userId } },

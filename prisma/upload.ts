@@ -24,7 +24,7 @@ async function main() {
     // 3. Correct path to the CSV file (one level up from /prisma/)
     const filePath = path.resolve(__dirname, '../faaslist2026Current.csv');
 
-    const SYSTEM_USER_ID = 'cmn38eqoo0000eoqyqxvqbb1a';
+    const SYSTEM_USER_ID = 'cmnhfeub80000eosvjhpyoax5';
 
     if (!fs.existsSync(filePath)) {
         console.error(`File not found at: ${filePath}`);

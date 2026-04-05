@@ -51,7 +51,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [searchResults, setSearchResults] = useState<RealPropertyInfo[]>([])
     const [isLoading, setIsLoading] = useState(false)
-    
+
     // Pagination state
     const [page, setPage] = useState(1)
     const [limit, setLimit] = useState(10)
@@ -93,9 +93,9 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
         try {
             const queryParam = search ? `&query=${encodeURIComponent(search)}` : ''
             const res = await fetch(`/api/realproperty?page=${currentPage}&limit=${limit}${queryParam}`)
-            
+
             if (!res.ok) throw new Error("Failed to search")
-            
+
             const result = await res.json()
             setSearchResults(result.data)
             setTotal(result.pagination.total)
@@ -127,7 +127,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
             toast.warning("Whole property is already in the cart")
             return
         }
-        
+
         setSelectedPropertyForCart(property)
         setTransferMode("whole")
         setPortionArea("")
@@ -165,10 +165,10 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                 return;
             }
 
-            const originalMarketValue = typeof propertyToAdd.marketValue === 'string' 
-                ? parseFloat(propertyToAdd.marketValue) 
+            const originalMarketValue = typeof propertyToAdd.marketValue === 'string'
+                ? parseFloat(propertyToAdd.marketValue)
                 : propertyToAdd.marketValue;
-            
+
             const newMarketValue = (originalMarketValue / propertyToAdd.area) * parsedArea;
 
             propertyToAdd = {
@@ -318,6 +318,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                     // These fields were required by your Zod schema but missing in the UI
                     paymentStatus: "Pending",
                     transactionDate: new Date().toISOString(),
+                    dayselapsed: safeNum(daysFromNotarial),
                     validUntil: safeValidityDate,
                 },
                 transferTaxDetails: cart.map(item => ({
@@ -396,7 +397,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                 transactionInfo: {
                     type: transactionType || "DEED OF ABSOLUTE SALE",
                     consideration: transactionType === "Deed of Sale" ? Number(consideration || 0) : 0,
-                    daysFromNotarial,
+                    dayselapsed: daysFromNotarial,
                     validityDate: validityDate || new Date().toLocaleDateString(),
                 },
                 computation: {
@@ -408,7 +409,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                     totalAmountDue,
                 },
                 preparedBy: (session?.user as any)?.name || "USER",
-                preparedByRole: (session?.user as any)?.role || "ROLE",
+                preparedByDesignation: (session?.user as any)?.designation || "DESIGNATION",
             });
         }
     };
@@ -432,23 +433,23 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                         <div className="space-y-4 py-4">
                             <div className="flex gap-4">
                                 <label className="flex items-center gap-2">
-                                    <input 
-                                        type="radio" 
-                                        name="transferMode" 
-                                        value="whole" 
-                                        checked={transferMode === "whole"} 
-                                        onChange={() => setTransferMode("whole")} 
+                                    <input
+                                        type="radio"
+                                        name="transferMode"
+                                        value="whole"
+                                        checked={transferMode === "whole"}
+                                        onChange={() => setTransferMode("whole")}
                                         className="size-4"
                                     />
                                     <span>Whole Property</span>
                                 </label>
                                 <label className="flex items-center gap-2">
-                                    <input 
-                                        type="radio" 
-                                        name="transferMode" 
-                                        value="portion" 
-                                        checked={transferMode === "portion"} 
-                                        onChange={() => setTransferMode("portion")} 
+                                    <input
+                                        type="radio"
+                                        name="transferMode"
+                                        value="portion"
+                                        checked={transferMode === "portion"}
+                                        onChange={() => setTransferMode("portion")}
                                         className="size-4"
                                     />
                                     <span>Portion of Land</span>
@@ -487,7 +488,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                             placeholder="Assign new TD number"
                                         />
                                     </Field>
-                                    
+
                                     {portionArea && Number(portionArea) > 0 && (
                                         <div className="pt-2 text-sm">
                                             New Computed Market Value: <br />
@@ -578,25 +579,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                             </div>
 
                             <UploadForm onUploadSuccess={(url) => setUploadedUrl(url)} />
-                            {/*
-                            <Field className="pt-4">
-                                <Label>Upload Files (PDF)</Label>
-                                <Input
-                                    type="file"
-                                    multiple
-                                    accept=".pdf"
-                                    onChange={handleFileChange}
-                                    className="cursor-pointer"
-                                />
-                            </Field>
-                            {documents.length > 0 && (
-                                <ul className="list-disc pl-5 mt-2 space-y-1 text-sm text-muted-foreground">
-                                    {documents.map((file, i) => (
-                                        <li key={i}>{file.name} ({(file.size / 1024).toFixed(1)} KB)</li>
-                                    ))}
-                                </ul>
-                            )}
-                            */}
+
                         </CardContent>
                         <CardFooter className="flex justify-end">
                             <Button onClick={() => setActiveTab("transaction")} disabled={!(documentInfo.type && documentInfo.date)}>Next: Transaction Type</Button>
@@ -616,18 +599,18 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                 {["Deed of Sale", "Deed of Donation", "Deed of Extrajudicial Settlement"]
                                     .filter(type => transactionType ? type === transactionType : true)
                                     .map((type) => (
-                                    <label key={type} className="flex items-center gap-2 cursor-pointer border p-4 rounded-md hover:bg-muted/50 transition-colors">
-                                        <input
-                                            type="radio"
-                                            name="transaction"
-                                            value={type}
-                                            checked={transactionType === type}
-                                            onChange={(e) => setTransactionType(e.target.value)}
-                                            className="size-4"
-                                        />
-                                        <span className="font-medium">{type}</span>
-                                    </label>
-                                ))}
+                                        <label key={type} className="flex items-center gap-2 cursor-pointer border p-4 rounded-md hover:bg-muted/50 transition-colors">
+                                            <input
+                                                type="radio"
+                                                name="transaction"
+                                                value={type}
+                                                checked={transactionType === type}
+                                                onChange={(e) => setTransactionType(e.target.value)}
+                                                className="size-4"
+                                            />
+                                            <span className="font-medium">{type}</span>
+                                        </label>
+                                    ))}
                             </div>
                             {transactionType && (
                                 <div className="flex justify-end">
@@ -707,23 +690,24 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                                 {searchResults.map((item) => {
                                                     const isAdded = cart.some(c => c.id === item.id);
                                                     return (
-                                                    <tr key={item.id} className={`hover:bg-gray-50 ${isAdded ? 'bg-green-50/50 text-muted-foreground' : ''}`}>
-                                                        <td className="px-4 py-2 text-sm">{item.taxdecnumber}</td>
-                                                        <td className="px-4 py-2 text-sm text-gray-600">{item.pin}</td>
-                                                        <td className="px-4 py-2 text-sm text-gray-600">{item.owner}</td>
-                                                        <td className="px-4 py-2 text-right">
-                                                            <Button 
-                                                                size="sm" 
-                                                                variant={isAdded ? "outline" : "ghost"}
-                                                                className={isAdded ? "border-green-200 text-green-700 bg-green-50" : "text-primary hover:text-primary-dark"}
-                                                                onClick={() => !isAdded && addToCart(item)}
-                                                                disabled={isAdded}
-                                                            >
-                                                                {isAdded ? "Added ✓" : "Select"}
-                                                            </Button>
-                                                        </td>
-                                                    </tr>
-                                                )})}
+                                                        <tr key={item.id} className={`hover:bg-gray-50 ${isAdded ? 'bg-green-50/50 text-muted-foreground' : ''}`}>
+                                                            <td className="px-4 py-2 text-sm">{item.taxdecnumber}</td>
+                                                            <td className="px-4 py-2 text-sm text-gray-600">{item.pin}</td>
+                                                            <td className="px-4 py-2 text-sm text-gray-600">{item.owner}</td>
+                                                            <td className="px-4 py-2 text-right">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant={isAdded ? "outline" : "ghost"}
+                                                                    className={isAdded ? "border-green-200 text-green-700 bg-green-50" : "text-primary hover:text-primary-dark"}
+                                                                    onClick={() => !isAdded && addToCart(item)}
+                                                                    disabled={isAdded}
+                                                                >
+                                                                    {isAdded ? "Added ✓" : "Select"}
+                                                                </Button>
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
@@ -731,8 +715,8 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                     <div className="mt-4 flex items-center justify-between bg-gray-50 p-3 rounded-lg border">
                                         <div className="flex items-center gap-2 text-sm text-gray-600">
                                             <span>Show</span>
-                                            <select 
-                                                value={limit} 
+                                            <select
+                                                value={limit}
                                                 onChange={(e) => {
                                                     setLimit(Number(e.target.value));
                                                     setPage(1);
@@ -1122,7 +1106,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                 <div>
                                     <p className="text-xs mb-8">Prepared by:</p>
                                     <p className="font-bold border-b border-black w-[80%] pb-1 uppercase">{(session?.user as any)?.name || "USER"}</p>
-                                    <p className="text-xs mt-1">{(session?.user as any)?.role || "Designation"}</p>
+                                    <p className="text-xs mt-1">{(session?.user as any)?.designation || "Designation"}</p>
                                 </div>
                                 <div>
                                     <p className="text-xs mb-8">Approved by:</p>
@@ -1136,7 +1120,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                 <div>
                                     <p className="text-xs mb-8">Prepared by:</p>
                                     <p className="font-bold border-b border-black w-[80%] pb-1 uppercase">{(session?.user as any)?.name || "USER"}</p>
-                                    <p className="text-xs mt-1">{(session?.user as any)?.role || "Designation"}</p>
+                                    <p className="text-xs mt-1">{(session?.user as any)?.designation || "Designation"}</p>
                                 </div>
                                 <div>
                                     <p className="text-xs mb-8">Approved by:</p>
