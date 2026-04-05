@@ -1,3 +1,7 @@
+import FinalTaxComputation from "./finalTaxComputation";
+import ChainTransfers from "./ChainTransfers";
+import { calculateEJSTotals } from "../utils/invoiceCaculations";
+
 import { Download } from "lucide-react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
@@ -77,6 +81,8 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
         }
     };
 
+
+
     const invoice = data || {
         transferee: "JUAN DELA CRUZ",
         transferor: "JUAN DELA CRUZ",
@@ -113,6 +119,12 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
         preparedBy: "USER",
         preparedByDesignation: "DESIGNATION",
     };
+
+    const isEJS = invoice.transactionInfo.type === "EJS";
+
+    const ejsTotals = isEJS
+        ? calculateEJSTotals(invoice.ejsChain || [])
+        : null;
 
 
     return (
@@ -212,6 +224,56 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
                             </div>
                         </div>
 
+                        {invoice.ejsChain && invoice.ejsChain.length > 0 && (
+                            <div className="mb-10">
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4">Chain of Transfers</h3>
+                                <div className="space-y-4">
+                                    <div className="p-5 border-2 border-slate-200 rounded-xl bg-slate-50 relative overflow-hidden shadow-sm">
+                                        <div className="absolute top-0 left-0 w-1 bg-slate-400 h-full"></div>
+                                        <h4 className="font-bold text-slate-800 uppercase text-xs tracking-wider mb-2">FIRST TRANSFER (EJS)</h4>
+                                        <div className="grid grid-cols-2 text-sm">
+                                            <div>
+                                                <p className="text-slate-500 font-medium">Transferee:</p>
+                                                <p className="font-semibold text-slate-900">{invoice.transferee}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 font-medium">Transferor:</p>
+                                                <p className="font-semibold text-slate-900">{invoice.transferor}</p>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-slate-200 grid grid-cols-2 text-sm">
+                                            <p className="font-medium text-slate-600">Tax Base: ₱ {Number(invoice.computation.taxBase || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                            <p className="font-bold text-slate-900">Tax Due: ₱ {Number(invoice.computation.totalAmountDue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                        </div>
+                                    </div>
+
+                                    {invoice.ejsChain.map((t: any, i: number) => (
+                                        <div key={i} className="p-5 border-2 border-slate-200 rounded-xl bg-white relative overflow-hidden shadow-sm">
+                                            <div className="absolute top-0 left-0 w-1 bg-slate-400 h-full"></div>
+                                            <h4 className="font-bold text-slate-800 uppercase text-xs tracking-wider mb-2">{t.title} ({t.type})</h4>
+                                            <div className="grid grid-cols-2 text-sm">
+                                                <div>
+                                                    <p className="text-slate-500 font-medium">Transferee:</p>
+                                                    <p className="font-semibold text-slate-900">{t.transferee}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-slate-500 font-medium">Transferor:</p>
+                                                    <p className="font-semibold text-slate-900">{t.transferor}</p>
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 pt-3 border-t border-slate-200 grid grid-cols-2 text-sm">
+                                                <p className="font-mediuem text-slate-600">{t.type === "Adjudication" ? "Area Adjudicated (sq.m.)" : ""}</p>
+                                                <p className="font-mediuem text-slate-600">{t.type === "Adjudication" ? t.areaAdjudicated : ""}</p>
+                                                <p className="font-mediuem text-slate-600">{t.type === "Adjudication" ? "New Lot Number" : ""}</p>
+                                                <p className="font-mediuem text-slate-600">{t.type === "Adjudication" ? t.newLotNumber : ""}</p>
+                                                <p className="font-medium text-slate-600">Tax Base: ₱ {Number(t.taxBase || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                <p className="font-bold text-slate-900">Total Tax Due: ₱ {Number(t.totalAmountDue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Computation and Signatures */}
                         <div className="flex gap-10 items-stretch pb-4">
@@ -243,52 +305,131 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
                                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 border-b-2 border-slate-200 pb-3">Final Tax Computation</h3>
 
                                 <div className="space-y-4 text-sm z-10 relative">
-                                    <div className="flex justify-between items-center px-1">
-                                        <span className="text-slate-600 font-medium">Total Market Value:</span>
-                                        <span className="font-semibold text-slate-800">₱ {Number(invoice.totalMarketValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                    </div>
-                                    {invoice.transactionInfo.type === "Deed of Sale" && (
-                                        <div className="flex justify-between items-center px-1">
-                                            <span className="text-slate-600 font-medium">Consideration:</span>
-                                            <span className="font-semibold text-slate-800">₱ {Number(invoice.transactionInfo.consideration || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between items-center bg-white p-3 rounded-xl border-2 border-slate-100 shadow-sm">
-                                        <span className="font-black text-slate-800 uppercase tracking-wider text-xs">Tax Base:</span>
-                                        <span className="font-bold text-slate-900 text-base">₱ {Number(invoice.computation.taxBase || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center px-1">
-                                        <span className="text-slate-600 font-medium">Tax Rate:</span>
-                                        <span className="font-bold text-slate-800 bg-slate-200 px-2 py-0.5 rounded">{invoice.computation.taxRate}%</span>
-                                    </div>
-                                    <div className="flex justify-between items-center pt-4 border-t-2 border-slate-200 border-dashed px-1">
-                                        <span className="font-bold text-slate-700">Basic Tax Due:</span>
-                                        <span className="font-bold text-slate-900">₱ {Number(invoice.computation.basicTaxDue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                    </div>
 
-                                    {invoice.transactionInfo.dayselapsed > 60 && (
-                                        <div className="pt-3 pb-2">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <span className="px-3 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-700 uppercase tracking-widest border border-red-200">Late Penalty Applied</span>
+                                    {isEJS ? (
+
+                                        <>
+                                            <div className="flex justify-between items-center px-1">
+                                                <span className="text-slate-600 font-medium">Total Market Value:</span>
+                                                <span className="font-semibold text-slate-800">
+                                                    ₱ {Number(invoice.totalMarketValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
                                             </div>
-                                            <div className="space-y-2 pl-4 border-l-4 border-red-300 bg-red-50/50 py-2 rounded-r-lg">
-                                                <div className="flex justify-between text-red-800 pr-3">
-                                                    <span className="font-medium">Surcharge (25%):</span>
-                                                    <span className="font-bold">₱ {Number(invoice.computation.surcharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                                <div className="flex justify-between text-red-800 pr-3">
-                                                    <span className="font-medium">Interest (2% / month):</span>
-                                                    <span className="font-bold">₱ {Number(invoice.computation.interest || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
+
+                                            <div className="flex justify-between items-center pt-4 border-t-2 border-slate-200 border-dashed px-1">
+                                                <span className="font-bold text-slate-700">Total Tax Due:</span>
+                                                <span className="font-bold text-slate-900">
+                                                    ₱ {Number(ejsTotals?.taxDue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
                                             </div>
-                                        </div>
+
+                                            {invoice.transactionInfo.dayselapsed > 60 && (
+                                                <div className="pt-3 pb-2">
+                                                    <div className="space-y-2 pl-4 border-l-4 border-red-300 bg-red-50/50 py-2 rounded-r-lg">
+
+                                                        <div className="flex justify-between text-red-800 pr-3">
+                                                            <span className="font-medium">Total Surcharge:</span>
+                                                            <span className="font-bold">
+                                                                ₱ {Number(ejsTotals?.surcharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="flex justify-between text-red-800 pr-3">
+                                                            <span className="font-medium">Total Interest:</span>
+                                                            <span className="font-bold">
+                                                                ₱ {Number(ejsTotals?.interest || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </span>
+                                                        </div>
+
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+
+                                    ) : (
+
+                                        <>
+                                            <div className="flex justify-between items-center px-1">
+                                                <span className="text-slate-600 font-medium">Total Market Value:</span>
+                                                <span className="font-semibold text-slate-800">
+                                                    ₱ {Number(invoice.totalMarketValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+
+                                            {invoice.transactionInfo.type === "Deed of Sale" && (
+                                                <div className="flex justify-between items-center px-1">
+                                                    <span className="text-slate-600 font-medium">Consideration:</span>
+                                                    <span className="font-semibold text-slate-800">
+                                                        ₱ {Number(invoice.transactionInfo.consideration || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            <div className="flex justify-between items-center bg-white p-3 rounded-xl border-2 border-slate-100 shadow-sm">
+                                                <span className="font-black text-slate-800 uppercase tracking-wider text-xs">Tax Base:</span>
+                                                <span className="font-bold text-slate-900 text-base">
+                                                    ₱ {Number(invoice.computation.taxBase || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between items-center px-1">
+                                                <span className="text-slate-600 font-medium">Tax Rate:</span>
+                                                <span className="font-bold text-slate-800 bg-slate-200 px-2 py-0.5 rounded">
+                                                    {invoice.computation.taxRate}%
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between items-center pt-4 border-t-2 border-slate-200 border-dashed px-1">
+                                                <span className="font-bold text-slate-700">Basic Tax Due:</span>
+                                                <span className="font-bold text-slate-900">
+                                                    ₱ {Number(invoice.computation.basicTaxDue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+
+                                            {invoice.transactionInfo.dayselapsed > 60 && (
+                                                <div className="pt-3 pb-2">
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <span className="px-3 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-700 uppercase tracking-widest border border-red-200">
+                                                            Late Penalty Applied
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="space-y-2 pl-4 border-l-4 border-red-300 bg-red-50/50 py-2 rounded-r-lg">
+
+                                                        <div className="flex justify-between text-red-800 pr-3">
+                                                            <span className="font-medium">Surcharge (25%):</span>
+                                                            <span className="font-bold">
+                                                                ₱ {Number(invoice.computation.surcharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="flex justify-between text-red-800 pr-3">
+                                                            <span className="font-medium">Interest (2% / month):</span>
+                                                            <span className="font-bold">
+                                                                ₱ {Number(invoice.computation.interest || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </span>
+                                                        </div>
+
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+
                                     )}
 
                                 </div>
+
+
                                 <div className="mt-6 pt-5 border-t-2 border-slate-800 z-10 relative">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-base font-black text-slate-900 uppercase tracking-widest">Total Amount Due</span>
-                                        <span className="text-2xl font-black text-primary drop-shadow-sm">₱ {Number(invoice.computation.totalAmountDue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="text-base font-black text-slate-900 uppercase tracking-widest">Grand Total Due</span>
+                                        <span className="text-2xl font-black text-primary drop-shadow-sm">
+                                            ₱ {Number(
+                                                isEJS
+                                                    ? ejsTotals?.total || 0
+                                                    : invoice.computation.totalAmountDue || 0
+                                            ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
                                     </div>
                                 </div>
                             </div>

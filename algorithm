@@ -34,6 +34,9 @@ Requirements:
 
 -- end of file --
 
+
+create a complex computation of transfer tax for the following:
+
 Deed of Extrajudicial Settlement 
 
 1. Search for the property in the database
@@ -43,16 +46,96 @@ Deed of Extrajudicial Settlement
     lot number 
     area 
     market value
-3. Determine among the owners who are deceased 
-4. In the owner list to determine multiple owner, the system will count the number of owner by the ';' separator
+3. List all the owner of the property and determine if the owner is deceased or alive
+4. System will count the number of owner by the ';' separator
     User can select the owner who are deceased and the system will compute the share of the deceased owner
 5. To compute the share of the of the deceased owner, the system will divide the market value by the number of owners
 6. System will add the share of the deceased owner to the transferee
 7. User will click the add to computation button to add the property to the transaction list for computation
-8. System will loop back to step 2 if the user wants to add more properties to the transaction list for computation
+8. System will loop back to step 1 if the user wants to add more properties to the transaction list for computation
 9. System will update the owner of the properties transferred to heirs and remove the deceased owner from the owner list
 10. System will compute the transfer tax for the share of the deceased owner
 11. System will generate report for the computation of the transfer tax for the share of the deceased owner
+
+    Sample Output:
+
+    Republic of the Philippines
+    Province of Bohol
+    City Of Tagbilaran
+
+    OFFICE OF THE CITY TREAUSURER
+
+    TRANSFERTAX COMPUTATION SHEET
+
+FIRST TRANSFER
+    Transferee: Heirs of Y
+    Transferror: Y
+
+    Property Details:
+        Tax Dec No: 01-0002B-0212
+        Lot No: 1-B-C-1
+        Area: 1000
+        Market Value: 1000000
+    
+    Transfertax Computation:
+        Tax Base: 1000000
+        Tax Rate: 0.75%
+        Basic Tax Due: 7,500.00
+
+SECOND TRANSFER
+    Transferee: X
+    Transferror: HEIRS OF Y
+
+    Property Details:
+        Tax Dec No: 01-0002B-0212
+        Lot No: 1-B-C-1
+        Area: 1000
+        Market Value: 100000
+    
+    Transfertax Computation:
+        Tax Base: 100000
+        Tax Rate: 0.75%
+        Basic Tax Due: 750
+
+THIRD TRANSFER
+
+    Transferee: W
+    Transferror: Heirs of Y 
+
+    Property Details:
+        Tax Dec No: 01-0002B-0212
+        Lot No: 1-B-C-1
+        Area: 1000
+        Market Value: 100000
+    
+    Transfertax Computation:
+        Tax Base: 100000
+        Tax Rate: 0.75%
+        Basic Tax Due: 750
+
+    -------
+
+    FINAL COMPUTATION
+
+    Transferree:                                Amount Due
+        1. Heirs of Y                           7,500.00
+        2. X                                    750.00
+        3. W                                    750.00
+
+    Total Amount Due: 9,000.00
+    Surcharge 25%: 2,250.00
+    Interest: 0.00
+    Total Amount Due: 11,250.00
+
+    Prepared by:                    Approved by:
+    
+    User                            City Treasurer
+
+
+
+
+    --- end of computation ---
+        
 
 Sub computation for extrajudicial settlement - with Deed of Sale on a Portion of Land
 1. System will select from the previous computation the property that will be included in the computation

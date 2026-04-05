@@ -25,6 +25,11 @@ type RealPropertyInfo = {
     area: number;
     marketValue: string | number;
     tctOct: string;
+    ejsData?: {
+        deceasedOwners: string[];
+        parsedOwners: string[];
+        shareFraction: number;
+    };
 }
 
 export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any) => void }) {
@@ -63,6 +68,25 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
     const [isSuccess, setIsSuccess] = useState(false)
     const [savedTxId, setSavedTxId] = useState<string | null>(null)
 
+    // EJS Chain State
+    type EjsSubTransfer = {
+        id: string;
+        title: string;
+        type: string;
+        transferee: string;
+        transferor: string;
+        properties: RealPropertyInfo[];
+        consideration: number;
+        taxBase: number;
+        taxDue: number;
+        surcharge: number;
+        interest: number;
+        totalAmountDue: number;
+    };
+    const [ejsChain, setEjsChain] = useState<EjsSubTransfer[]>([]);
+    const [isSubTransferModalOpen, setIsSubTransferModalOpen] = useState(false);
+    const [subTransferForm, setSubTransferForm] = useState({ type: "Deed of Sale", transferee: "", consideration: 0, totalHeirs: 1, waivingHeirs: 1, areaAdjudicated: 0, newLotNumber: "" });
+
     // Portion Modal States
     const [isPortionModalOpen, setIsPortionModalOpen] = useState(false)
     const [selectedPropertyForCart, setSelectedPropertyForCart] = useState<RealPropertyInfo | null>(null)
@@ -70,6 +94,30 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
     const [portionArea, setPortionArea] = useState<number | "">("")
     const [portionLotNumber, setPortionLotNumber] = useState("")
     const [portionTaxDec, setPortionTaxDec] = useState("")
+
+    // EJS Modal States
+    const [isEjsOwnerModalOpen, setIsEjsOwnerModalOpen] = useState(false)
+    const [parsedOwners, setParsedOwners] = useState<string[]>([])
+    const [deceasedOwners, setDeceasedOwners] = useState<string[]>([])
+    const [tempEjsProperty, setTempEjsProperty] = useState<RealPropertyInfo | null>(null)
+
+    const parseOwners = (ownerStr: string) => {
+        if (!ownerStr) return [];
+        let normalizedStr = ownerStr;
+
+        // If it contains SPS or SPOUSES, also treat 'and' and '&' as separators
+        if (/\bsps\.?\b|\bspouses\b/i.test(ownerStr)) {
+            normalizedStr = normalizedStr.replace(/\band\b/gi, ';');
+            normalizedStr = normalizedStr.replace(/&/gi, ';');
+        }
+
+        normalizedStr = normalizedStr.replace(/\bsps\.?\b/gi, ';');
+        normalizedStr = normalizedStr.replace(/\bspouses\b/gi, ';');
+        normalizedStr = normalizedStr.replace(/\bmarried to\b/gi, ';');
+        normalizedStr = normalizedStr.replace(/\bm\/t\b/gi, ';');
+
+        return normalizedStr.split(';').map(s => s.trim()).filter(s => s.length > 0);
+    }
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -128,11 +176,55 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
             return
         }
 
+        if (transactionType === "Deed of Extrajudicial Settlement") {
+            const ownersList = parseOwners(property.owner);
+            setParsedOwners(ownersList);
+            setDeceasedOwners([]);
+            setTempEjsProperty(property);
+            setIsEjsOwnerModalOpen(true);
+            return;
+        }
+
         setSelectedPropertyForCart(property)
         setTransferMode("whole")
         setPortionArea("")
         setPortionLotNumber("")
         setPortionTaxDec(`${property.taxdecnumber}-PORTION`)
+        setIsPortionModalOpen(true)
+    }
+
+    const handleEjsNext = () => {
+        if (deceasedOwners.length === 0) {
+            toast.error("Please select at least one deceased owner.");
+            return;
+        }
+
+        let prop = { ...tempEjsProperty! };
+        const shareFraction = deceasedOwners.length / parsedOwners.length;
+
+        const oldVal = typeof prop.marketValue === 'string' ? parseFloat(prop.marketValue) : prop.marketValue;
+        prop.marketValue = oldVal * shareFraction;
+        prop.area = Number(prop.area) * shareFraction;
+        prop.ejsData = {
+            deceasedOwners,
+            parsedOwners,
+            shareFraction
+        };
+
+        if (cart.length === 0) {
+            setParties(prev => ({
+                ...prev,
+                prevOwner: deceasedOwners.join(", "),
+                newOwner: "HEIRS OF " + deceasedOwners.join(", ").toUpperCase()
+            }));
+        }
+
+        setIsEjsOwnerModalOpen(false);
+        setSelectedPropertyForCart(prop)
+        setTransferMode("whole")
+        setPortionArea("")
+        setPortionLotNumber("")
+        setPortionTaxDec(`${prop.taxdecnumber}-PORTION`)
         setIsPortionModalOpen(true)
     }
 
@@ -184,7 +276,9 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
         setCart([...cart, propertyToAdd]);
 
         if (cart.length === 0) {
-            setParties(prev => ({ ...prev, prevOwner: propertyToAdd.owner }));
+            if (transactionType !== "Deed of Extrajudicial Settlement") {
+                setParties(prev => ({ ...prev, prevOwner: propertyToAdd.owner }));
+            }
         }
 
         setIsPortionModalOpen(false);
@@ -276,6 +370,59 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
     }
 
     const totalAmountDue = taxDue + surcharge + interest;
+
+    const handleAddSubTransfer = () => {
+        if (!subTransferForm.transferee) {
+            toast.error("Please provide a transferee");
+            return;
+        }
+
+        const baseVal = totalMarketValue;
+
+        let tBase = baseVal;
+        if (subTransferForm.type.includes("Sale")) {
+            tBase = Math.max(baseVal, subTransferForm.consideration);
+        } else if (subTransferForm.type === "Waiver of Rights") {
+            tBase = (baseVal / subTransferForm.totalHeirs) * subTransferForm.waivingHeirs;
+        } else if (subTransferForm.type === "Adjudication") {
+            const totalArea = cart.reduce((sum, p) => sum + Number(p.area), 0);
+            tBase = totalArea > 0 ? (baseVal / totalArea) * subTransferForm.areaAdjudicated : baseVal;
+        }
+
+        const tcalculatedTax = tBase * 0.0075;
+        const tDue = Math.max(tcalculatedTax, 500);
+
+        let tSurcharge = 0; let tInterest = 0;
+        if (daysFromNotarial > 60) tSurcharge = tDue * 0.25;
+        if (daysFromNotarial > 90) {
+            const monthsLate = Math.ceil((daysFromNotarial - 90) / 30);
+            tInterest = Math.min(tDue * 0.02 * monthsLate, tDue * 0.72);
+        }
+        let dynamicTransferor = parties.newOwner;
+        if (subTransferForm.type === "Waiver of Rights") {
+            dynamicTransferor = `${subTransferForm.waivingHeirs} of ${subTransferForm.totalHeirs} ` + parties.newOwner;
+        }
+
+        const newTransfer: EjsSubTransfer = {
+            id: `sub-${Date.now()}`,
+            title: `TRANSFER ${ejsChain.length + 2}`, // 2nd, 3rd...
+            type: subTransferForm.type,
+            transferor: dynamicTransferor,
+            transferee: subTransferForm.transferee,
+            properties: cart, // Using the cart properties for the portion sold
+            consideration: subTransferForm.consideration,
+            taxBase: tBase,
+            taxDue: tDue,
+            surcharge: tSurcharge,
+            interest: tInterest,
+            totalAmountDue: tDue + tSurcharge + tInterest
+        };
+
+        setEjsChain([...ejsChain, newTransfer]);
+        setIsSubTransferModalOpen(false);
+        setSubTransferForm({ type: "Deed of Sale", transferee: "", consideration: 0, totalHeirs: 1, waivingHeirs: 1, areaAdjudicated: 0, newLotNumber: "" });
+        toast.success(`Added ${newTransfer.title}`);
+    }
 
     // ---------------- BEGIN OF HANDLE SUBMIT ---------------
 
@@ -373,13 +520,17 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
 
     const handlePreview = () => {
         if (onPreview) {
+            const ejsGrandTotal = transactionType === "Deed of Extrajudicial Settlement" && ejsChain.length > 0
+                ? totalAmountDue + ejsChain.reduce((acc, t) => acc + t.totalAmountDue, 0)
+                : totalAmountDue;
+
             onPreview({
                 transferee: parties.newOwner || "JUAN DELA CRUZ",
                 transferor: parties.prevOwner || "JUAN DELA CRUZ",
                 computationDate: new Date().toLocaleDateString(),
                 validityDate: validityDate || new Date().toLocaleDateString(),
                 transactionId: savedTxId || "PREVIEW",
-                qrValue: `ID: ${savedTxId || "PREVIEW"}\nTransferee: ${parties.newOwner || "JUAN DELA CRUZ"}\nAmount Due: P ${totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nValidity Date: ${validityDate || new Date().toLocaleDateString()}`,
+                qrValue: `ID: ${savedTxId || "PREVIEW"}\nTransferee: ${parties.newOwner || "JUAN DELA CRUZ"}\nTotal Amount Due: P ${ejsGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nValidity Date: ${validityDate || new Date().toLocaleDateString()}`,
                 properties: cart.map(p => ({
                     tdNo: p.taxdecnumber,
                     lotNo: p.lotNumber,
@@ -408,6 +559,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                     interest,
                     totalAmountDue,
                 },
+                ejsChain: transactionType === "Deed of Extrajudicial Settlement" ? ejsChain : undefined,
                 preparedBy: (session?.user as any)?.name || "USER",
                 preparedByDesignation: (session?.user as any)?.designation || "DESIGNATION",
             });
@@ -418,6 +570,135 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
     return (
         <div className="mx-auto max-w-5xl space-y-6 print:space-y-0 print:m-0 print:p-0">
             <h1 className="text-3xl font-bold print:hidden">New Transfer Tax Transaction</h1>
+
+            {/* EJS Modal */}
+            <Dialog open={isEjsOwnerModalOpen} onOpenChange={setIsEjsOwnerModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Extrajudicial Settlement Setup</DialogTitle>
+                        <DialogDescription>
+                            We detected {parsedOwners.length} owner(s). Select the deceased owner(s) whose share will be transferred.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        {parsedOwners.map((owner, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id={`deceased-${idx}`}
+                                    className="w-4 h-4"
+                                    checked={deceasedOwners.includes(owner)}
+                                    onChange={(e) => {
+                                        if (e.target.checked) setDeceasedOwners(prev => [...prev, owner]);
+                                        else setDeceasedOwners(prev => prev.filter(o => o !== owner));
+                                    }}
+                                />
+                                <label htmlFor={`deceased-${idx}`} className="text-sm font-medium">{owner}</label>
+                            </div>
+                        ))}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEjsOwnerModalOpen(false)}>Cancel</Button>
+                        <Button onClick={handleEjsNext}>Next Stage</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isSubTransferModalOpen} onOpenChange={setIsSubTransferModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Add Subsequent Transfer</DialogTitle>
+                        <DialogDescription>
+                            Define the next transfer in this chain (e.g. Heirs selling to a Buyer). Note: This uses the properties currently in the cart.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <Field>
+                            <Label>Transfer Type</Label>
+                            <select
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                value={subTransferForm.type}
+                                onChange={(e) => setSubTransferForm({ ...subTransferForm, type: e.target.value })}
+                            >
+                                <option>Deed of Sale</option>
+                                <option>Waiver of Rights</option>
+                                <option>Deed of Donation</option>
+                                <option>Adjudication</option>
+                            </select>
+                        </Field>
+                        <Field>
+                            <Label>Transferor (Seller)</Label>
+                            <Input value={parties.newOwner} disabled />
+                        </Field>
+                        <Field>
+                            <Label>Transferee (Buyer)</Label>
+                            <Input
+                                value={subTransferForm.transferee}
+                                onChange={(e) => setSubTransferForm({ ...subTransferForm, transferee: e.target.value })}
+                                placeholder="E.g. Juan Buyer"
+                            />
+                        </Field>
+                        {subTransferForm.type.includes("Sale") && (
+                            <Field>
+                                <Label>Consideration Amount</Label>
+                                <Input
+                                    type="number"
+                                    value={subTransferForm.consideration || ""}
+                                    onChange={(e) => setSubTransferForm({ ...subTransferForm, consideration: Number(e.target.value) })}
+                                />
+                            </Field>
+                        )}
+                        {subTransferForm.type === "Waiver of Rights" && (
+                            <div className="grid grid-cols-2 gap-4">
+                                <Field>
+                                    <Label>Total Number of Heirs</Label>
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        value={subTransferForm.totalHeirs}
+                                        onChange={(e) => setSubTransferForm({ ...subTransferForm, totalHeirs: Number(e.target.value) })}
+                                    />
+                                </Field>
+                                <Field>
+                                    <Label>Number of Heirs Waiving</Label>
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        max={subTransferForm.totalHeirs}
+                                        value={subTransferForm.waivingHeirs}
+                                        onChange={(e) => setSubTransferForm({ ...subTransferForm, waivingHeirs: Number(e.target.value) })}
+                                    />
+                                </Field>
+                            </div>
+                        )}
+                        {subTransferForm.type === "Adjudication" && (
+                            <div className="grid grid-cols-2 gap-4">
+                                <Field>
+                                    <Label>Area Adjudicated (sq.m.)</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        value={subTransferForm.areaAdjudicated || ""}
+                                        onChange={(e) => setSubTransferForm({ ...subTransferForm, areaAdjudicated: Number(e.target.value) })}
+                                    />
+                                </Field>
+                                <Field>
+                                    <Label>New Lot Number</Label>
+                                    <Input
+                                        type="text"
+                                        value={subTransferForm.newLotNumber}
+                                        onChange={(e) => setSubTransferForm({ ...subTransferForm, newLotNumber: e.target.value })}
+                                    />
+                                </Field>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsSubTransferModalOpen(false)}>Cancel</Button>
+                        <Button onClick={handleAddSubTransfer}>Save Sub-Transfer</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Portion Transfer Modal */}
             <Dialog open={isPortionModalOpen} onOpenChange={setIsPortionModalOpen}>
@@ -975,6 +1256,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                         <tr className="bg-muted text-muted-foreground">
                                             <th className="px-2 py-1 text-left font-medium">TD No</th>
                                             <th className="px-2 py-1 text-left font-medium">Lot No</th>
+                                            <th className="px-2 py-1 text-center font-mediuem">Area(sqm)</th>
                                             <th className="px-2 py-1 text-right font-medium">Market Value</th>
                                         </tr>
                                     </thead>
@@ -983,6 +1265,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                             <tr key={item.id} className="border-b">
                                                 <td className="px-2 py-1">{item.taxdecnumber}</td>
                                                 <td className="px-2 py-1">{item.lotNumber}</td>
+                                                <td className="px-2 py-1 text-center">{Number(item.area || 0).toLocaleString()}</td>
                                                 <td className="px-2 py-1 text-right">P {Number(item.marketValue || 0).toLocaleString()}</td>
                                             </tr>
                                         ))}
@@ -1076,6 +1359,35 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                         )}
 
                                     </div>
+
+                                    {transactionType === "Deed of Extrajudicial Settlement" && (
+                                        <div className="mt-6 border p-4 rounded-md bg-slate-50 border-slate-200">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wide">Subsequent Transfers</h3>
+                                                <Button size="sm" variant="outline" className="bg-white" onClick={() => setIsSubTransferModalOpen(true)}>
+                                                    + Add Secondary Transfer
+                                                </Button>
+                                            </div>
+                                            {ejsChain.length === 0 ? (
+                                                <p className="text-xs text-muted-foreground italic">No subsequent transfers added. Computation will only reflect the First Transfer (EJS).</p>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {ejsChain.map((transfer, idx) => (
+                                                        <div key={idx} className="border border-slate-200 p-3 bg-white rounded flex justify-between items-center shadow-sm">
+                                                            <div>
+                                                                <p className="font-bold text-sm text-slate-800">{transfer.title} <span className="font-normal text-slate-500">({transfer.type})</span></p>
+                                                                <p className="text-xs text-slate-600 mt-1">Transferee: <strong>{transfer.transferee}</strong></p>
+                                                                <p className="text-xs text-slate-600">Amount Due: <strong className="text-primary">P {transfer.totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></p>
+                                                            </div>
+                                                            <Button variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50" size="sm" onClick={() => setEjsChain(prev => prev.filter((_, i) => i !== idx))}>
+                                                                Remove
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                 </div>
 
