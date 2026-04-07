@@ -14,11 +14,11 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             },
             async authorize(credentials) {
                 if (!credentials?.email || !credentials?.password) return null;
-                
+
                 const user = await prisma.user.findUnique({
                     where: { email: credentials.email as string }
                 });
-                
+
                 if (!user) {
                     return null;
                 }
@@ -27,11 +27,11 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
                     credentials.password as string,
                     user.password
                 );
-                
+
                 if (!isValidPassword) {
                     return null;
                 }
-                
+
                 return {
                     id: user.id,
                     name: user.name,
@@ -64,3 +64,10 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         }
     }
 });
+
+// @/actions/auth.ts
+export const logout = async () => {
+    // Using a relative path "/" ensures it redirects 
+    // to whatever the current browser origin is.
+    await signOut({ redirectTo: "/" })
+}
