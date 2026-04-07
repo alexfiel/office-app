@@ -29,6 +29,7 @@ model User {
   transferTaxes      TransferTax[]
   transferTaxDetails TransferTaxDetails[]
   realProperties     RealProperty[]
+  chainTransactions  ChainTransaction[]
 }
 
 enum Role {
@@ -105,6 +106,7 @@ model TransferTax {
   user               User                 @relation(fields: [userId], references: [id])
   // Added back-relation for TransferTaxDetails
   details            TransferTaxDetails[] 
+  chainTransactions  ChainTransaction[]
 }
 
 model TransferTaxDetails {
@@ -125,6 +127,26 @@ model TransferTaxDetails {
   // Added the missing User relation field
   userId         String
   user           User         @relation(fields: [userId], references: [id])
+}
+
+model ChainTransaction {
+  id             String       @id @default(cuid())
+  transferee  String
+  transferror String
+  transactionType String
+  lotnumber String
+  area Float
+  marketValue Decimal
+  taxdue Decimal
+  
+
+  // Relations
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  transferTaxId String
+  transferTax TransferTax @relation(fields: [transferTaxId], references: [id])
+
+  
 }
 
 model OfficeSignature {

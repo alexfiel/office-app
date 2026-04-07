@@ -40,3 +40,4 @@ export interface TransferTaxFormSubmission {
     transferTaxInfo: TransferTaxInput;
     transferTaxDetails: TransferTaxDetailInput[];
 }
+

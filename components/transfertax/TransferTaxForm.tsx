@@ -647,6 +647,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                     onChange={(e) => setSubTransferForm({ ...subTransferForm, consideration: Number(e.target.value) })}
                                 />
                             </Field>
+
                         )}
                         {subTransferForm.type === "Waiver of Rights" && (
                             <div className="grid grid-cols-2 gap-4">
@@ -809,9 +810,10 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Field>
+                                <Field className="uppercase">
                                     <Label>Document Type</Label>
                                     <Input
+                                        className="uppercase"
                                         value={documentInfo.type}
                                         onChange={(e) => setDocumentInfo({ ...documentInfo, type: e.target.value })}
                                         placeholder="e.g. Deed of Sale, Deed of Donation"
@@ -820,6 +822,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                 <Field>
                                     <Label>Doc No.</Label>
                                     <Input
+                                        className="uppercase"
                                         value={documentInfo.docNo}
                                         onChange={(e) => setDocumentInfo({ ...documentInfo, docNo: e.target.value })}
                                         placeholder="Doc No."
@@ -828,6 +831,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                 <Field>
                                     <Label>Page No.</Label>
                                     <Input
+                                        className="uppercase"
                                         value={documentInfo.pageNo}
                                         onChange={(e) => setDocumentInfo({ ...documentInfo, pageNo: e.target.value })}
                                         placeholder="Page No."
@@ -836,6 +840,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                 <Field>
                                     <Label>Book No.</Label>
                                     <Input
+                                        className="uppercase"
                                         value={documentInfo.bookNo}
                                         onChange={(e) => setDocumentInfo({ ...documentInfo, bookNo: e.target.value })}
                                         placeholder="Book No."
@@ -844,6 +849,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                 <Field>
                                     <Label>Notarized By</Label>
                                     <Input
+                                        className="uppercase"
                                         value={documentInfo.notarizedBy}
                                         onChange={(e) => setDocumentInfo({ ...documentInfo, notarizedBy: e.target.value })}
                                         placeholder="Name of Notary Public"
@@ -1119,6 +1125,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                             <Field>
                                 <Label>Previous Owner</Label>
                                 <Input
+                                    className="uppercase"
                                     value={parties.prevOwner}
                                     onChange={(e) => setParties({ ...parties, prevOwner: e.target.value })}
                                     placeholder="Full name of previous owner"
@@ -1127,6 +1134,7 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                             <Field>
                                 <Label>New Owner</Label>
                                 <Input
+                                    className="uppercase"
                                     value={parties.newOwner}
                                     onChange={(e) => setParties({ ...parties, newOwner: e.target.value })}
                                     placeholder="Full name of new owner"
