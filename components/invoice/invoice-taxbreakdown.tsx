@@ -35,7 +35,7 @@ export function TaxBreakdown({ invoice, isEJS, ejsTotals }: TaxBreakdownProps) {
 
     return (
         <div className="w-1/2 p-7 rounded-2xl border-2 border-slate-200 bg-slate-50/80 flex flex-col justify-center shadow-inner relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 bg-blue-600 h-full"></div>
+            <div className="absolute top-0 left-0 w-1 bg-gray-600 h-full"></div>
             <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 border-b-2 border-slate-200 pb-3">
                 FINAL TAX COMPUTATION
             </h3>
@@ -119,7 +119,7 @@ export function TaxBreakdown({ invoice, isEJS, ejsTotals }: TaxBreakdownProps) {
                     <span className="text-base font-black text-slate-900 uppercase tracking-widest">
                         GRAND TOTAL DUE
                     </span>
-                    <span className="text-2xl font-black text-blue-600 drop-shadow-sm">
+                    <span className="text-2xl font-black text-black-600 drop-shadow-sm">
                         {formatCurrency(
                             isEJS ? ejsTotals?.total : invoice.computation.totalAmountDue
                         )}

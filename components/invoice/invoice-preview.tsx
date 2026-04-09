@@ -50,39 +50,38 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
     const handleDownloadPdf = async () => {
         if (!invoiceRef.current) return;
         try {
-            const dataUrl = await htmlToImage.toPng(invoiceRef.current, { pixelRatio: 2 });
-
-            // Folio Dimensions (8.5" x 13")
-            const folioWidth = 215.9;
-            const folioHeight = 330.2;
-
-            const pdf = new jsPDF({
-                orientation: 'p',
-                unit: 'mm',
-                format: [folioWidth, folioHeight]
+            const dataUrl = await htmlToImage.toPng(invoiceRef.current, {
+                pixelRatio: 2,
+                skipFonts: true,
+                cacheBust: true,
             });
 
+            const folioWidth = 215.9;
+            const folioHeight = 330.2;
+            const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: [folioWidth, folioHeight] });
+
             const img = new Image();
-            img.src = dataUrl;
-            await new Promise((resolve) => { img.onload = resolve; });
+            img.crossOrigin = "anonymous";
+            await new Promise((resolve) => {
+                img.onload = resolve;
+                img.src = dataUrl;
+            });
 
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
-
             const sideMargin = 12.7;
             const topMargin = 0.25;
             const footerBottomOffset = 10;
 
-            // 1. Calculate the printable area per page
             const printableWidthMM = pdfWidth - (2 * sideMargin);
-            const printableHeightMM = pdfHeight - topMargin - 20; // Room for footer
+            const printableHeightMM = pdfHeight - topMargin - 20;
 
-            // 2. Determine how many pixels fit on one PDF page
             const scale = img.width / printableWidthMM;
             const pixelHeightPerPage = printableHeightMM * scale;
 
-            // 3. DYNAMICALLY CALCULATE TOTAL PAGES
-            const totalPages = Math.ceil(img.height / pixelHeightPerPage);
+            // --- FIX 1: CALCULATE REAL TOTAL PAGES BY IGNORING TINY OVERFLOWS ---
+            const PIXEL_THRESHOLD = 20; // Ignore overlaps smaller than 20px
+            const totalPages = Math.max(1, Math.ceil((img.height - PIXEL_THRESHOLD) / pixelHeightPerPage));
 
             let remainingHeight = img.height;
             let currentY = 0;
@@ -92,9 +91,14 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
             canvas.width = img.width;
             canvas.height = img.height;
             const ctx = canvas.getContext("2d");
-            ctx?.drawImage(img, 0, 0);
+            if (ctx) {
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+            }
 
-            while (remainingHeight > 0) {
+            // --- FIX 2: STOP LOOP IF REMAINING CONTENT IS NEGLIGIBLE ---
+            while (remainingHeight > PIXEL_THRESHOLD && currentPage <= totalPages) {
                 if (currentPage > 1) pdf.addPage();
 
                 const sliceHeight = Math.min(pixelHeightPerPage, remainingHeight);
@@ -112,18 +116,14 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
                 const sliceDataUrl = sliceCanvas.toDataURL("image/png");
                 const sliceHeightMM = sliceHeight / scale;
 
-                // Render Content
                 pdf.addImage(sliceDataUrl, 'PNG', sideMargin, topMargin, printableWidthMM, sliceHeightMM);
 
-                // 4. RENDER DYNAMIC FOOTER
+                // RENDER DYNAMIC FOOTER
                 pdf.setFontSize(9);
-                pdf.setTextColor(150); // Muted gray
+                pdf.setTextColor(150);
                 const pageText = `Page ${currentPage} of ${totalPages}`;
-
-                // Calculate center position
                 const textWidth = pdf.getStringUnitWidth(pageText) * pdf.getFontSize() / pdf.internal.scaleFactor;
                 const xPosition = (pdfWidth - textWidth) / 2;
-
                 pdf.text(pageText, xPosition, pdfHeight - footerBottomOffset);
 
                 remainingHeight -= sliceHeight;
@@ -133,7 +133,7 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
 
             pdf.save(`invoice-${data?.transactionId || 'preview'}.pdf`);
         } catch (error) {
-            console.error('Error generating dynamic PDF', error);
+            console.error('PDF Error:', error);
         }
     };
     // 2. WRAP EVERYTHING IN A FRAGMENT (<> ... </>)

@@ -48,8 +48,8 @@ const data = {
       icon: IconDashboard,
     },
     {
-      title: "Accomplishment Report",
-      url: "#",
+      title: "Accomplishment ReportX",
+      url: "/txn",
       icon: IconListDetails,
     },
     {
