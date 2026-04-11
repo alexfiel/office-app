@@ -48,15 +48,7 @@ export function TaxBreakdown({ invoice, isEJS, ejsTotals }: TaxBreakdownProps) {
                         {formatCurrency(invoice.totalMarketValue)}
                     </span>
                 </div>
-                {/* CONSIDERATION - NOW SHOWN DIRECTLY BELOW MARKET VALUE */}
-                {!isEJS && (
-                    <div className="flex justify-between items-center px-1">
-                        <span className="text-slate-500 font-medium text-xs">Consideration Amount:</span>
-                        <span className="font-semibold text-slate-800">
-                            {formatCurrency(invoice.transactionInfo?.consideration)}
-                        </span>
-                    </div>
-                )}
+
                 <div className="my-2 border-t border-dashed border-slate-300"></div>
 
                 {isEJS ? (
