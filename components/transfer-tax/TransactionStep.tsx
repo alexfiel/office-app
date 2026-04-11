@@ -18,7 +18,11 @@ interface TransactionStepProps {
 const TRANSACTION_OPTIONS = [
     "DEED OF SALE",
     "DEED OF DONATION",
-    "DEED OF EXTRAJUDICIAL SETTLEMENT"
+    "DEED OF EXTRAJUDICIAL SETTLEMENT",
+    "DEED OF PARTITION",
+    "DEED OF ASSIGNMENT",
+    "DEED OF EXCHANGE",
+    "DEED OF WAIVER"
 ];
 
 export default function TransactionStep({
@@ -60,8 +64,8 @@ export default function TransactionStep({
                             <label
                                 key={type}
                                 className={`flex items-center gap-2 cursor-pointer border p-4 rounded-md transition-all ${transactionType === type
-                                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                                        : 'hover:bg-muted/50'
+                                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                    : 'hover:bg-muted/50'
                                     }`}
                             >
                                 <input

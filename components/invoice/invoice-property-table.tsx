@@ -21,8 +21,8 @@ export function PropertyTable({ properties, totalMarketValue }: { properties: an
                     <tbody className="divide-y divide-slate-100 bg-white">
                         {properties?.map((p, i) => (
                             <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-5 py-3 text-slate-800 font-medium">{p.tdNo}</td>
-                                <td className="px-5 py-3 text-slate-800">{p.lotNo}</td>
+                                <td className="px-5 py-3 text-slate-800 font-medium">{p.taxdecnumber}</td>
+                                <td className="px-5 py-3 text-slate-800">{p.lotNumber}</td>
                                 <td className="px-5 py-3 text-slate-800">{p.area}</td>
                                 <td className="px-5 py-3 text-right font-semibold text-slate-900">
                                     {formatCurrency(p.marketValue)}

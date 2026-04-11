@@ -58,42 +58,43 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
         const parsedBookNo = docNum.split(",")[2]?.replace(" Book: ", "") || "N/A";
 
         setPreviewData({
-                transferee: selectedItem.transferee || "JUAN DELA CRUZ",
-                transferor: selectedItem.transferor || "JUAN DELA CRUZ",
-                computationDate: new Date(selectedItem.transactionDate).toLocaleDateString(),
-                validityDate: selectedItem.validuntil || "N/A",
-                transactionId: selectedItem.id,
-                qrValue: `ID: ${selectedItem.id}\nNew Owner: ${selectedItem.transferee}\nAmount Due: P ${Number(selectedItem.totalamountdue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nValidity Date: ${selectedItem.validuntil || "N/A"}`,
-                properties: selectedItem.details ? selectedItem.details.map((d: any) => ({
-                    tdNo: d.taxdecnumber,
-                    lotNo: d.lotNumber,
-                    marketValue: d.marketValue
-                })) : [],
-                totalMarketValue: selectedItem.totalmarketvalue,
-                documentInfo: {
-                    type: selectedItem.notarialDocument?.documentType || "N/A",
-                    docNo: parsedDocNo,
-                    pageNo: parsedPageNo,
-                    bookNo: parsedBookNo,
-                    notarizedBy: selectedItem.notarialDocument?.notarizedBy || "N/A",
-                    date: selectedItem.notarialDocument?.notarialDate ? new Date(selectedItem.notarialDocument.notarialDate).toLocaleDateString() : "N/A",
-                },
-                transactionInfo: {
-                    type: selectedItem.transactionType,
-                    consideration: selectedItem.considerationvalue,
-                    dayselapsed: selectedItem.dayselapsed || 0,
-                    validityDate: selectedItem.validuntil,
-                },
-                computation: {
-                    taxBase: selectedItem.taxbase,
-                    taxRate: 0.75,
-                    basicTaxDue: selectedItem.taxdue,
-                    surcharge: selectedItem.surcharge,
-                    interest: selectedItem.interest,
-                    totalAmountDue: selectedItem.totalamountdue,
-                },
-                preparedBy: currentUser?.name || "USER",
-                preparedByDesignation: currentUser?.designation || "DESIGNATION",
+            transferee: selectedItem.transferee || "JUAN DELA CRUZ",
+            transferor: selectedItem.transferor || "JUAN DELA CRUZ",
+            computationDate: new Date(selectedItem.transactionDate).toLocaleDateString(),
+            validityDate: selectedItem.validuntil || "N/A",
+            transactionId: selectedItem.id,
+            qrValue: `ID: ${selectedItem.id}\nNew Owner: ${selectedItem.transferee}\nAmount Due: P ${Number(selectedItem.totalamountdue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nValidity Date: ${selectedItem.validuntil || "N/A"}`,
+            properties: selectedItem.details ? selectedItem.details.map((d: any) => ({
+                taxdecnumber: d.taxdecnumber,
+                lotNumber: d.lotNumber,
+                area: d.area,
+                marketValue: d.marketValue
+            })) : [],
+            totalMarketValue: selectedItem.totalmarketvalue,
+            documentInfo: {
+                type: selectedItem.notarialDocument?.documentType || "N/A",
+                docNo: parsedDocNo,
+                pageNo: parsedPageNo,
+                bookNo: parsedBookNo,
+                notarizedBy: selectedItem.notarialDocument?.notarizedBy || "N/A",
+                date: selectedItem.notarialDocument?.notarialDate ? new Date(selectedItem.notarialDocument.notarialDate).toLocaleDateString() : "N/A",
+            },
+            transactionInfo: {
+                type: selectedItem.transactionType,
+                consideration: selectedItem.considerationvalue,
+                dayselapsed: selectedItem.dayselapsed || 0,
+                validityDate: selectedItem.validuntil,
+            },
+            computation: {
+                taxBase: selectedItem.taxbase,
+                taxRate: 0.75,
+                basicTaxDue: selectedItem.taxdue,
+                surcharge: selectedItem.surcharge,
+                interest: selectedItem.interest,
+                totalAmountDue: selectedItem.totalamountdue,
+            },
+            preparedBy: currentUser?.name || "USER",
+            preparedByDesignation: currentUser?.designation || "TRANSFERTAX ASSESSOR",
         });
         setSelectedItem(null);
     }
@@ -118,7 +119,7 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this transaction? This action cannot be undone.")) return;
-        
+
         try {
             const res = await fetch(`/api/transfertax/${id}`, {
                 method: "DELETE"
@@ -134,10 +135,10 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
         }
     }
 
-    const filteredData = data.filter(item => 
-       item.transferee.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       item.transferor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       item.id.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredData = data.filter(item =>
+        item.transferee.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.transferor.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (previewData) {
@@ -164,9 +165,9 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
                     </Field>
                 </div>
             </div>
-            
+
             {loading && <p className="text-muted-foreground font-medium">Loading transactions...</p>}
-            
+
             {!loading && filteredData.length === 0 && (
                 <p className="text-muted-foreground font-medium">No transactions found.</p>
             )}
@@ -197,71 +198,72 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
                             {filteredData.map((item) => {
                                 const isOwnerOrAdmin = currentUser.id === item.userId || currentUser.role === "ADMIN";
                                 return (
-                                <tr key={item.id} className="border-b hover:bg-gray-50">
-                                    <td className="border px-4 py-2 whitespace-nowrap">
-                                        {new Date(item.transactionDate).toLocaleDateString()}
-                                    </td>
-                                    <td className="border px-4 py-2">{item.transactionType}</td>
-                                    <td className="border px-4 py-2">
-                                        <button 
-                                            onClick={() => setSelectedItem(item)}
-                                            className="text-primary hover:underline font-bold focus:outline-none text-left"
-                                        >
-                                            {item.transferee}
-                                        </button>
-                                    </td>
-                                    <td className="border px-4 py-2">{item.transferor}</td>
-                                    <td className="border px-4 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
-                                        P {Number(item.totalmarketvalue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="border px-4 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
-                                        P {Number(item.considerationvalue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="border px-4 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
-                                        P {Number(item.taxbase || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="border px-4 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
-                                        P {Number(item.taxdue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="border px-4 py-2 text-right font-medium text-destructive whitespace-nowrap">
-                                        P {Number(item.surcharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="border px-4 py-2 text-right font-medium text-destructive whitespace-nowrap">
-                                        P {Number(item.interest || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="border px-4 py-2 text-right font-bold text-primary whitespace-nowrap">
-                                        P {Number(item.totalamountdue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="border px-4 py-2 text-center whitespace-nowrap">
-                                        {item.validuntil || "N/A"}
-                                    </td>
-                                    <td className="border px-4 py-2 text-center">
-                                        <span className={`px-2 py-1 inline-flex items-center rounded-full text-xs font-semibold ${item.paymentstatus === 'PAID' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                            {item.paymentstatus || "PENDING"}
-                                        </span>
-                                    </td>
-                                    <td className="border px-4 py-2">{item.user?.name || "Unknown"}</td>
-                                    <td className="border px-4 py-2 text-center space-x-2 whitespace-nowrap">
-                                        {item.notarialDocument?.document_url && (
-                                            <Button variant="outline" size="sm" asChild>
-                                                <a href={item.notarialDocument.document_url} target="_blank" rel="noreferrer">
-                                                    View Doc
-                                                </a>
-                                            </Button>
-                                        )}
-                                        {isOwnerOrAdmin && (
-                                            <>
+                                    <tr key={item.id} className="border-b hover:bg-gray-50">
+                                        <td className="border px-4 py-2 whitespace-nowrap">
+                                            {new Date(item.transactionDate).toLocaleDateString()}
+                                        </td>
+                                        <td className="border px-4 py-2">{item.transactionType}</td>
+                                        <td className="border px-4 py-2">
+                                            <button
+                                                onClick={() => setSelectedItem(item)}
+                                                className="text-primary hover:underline font-bold focus:outline-none text-left"
+                                            >
+                                                {item.transferee}
+                                            </button>
+                                        </td>
+                                        <td className="border px-4 py-2">{item.transferor}</td>
+                                        <td className="border px-4 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
+                                            P {Number(item.totalmarketvalue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="border px-4 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
+                                            P {Number(item.considerationvalue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="border px-4 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
+                                            P {Number(item.taxbase || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="border px-4 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
+                                            P {Number(item.taxdue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="border px-4 py-2 text-right font-medium text-destructive whitespace-nowrap">
+                                            P {Number(item.surcharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="border px-4 py-2 text-right font-medium text-destructive whitespace-nowrap">
+                                            P {Number(item.interest || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="border px-4 py-2 text-right font-bold text-primary whitespace-nowrap">
+                                            P {Number(item.totalamountdue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="border px-4 py-2 text-center whitespace-nowrap">
+                                            {item.validuntil || "N/A"}
+                                        </td>
+                                        <td className="border px-4 py-2 text-center">
+                                            <span className={`px-2 py-1 inline-flex items-center rounded-full text-xs font-semibold ${item.paymentstatus === 'PAID' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                                {item.paymentstatus || "PENDING"}
+                                            </span>
+                                        </td>
+                                        <td className="border px-4 py-2">{item.user?.name || "Unknown"}</td>
+                                        <td className="border px-4 py-2 text-center space-x-2 whitespace-nowrap">
+                                            {item.notarialDocument?.document_url && (
                                                 <Button variant="outline" size="sm" asChild>
-                                                    <Link href={`/transfertax/${item.id}/edit`}>Edit</Link>
+                                                    <a href={item.notarialDocument.document_url} target="_blank" rel="noreferrer">
+                                                        View Doc
+                                                    </a>
                                                 </Button>
-                                                <Button variant="destructive" size="sm" onClick={() => handleDelete(item.id)}>
-                                                    Delete
-                                                </Button>
-                                            </>
-                                        )}
-                                    </td>
-                                </tr>
-                            )})}
+                                            )}
+                                            {isOwnerOrAdmin && (
+                                                <>
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link href={`/transfertax/${item.id}/edit`}>Edit</Link>
+                                                    </Button>
+                                                    <Button variant="destructive" size="sm" onClick={() => handleDelete(item.id)}>
+                                                        Delete
+                                                    </Button>
+                                                </>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )
+                            })}
                         </tbody>
                     </table>
                 </div>
