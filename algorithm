@@ -40,22 +40,21 @@ create a complex computation of transfer tax for the following:
 Deed of Extrajudicial Settlement 
 
 1. Search for the property in the database
-2. If found get the following information:
-    Owner Name
-    tax dec number
-    lot number 
-    area 
-    market value
-3. List all the owner of the property and determine if the owner is deceased or alive
-4. System will count the number of owner by the ';' separator
-    User can select the owner who are deceased and the system will compute the share of the deceased owner
-5. To compute the share of the of the deceased owner, the system will divide the market value by the number of owners
-6. System will add the share of the deceased owner to the transferee
-7. User will click the add to computation button to add the property to the transaction list for computation
-8. System will loop back to step 1 if the user wants to add more properties to the transaction list for computation
-9. System will update the owner of the properties transferred to heirs and remove the deceased owner from the owner list
-10. System will compute the transfer tax for the share of the deceased owner
-11. System will generate report for the computation of the transfer tax for the share of the deceased owner
+2. Determine the number of owners of the property
+3. Determining the deceased owner
+4. transfer the share of the deceased to the heirs
+5. compute transfer tax of the deceased to heirs
+6. Update owner name of the property remaining co-owner + heirs of the deceased
+7. add to cart for chaintransaction and save the transfer to the schema chaintransaction 
+8. repeat step 1 until all the deceased owner is transferred to the heirs
+9. compute the total amount due by adding the transfer tax of all the transfers
+10. compute the surcharge and interest if any
+11. save the computation to the transafer tax list 
+12. User can print the computation sheet
+
+-- end of file --
+
+
 
     Sample Output:
 

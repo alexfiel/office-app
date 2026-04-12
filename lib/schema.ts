@@ -52,8 +52,17 @@ export const notarialDocumentSchema = z.object({
     document_url: z.string().optional()
 });
 
+export const chainTransactionSchema = z.object({
+    deceasedOwner: z.string(),
+    heirs: z.string(),
+    share: z.number(),
+    taxBase: z.number(),
+    basicTaxDue: z.number(),
+});
+
 export const transferTaxFormSchema = z.object({
     documentInfo: notarialDocumentSchema,
     transferTaxInfo: transferTaxSchema,
-    transferTaxDetails: z.array(transferTaxDetailSchema).min(1)
+    transferTaxDetails: z.array(transferTaxDetailSchema).min(1),
+    chainTransactions: z.array(chainTransactionSchema).optional()
 });

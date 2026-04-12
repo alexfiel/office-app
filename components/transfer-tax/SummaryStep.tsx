@@ -15,8 +15,9 @@ interface SummaryStepProps {
     parties: { prevOwner: string; newOwner: string };
     computation: {
         taxBase: number;
-        consideration: number; // Remove the '?' here
-        taxDue: number;
+        totalMarketValue?: number | string;
+        consideration?: number | string;
+        basicTaxDue: number;
         surcharge: number;
         interest: number;
         totalAmountDue: number;
@@ -29,6 +30,8 @@ interface SummaryStepProps {
     onSubmit: () => void;
     onReset: () => void;
     onBack: () => void;
+    ejsChain?: any[];
+    onTriggerEjsTransfer?: (property: RealPropertyInfo) => void;
 }
 
 // 2. Fix the function signature
@@ -43,7 +46,9 @@ export function SummaryStep({
     isLoading,
     onSubmit,
     onReset,
-    onBack
+    onBack,
+    ejsChain,
+    onTriggerEjsTransfer
 }: SummaryStepProps) {
 
     const handlePrint = () => window.print();
@@ -136,6 +141,59 @@ export function SummaryStep({
                     </div>
                 </div>
 
+                {/* CHAIN OF TRANSFERS SECTION (For EJS) */}
+                {(transactionType === "DEED OF EXTRAJUDICIAL SETTLEMENT" || transactionType === "EJS") && (
+                    <div className="space-y-4 animate-in slide-in-from-left duration-500">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Chain of Transfers</h3>
+                        </div>
+
+                        {/* First Transfer Visualization */}
+                        <div className="p-4 border-2 border-slate-200 rounded-lg bg-slate-50 relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 bg-slate-400 h-full"></div>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-2">First Transfer (Base EJS)</p>
+                            <div className="grid grid-cols-2 text-xs">
+                                <div>
+                                    <p className="text-[8px] text-muted-foreground uppercase">Transferor</p>
+                                    <p className="font-bold uppercase">{parties.prevOwner}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[8px] text-muted-foreground uppercase">Transferee</p>
+                                    <p className="font-bold uppercase">{parties.newOwner}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Subsequent Transfers */}
+                        {ejsChain?.map((tx, i) => (
+                            <div key={i} className="p-4 border-2 border-blue-100 rounded-lg bg-white relative overflow-hidden shadow-sm">
+                                <div className="absolute top-0 left-0 w-1 bg-blue-400 h-full"></div>
+                                <p className="text-[9px] font-bold text-blue-600 uppercase tracking-wider mb-2">Subsequent Transfer {i + 1}</p>
+                                <div className="grid grid-cols-2 text-xs gap-4">
+                                    <div>
+                                        <p className="text-[8px] text-muted-foreground uppercase">Deceased Owner</p>
+                                        <p className="font-bold uppercase">{tx.deceasedOwner}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[8px] text-muted-foreground uppercase">Heirs (New Owners)</p>
+                                        <p className="font-bold uppercase">{tx.heirs}</p>
+                                    </div>
+                                    <div className="col-span-2 pt-2 border-t border-slate-100 mt-1 flex justify-between items-center">
+                                        <div className="text-[9px]">
+                                            <span className="text-muted-foreground">SHARE:</span> <span className="font-mono font-bold text-slate-700">{tx.share}</span>
+                                            <span className="mx-2 text-slate-300">|</span>
+                                            <span className="text-muted-foreground">TAX BASE:</span> <span className="font-mono font-bold text-slate-700">P {tx.taxBase.toLocaleString()}</span>
+                                        </div>
+                                        <div className="font-bold text-blue-700">
+                                            P {tx.basicTaxDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 {/* FINAL FINANCIALS */}
                 <div className="flex flex-col items-end space-y-2 border-t pt-6">
                     <div className="w-full md:w-1/2 space-y-1">
@@ -150,15 +208,19 @@ export function SummaryStep({
                         )}
 
                         <div className="flex justify-between text-sm">
-                            <span className="font-small-caps font-bold">Tax Base (Higher Value):</span>
+                            <span className="font-small-caps font-bold">
+                                {(transactionType === "DEED OF EXTRAJUDICIAL SETTLEMENT" || transactionType === "EJS") ? "SUB TOTAL TAX DUE (CHAIN):" : "Tax Base (Higher Value):"}
+                            </span>
                             <span className="font-mono font-bold">
-                                P {computation.taxBase.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                P {computation.basicTaxDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="font-small-caps">Basic Tax Due (0.75%):</span>
-                            <span className="font-mono">P {computation.taxDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                        </div>
+                        {!(transactionType === "DEED OF EXTRAJUDICIAL SETTLEMENT" || transactionType === "EJS") && (
+                            <div className="flex justify-between text-sm">
+                                <span className="font-small-caps">Basic Tax Due (0.75%):</span>
+                                <span className="font-mono">P {computation.basicTaxDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            </div>
+                        )}
                         {computation.surcharge > 0 && (
                             <div className="flex justify-between text-sm text-destructive">
                                 <span className="font-small-caps">Surcharge (25%):</span>

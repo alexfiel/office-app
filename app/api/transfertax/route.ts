@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
         // 1. Validate incoming data
         const validatedData = transferTaxFormSchema.parse(body);
-        const { documentInfo, transferTaxInfo, transferTaxDetails } = validatedData;
+        const { documentInfo, transferTaxInfo, transferTaxDetails, chainTransactions } = validatedData;
 
         // 2. Create the record
         const result = await prisma.transferTax.create({
@@ -66,10 +66,23 @@ export async function POST(req: Request) {
                         },
                     })),
                 },
+
+                // 4. Create Chain Transactions nested
+                chainTransactions: {
+                    create: chainTransactions?.map((tx: any) => ({
+                        deceasedOwner: tx.deceasedOwner,
+                        heirs: tx.heirs,
+                        deceasedShare: tx.share,
+                        taxBase: tx.taxBase,
+                        basicTaxDue: tx.basicTaxDue,
+                        user: { connect: { id: userId } },
+                    })),
+                },
             },
             include: {
                 notarialDocument: true,
                 details: true,
+                chainTransactions: true,
             },
         });
 

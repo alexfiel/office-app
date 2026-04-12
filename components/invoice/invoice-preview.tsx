@@ -38,8 +38,8 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
         preparedByDesignation: "Assessor"
     };
 
-    const isEJS = invoice.transactionInfo?.type === "EJS";
-    const ejsTotals = isEJS ? calculateEJSTotals(invoice.ejsChain || []) : null;
+    const isEJS = invoice.transactionInfo?.type === "DEED OF EXTRAJUDICIAL SETTLEMENT";
+    const ejsTotals = isEJS ? calculateEJSTotals(invoice.ejsChain || [], invoice.computation) : null;
 
     const formatCurrency = (val: number) =>
         `₱ ${Number(val || 0).toLocaleString(undefined, {

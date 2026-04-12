@@ -7,11 +7,13 @@ interface TaxBreakdownProps {
 }
 
 export function TaxBreakdown({ invoice, isEJS, ejsTotals }: TaxBreakdownProps) {
-    const formatCurrency = (val: number) =>
-        `₱ ${Number(val || 0).toLocaleString(undefined, {
+    const formatCurrency = (val: number | string) => {
+        if (val === "N/A") return "N/A";
+        return `₱ ${Number(val || 0).toLocaleString(undefined, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
         })}`;
+    };
 
     const renderPenaltySection = (surcharge: number, interest: number) => (
         <div className="pt-3 pb-2">
@@ -55,13 +57,13 @@ export function TaxBreakdown({ invoice, isEJS, ejsTotals }: TaxBreakdownProps) {
                     /* EJS COMPUTATION VIEW */
                     <>
                         <div className="flex justify-between items-center pt-4 border-t-2 border-slate-200 border-dashed px-1">
-                            <span className="font-bold text-slate-700 uppercase text-xs">TOTAL TAX DUE:</span>
+                            <span className="font-bold text-slate-700 uppercase text-xs">SUB TOTAL TAX DUE (CHAIN):</span>
                             <span className="font-bold text-slate-900">
-                                {formatCurrency(ejsTotals?.taxDue)}
+                                {formatCurrency(invoice.computation.basicTaxDue)}
                             </span>
                         </div>
                         {invoice.transactionInfo.dayselapsed > 60 &&
-                            renderPenaltySection(ejsTotals?.surcharge, ejsTotals?.interest)}
+                            renderPenaltySection(invoice.computation.surcharge, invoice.computation.interest)}
                     </>
                 ) : (
                     /* STANDARD COMPUTATION VIEW */
@@ -112,9 +114,7 @@ export function TaxBreakdown({ invoice, isEJS, ejsTotals }: TaxBreakdownProps) {
                         GRAND TOTAL DUE
                     </span>
                     <span className="text-2xl font-black text-black-600 drop-shadow-sm">
-                        {formatCurrency(
-                            isEJS ? ejsTotals?.total : invoice.computation.totalAmountDue
-                        )}
+                        {formatCurrency(invoice.computation.totalAmountDue)}
                     </span>
                 </div>
             </div>

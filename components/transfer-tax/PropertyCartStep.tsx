@@ -11,9 +11,11 @@ interface PropertyCartStepProps {
     onRemove: (id: string) => void;
     onBack: () => void;
     onNext: () => void;
+    isEJS?: boolean;
+    ejsChain?: any[];
 }
 
-export function PropertyCartStep({ cart, onRemove, onBack, onNext }: PropertyCartStepProps) {
+export function PropertyCartStep({ cart, onRemove, onBack, onNext, onTriggerEjsTransfer, isEJS, ejsChain = [] }: PropertyCartStepProps) {
 
     // Calculate aggregate market value for the cart
     const totalMarketValue = cart.reduce((total, item) => {
@@ -49,11 +51,73 @@ export function PropertyCartStep({ cart, onRemove, onBack, onNext }: PropertyCar
                 ) : (
                     <div className="space-y-6">
                         {/* The PropertyTable handles the actual mapping of data */}
-                        <PropertyTable
-                            properties={cart}
-                            onRemove={onRemove}
-                            showActions={true}
-                        />
+                        <div className="space-y-4">
+                            {cart.map((item) => {
+                                const propertyTransfers = ejsChain.filter(tx => tx.propertyId === item.id);
+                                const totalAssignedShare = propertyTransfers.reduce((sum, tx) => sum + (Number(tx.share) || 0), 0);
+                                const isShareComplete = totalAssignedShare >= 0.999; // Handle float floating point
+
+                                return (
+                                    <div key={item.id} className="border rounded-xl bg-white shadow-sm overflow-hidden border-slate-200">
+                                        <div className="p-5 flex justify-between items-start bg-slate-50/50">
+                                            <div className="flex-1">
+                                                <p className="font-bold text-sm uppercase tracking-tight text-slate-900">{item.taxdecnumber} | LOT {item.lotNumber}</p>
+                                                <p className="text-[10px] text-muted-foreground uppercase mt-1">LATEST OWNER: {item.owner}</p>
+                                                <div className="flex gap-4 mt-2">
+                                                    <p className="text-[11px] font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200">MV: P {Number(item.marketValue).toLocaleString()}</p>
+                                                    {isEJS && (
+                                                        <p className={`text-[11px] font-bold px-2 py-0.5 rounded border ${isShareComplete ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                                                            ASSIGNED: {(totalAssignedShare * 100).toFixed(0)}%
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {isEJS && (
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        onClick={() => onTriggerEjsTransfer?.(item)}
+                                                        className="text-[10px] font-bold h-8 bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                                                        disabled={isShareComplete}
+                                                    >
+                                                        + ESTATE TRANSFER
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => onRemove(item.id)}
+                                                    className="h-8 w-8 text-slate-400 hover:text-destructive transition-colors"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {/* CHAIN OF TRANSFERS VIEW */}
+                                        {isEJS && propertyTransfers.length > 0 && (
+                                            <div className="bg-white border-t border-slate-100 p-4 space-y-3">
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2 border-l-2 border-blue-400">Recorded Transfers</h4>
+                                                <div className="space-y-2">
+                                                    {propertyTransfers.map((tx, idx) => (
+                                                        <div key={idx} className="flex justify-between items-center text-xs p-3 rounded-lg border border-slate-100 bg-blue-50/30 group">
+                                                            <div>
+                                                                <p className="font-bold text-slate-800">{tx.deceasedOwner} → {tx.heirs}</p>
+                                                                <p className="text-[10px] text-slate-500 uppercase">Share: {tx.shareString || tx.share}</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="font-mono font-bold text-slate-900">P {tx.basicTaxDue.toLocaleString()}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
 
                         {/* Highlighted Total Box */}
                         <div className="bg-primary/5 p-5 rounded-xl border border-primary/20 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -70,7 +134,7 @@ export function PropertyCartStep({ cart, onRemove, onBack, onNext }: PropertyCar
                             <div className="text-center md:text-right">
                                 <p className="text-[10px] font-black uppercase tracking-tighter text-primary">Total Market Value (PHP)</p>
                                 <p className="text-3xl font-mono font-black text-primary">
-                                    {totalMarketValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {isEJS ? "N/A" : totalMarketValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </p>
                             </div>
                         </div>
@@ -96,9 +160,9 @@ export function PropertyCartStep({ cart, onRemove, onBack, onNext }: PropertyCar
                 <Button
                     onClick={onNext}
                     disabled={isEmpty}
-                    className="min-w-[200px] font-bold shadow-lg"
+                    className={`min-w-[200px] font-bold shadow-lg ${isEJS ? 'bg-green-600 hover:bg-green-700' : ''}`}
                 >
-                    NEXT: ASSIGN PARTIES →
+                    {isEJS ? 'NEXT: REVIEW SUMMARY →' : 'NEXT: ASSIGN PARTIES →'}
                 </Button>
             </CardFooter>
         </Card>

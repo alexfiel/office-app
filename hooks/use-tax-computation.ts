@@ -1,89 +1,76 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { calculateTaxPenalties } from "@/lib/tax-utils";
 
-interface ComputationProps {
-    notarialDate: string;
-    transactionType: string;
-    totalMarketValue: number;
-    consideration: number | "";
-}
 
-export function useTaxComputation({
-    notarialDate,
-    transactionType,
-    totalMarketValue,
-    consideration,
-}: ComputationProps) {
+
+export function useTaxComputation({ notarialDate, transactionType, totalMarketValue, consideration }: any) {
     return useMemo(() => {
         const mv = Number(totalMarketValue) || 0;
         const con = Number(consideration) || 0;
-
-        // 1. Corrected Tax Base Logic: Case-insensitive check
-        // Also added Certificate of Sale as it follows the same "Higher Of" rule
         const isSale = ["DEED OF SALE", "CERTIFICATE OF SALE"].includes(transactionType.toUpperCase());
 
         const taxBase = isSale ? Math.max(mv, con) : mv;
+        const basicTaxDue = Math.max(taxBase * 0.0075, 500);
 
-        // 2. Basic Tax Due (0.75% with P500 minimum)
-        const taxDue = Math.max(taxBase * 0.0075, 500);
-
-        // 3. Penalty Logic
-        let daysElapsed = 0;
-        let surcharge = 0;
-        let interest = 0;
-        let validityDate = "N/A";
-
-        if (notarialDate) {
-            const start = new Date(notarialDate);
-            const today = new Date();
-
-            // Remove the time portion to avoid partial-day math issues
-            start.setHours(0, 0, 0, 0);
-            today.setHours(0, 0, 0, 0);
-
-            // Use simple subtraction. Only calculate if the date is in the past.
-            const diffTime = today.getTime() - start.getTime();
-            daysElapsed = diffTime > 0 ? Math.floor(diffTime / (1000 * 60 * 60 * 24)) : 0;
-
-            // Surcharge (25% after 60 days)
-            if (daysElapsed > 60) surcharge = taxDue * 0.25;
-
-            // Interest (2% per month after 90 days, capped at 72% / 36 months)
-            if (daysElapsed > 90) {
-                const monthsLate = Math.ceil((daysElapsed - 90) / 30);
-                interest = Math.min(taxDue * 0.02 * monthsLate, taxDue * 0.72);
-            }
-
-            // Validity Date Logic
-            if (daysElapsed > 90) {
-                if (interest >= taxDue * 0.72) {
-                    validityDate = "MAXIMUM INTEREST REACHED";
-                } else {
-                    // Valid until the end of the current 30-day interest cycle
-                    const daysIntoCycle = (daysElapsed - 90) % 30;
-                    const daysToNext = 30 - daysIntoCycle;
-                    const vDate = new Date();
-                    vDate.setDate(vDate.getDate() + (daysToNext - 1)); // -1 to be safe for same-day payments
-                    validityDate = vDate.toLocaleDateString('EN-US').toUpperCase();
-                }
-            } else {
-                // Not yet penalized: Valid until the next penalty threshold
-                const nextThreshold = daysElapsed <= 60 ? 60 : 90;
-                const vDate = new Date(start);
-                vDate.setDate(vDate.getDate() + nextThreshold);
-                validityDate = vDate.toLocaleDateString('EN-US').toUpperCase();
-            }
-        }
+        // Call the shared utility
+        const penalties = calculateTaxPenalties(basicTaxDue, notarialDate);
 
         return {
-            taxBase,
+            totalMarketValue: mv,
             consideration: con,
-            totalMarketValue: mv, // Return this for comparison display in Summary
-            taxDue,
-            surcharge,
-            interest,
-            totalAmountDue: taxDue + surcharge + interest,
-            daysElapsed,
-            validityDate,
+            taxBase,
+            taxRate: 0.75, // Standard rate
+            basicTaxDue: basicTaxDue,
+            ...penalties, // Spreads surcharge, interest, daysElapsed, etc.
         };
     }, [notarialDate, transactionType, totalMarketValue, consideration]);
+}
+
+
+
+export function useEJSComputation(properties: any[], notarialDate: string) {
+    const [ejsChain, setEjsChain] = useState<any[]>([]);
+
+    const addTransfer = (deceasedName: string, heirs: string[], share: number, mv: number) => {
+        const taxBase = mv * share;
+        const basicTaxDue = Math.max(taxBase * 0.0075, 500);
+        const newTransfer = {
+            deceasedOwner: deceasedName,
+            heirs: heirs.join(", "),
+            share,
+            taxBase,
+            basicTaxDue
+        };
+
+        setEjsChain((prev) => [...prev, newTransfer]);
+    };
+    // 2. Compute the final totals based on the chain and the date
+    const totals = useMemo(() => {
+        // Step 9: sum basic taxes
+        const totalBasicTax = ejsChain.reduce((sum, item) => sum + item.basicTaxDue, 0);
+
+        // Step 10: Apply penalties to the total sum
+        // We ensure a minimum tax of P500 is applied to the aggregate if required by law
+        const adjustedBasicTax = Math.max(totalBasicTax, 500);
+
+        const penalties = calculateTaxPenalties(adjustedBasicTax, notarialDate);
+
+        return {
+            totalMarketValue: "N/A" as any,
+            consideration: "N/A" as any,
+            taxBase: adjustedBasicTax, // For EJS, taxBase is effectively the sum of shares
+            taxRate: 0.75,
+            basicTaxDue: adjustedBasicTax,
+            ...penalties // Includes surcharge, interest, daysElapsed, validityDate, and totalAmountDue
+        };
+
+        // 3. Include notarialDate in the dependencies
+    }, [ejsChain, notarialDate]);
+
+    return {
+        ejsChain,
+        setEjsChain,
+        addTransfer,
+        totals
+    };
 }

@@ -130,24 +130,23 @@ model TransferTaxDetails {
 }
 
 model ChainTransaction {
-  id             String       @id @default(cuid())
-  transferee  String
-  transferror String
-  transactionType String
-  lotnumber String
-  area Float
-  marketValue Decimal
-  taxdue Decimal
+  id               String      @id @default(cuid())
+  transferTaxId    String
+  transferTax      TransferTax @relation(fields: [transferTaxId], references: [id])
+  userId           String
+  user             User        @relation(fields: [userId], references: [id])
   
-
-  // Relations
-  userId String
-  user User @relation(fields: [userId], references: [id])
-  transferTaxId String
-  transferTax TransferTax @relation(fields: [transferTaxId], references: [id])
-
+  deceasedOwner    String      // Step 3
+  heirs            String      // Step 4
+  deceasedShare    Float       // e.g., 0.25 (if 1 of 4 owners)
+  taxBase          Float       // Share * Market Value
+  basicTaxDue      Float       // taxBase * 0.0075
   
+  createdAt        DateTime    @default(now())
 }
+
+  
+
 
 model OfficeSignature {
   id        String   @id @default(cuid())

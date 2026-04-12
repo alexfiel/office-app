@@ -12,10 +12,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui
 import { PropertySearchStep } from "./PropertySearchStep"
 import { PartiesStep } from "./PartiesStep"
 import { PropertyCartStep } from "./PropertyCartStep"
-import { useTaxComputation } from "@/hooks/use-tax-computation"
+import { useTaxComputation, useEJSComputation } from "@/hooks/use-tax-computation"
 import { SummaryStep } from "./SummaryStep"
 import { toast } from "sonner"
 import InvoicePreview from "@/components/invoice/invoice-preview"
+import { EJSTransferModal } from "./EJSTransferModal"
 
 export default function TransferTxFrm() {
     const { data: session } = useSession()
@@ -34,6 +35,7 @@ export default function TransferTxFrm() {
         document_url: ""
     });
 
+
     const [cart, setCart] = useState<RealPropertyInfo[]>([]);
 
     const onAddToCart = (property: RealPropertyInfo) => {
@@ -49,6 +51,20 @@ export default function TransferTxFrm() {
         newOwner: ""
     });
 
+    const ejsChainComputation = useEJSComputation(cart, documentInfo.date);
+    const { ejsChain, setEjsChain } = ejsChainComputation;
+
+    const [isEjsModalOpen, setIsEjsModalOpen] = useState(false);
+    const [selectedEjsProperty, setSelectedEjsProperty] = useState<RealPropertyInfo | null>(null);
+
+    const handleAddEJSTransfer = (newTransfer: any) => {
+        setEjsChain((prev: any) => [...prev, newTransfer]);
+        setIsEjsModalOpen(false);
+        setSelectedEjsProperty(null);
+    }
+
+    const isEJS = transactionType === "DEED OF EXTRAJUDICIAL SETTLEMENT";
+
     const computation = useTaxComputation({
         notarialDate: documentInfo.date,
         transactionType: transactionType,
@@ -58,6 +74,9 @@ export default function TransferTxFrm() {
         }, 0),
         consideration: consideration,
     });
+
+    // Use aggregate EJS totals if applicable, otherwise fallback to standard computation
+    const effectivityComputation = isEJS ? ejsChainComputation.totals : computation;
 
     const [isSuccess, setIsSuccess] = useState(false);
     const [savedTxId, setSavedTxId] = useState<string | null>(null);
@@ -79,16 +98,16 @@ export default function TransferTxFrm() {
                 },
                 // 2. Matches transferTaxInfo in your API
                 transferTaxInfo: {
-                    transferee: parties.newOwner,
-                    transferor: parties.prevOwner,
+                    transferee: isEJS ? (ejsChain[0]?.heirs || "N/A") : parties.newOwner,
+                    transferor: isEJS ? (ejsChain[0]?.deceasedOwner || "N/A") : parties.prevOwner,
                     transactionType: transactionType,
-                    considerationValue: Number(consideration) || 0,
-                    totalMarketValue: computation.totalMarketValue,
-                    taxBase: computation.taxBase,
-                    taxDue: computation.taxDue,
-                    surcharge: computation.surcharge,
-                    interest: computation.interest,
-                    totalAmountDue: computation.totalAmountDue,
+                    considerationValue: isEJS ? 0 : (Number(consideration) || 0),
+                    totalMarketValue: isEJS ? 0 : effectivityComputation.totalMarketValue,
+                    taxBase: effectivityComputation.taxBase,
+                    taxDue: effectivityComputation.basicTaxDue,
+                    surcharge: effectivityComputation.surcharge,
+                    interest: effectivityComputation.interest,
+                    totalAmountDue: effectivityComputation.totalAmountDue,
                     paymentStatus: "PENDING",
                     transactionDate: new Date().toISOString(),
                     validUntil: computation.validityDate,
@@ -103,6 +122,7 @@ export default function TransferTxFrm() {
                     marketValue: Number(item.marketValue),
                     area: Number(item.area),
                 })),
+                chainTransactions: ejsChain,
             };
 
             const res = await fetch("/api/transfertax", {
@@ -144,36 +164,44 @@ export default function TransferTxFrm() {
                 onBack={handleReset}
                 data={{
                     transactionId: savedTxId || "SUCCESS",
-                    transferee: parties.newOwner,
-                    transferor: parties.prevOwner,
+                    transferee: isEJS ? (ejsChain[0]?.heirs || "N/A") : parties.newOwner,
+                    transferor: isEJS ? (ejsChain[0]?.deceasedOwner || "N/A") : parties.prevOwner,
                     computationDate: new Date().toLocaleDateString(),
-                    validityDate: computation.validityDate,
+                    validityDate: effectivityComputation.validityDate,
                     properties: cart.map((item) => ({
                         ...item,
                         marketValue: Number(item.marketValue),
                         area: Number(item.area),
                     })),
-                    totalMarketValue: computation.totalMarketValue,
+                    totalMarketValue: isEJS ? "N/A" : effectivityComputation.totalMarketValue,
                     documentInfo: documentInfo,
                     transactionInfo: {
                         type: transactionType,
-                        consideration: computation.consideration,
-                        dayselapsed: computation.daysElapsed
+                        consideration: isEJS ? "N/A" : effectivityComputation.consideration,
+                        dayselapsed: effectivityComputation.daysElapsed
                     },
+                    ejsChain: ejsChain,
                     computation: {
-                        taxBase: computation.taxBase,
-                        taxDue: computation.taxDue,
-                        surcharge: computation.surcharge,
-                        interest: computation.interest,
-                        totalAmountDue: computation.totalAmountDue
+                        taxBase: effectivityComputation.taxBase,
+                        taxRate: effectivityComputation.taxRate,
+                        basicTaxDue: effectivityComputation.basicTaxDue,
+                        surcharge: effectivityComputation.surcharge,
+                        interest: effectivityComputation.interest,
+                        totalAmountDue: effectivityComputation.totalAmountDue
                     },
-                    preparedBy: "OFFICE STAFF",
+                    preparedBy: session?.user?.name || "OFFICE STAFF",
                     preparedByDesignation: "REVENUE EXAMINER"
                 }}
             />
         );
     }
     //END OF NEW CODE BLOCK
+
+    // Helper to trigger EJS modal from summary or cart
+    const onTriggerEjsModal = (property: RealPropertyInfo) => {
+        setSelectedEjsProperty(property);
+        setIsEjsModalOpen(true);
+    };
 
     return (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -205,9 +233,12 @@ export default function TransferTxFrm() {
             <TabsContent value="cart">
                 <PropertyCartStep
                     cart={cart}
+                    ejsChain={ejsChain}
                     onRemove={removeFromCart}
                     onBack={() => setActiveTab("properties")}
-                    onNext={() => setActiveTab("parties")}
+                    onNext={() => setActiveTab(isEJS ? "summary" : "parties")}
+                    onTriggerEjsTransfer={onTriggerEjsModal}
+                    isEJS={isEJS}
                 />
             </TabsContent>
 
@@ -231,12 +262,9 @@ export default function TransferTxFrm() {
                     transactionType={transactionType}
                     cart={cart}
                     parties={parties}
-                    computation={{
-                        ...computation,
-                        taxBase: computation.taxBase,
-                        totalAmountDue: computation.totalAmountDue,
-
-                    }}// From useTaxComputation hook
+                    ejsChain={ejsChain}
+                    onTriggerEjsTransfer={onTriggerEjsModal}
+                    computation={effectivityComputation}
                     isSuccess={isSuccess}
                     savedTxId={savedTxId}
                     isLoading={isLoading}
@@ -246,6 +274,12 @@ export default function TransferTxFrm() {
                 />
             </TabsContent>
 
+            <EJSTransferModal
+                isOpen={isEjsModalOpen}
+                onClose={() => setIsEjsModalOpen(false)}
+                property={selectedEjsProperty}
+                onAddTransfer={handleAddEJSTransfer}
+            />
         </Tabs>
     )
 }
