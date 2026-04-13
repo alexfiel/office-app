@@ -108,12 +108,12 @@ import {
 
 export const schema = z.object({
   id: z.number(),
-  header: z.string(),
-  type: z.string(),
-  status: z.string(),
-  target: z.string(),
-  limit: z.string(),
-  reviewer: z.string(),
+  header: z.string(), // Transferee
+  type: z.string(),   // Transaction Type
+  status: z.string(), // Payment Status
+  target: z.string(), // Amount Due
+  limit: z.string(),  // Market Value
+  reviewer: z.string(), // Assessor
 })
 
 // Create a separate component for the drag handle
@@ -170,7 +170,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
   {
     accessorKey: "header",
-    header: "Header",
+    header: "Transferee",
     cell: ({ row }) => {
       return <TableCellViewer item={row.original} />
     },
@@ -178,10 +178,10 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
   {
     accessorKey: "type",
-    header: "Section Type",
+    header: "Transaction Type",
     cell: ({ row }) => (
-      <div className="w-32">
-        <Badge variant="outline" className="text-muted-foreground px-1.5">
+      <div className="w-48">
+        <Badge variant="outline" className="text-muted-foreground px-1.5 uppercase text-[10px]">
           {row.original.type}
         </Badge>
       </div>
@@ -203,7 +203,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
   {
     accessorKey: "target",
-    header: () => <div className="w-full text-right">Target</div>,
+    header: () => <div className="w-full text-right">Amount Due</div>,
     cell: ({ row }) => (
       <form
         onSubmit={(e) => {
@@ -228,7 +228,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
   {
     accessorKey: "limit",
-    header: () => <div className="w-full text-right">Limit</div>,
+    header: () => <div className="w-full text-right">Market Value</div>,
     cell: ({ row }) => (
       <form
         onSubmit={(e) => {
@@ -253,7 +253,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
   {
     accessorKey: "reviewer",
-    header: "Reviewer",
+    header: "Assessor",
     cell: ({ row }) => {
       const isAssigned = row.original.reviewer !== "Assign reviewer"
 
@@ -661,7 +661,7 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
         <DrawerHeader className="gap-1">
           <DrawerTitle>{item.header}</DrawerTitle>
           <DrawerDescription>
-            Showing total visitors for the last 6 months
+            Transaction Details and Summary
           </DrawerDescription>
         </DrawerHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">

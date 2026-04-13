@@ -140,7 +140,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-export function ChartAreaInteractive() {
+export function ChartAreaInteractive({ records }: { records: any[] }) {
   const isMobile = useIsMobile()
   const [timeRange, setTimeRange] = React.useState("90d")
 
@@ -150,29 +150,63 @@ export function ChartAreaInteractive() {
     }
   }, [isMobile])
 
-  const filteredData = chartData.filter((item) => {
-    const date = new Date(item.date)
-    const referenceDate = new Date("2024-06-30")
-    let daysToSubtract = 90
-    if (timeRange === "30d") {
-      daysToSubtract = 30
-    } else if (timeRange === "7d") {
-      daysToSubtract = 7
-    }
-    const startDate = new Date(referenceDate)
-    startDate.setDate(startDate.getDate() - daysToSubtract)
-    return date >= startDate
-  })
+  // Process data for chart
+  const processedData = React.useMemo(() => {
+    const dailyData: Record<string, { date: string; amount: number; count: number }> = {};
+    
+    // Sort records by date
+    const sortedRecords = [...records].sort((a, b) => 
+      new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()
+    );
+
+    sortedRecords.forEach(record => {
+      const dateStr = new Date(record.transactionDate).toISOString().split('T')[0];
+      if (!dailyData[dateStr]) {
+        dailyData[dateStr] = { date: dateStr, amount: 0, count: 0 };
+      }
+      dailyData[dateStr].amount += Number(record.totalamountdue || 0);
+      dailyData[dateStr].count += 1;
+    });
+
+    return Object.values(dailyData);
+  }, [records]);
+
+  const filteredData = React.useMemo(() => {
+    return processedData.filter((item) => {
+      const date = new Date(item.date)
+      const now = new Date();
+      let daysToSubtract = 90
+      if (timeRange === "30d") {
+        daysToSubtract = 30
+      } else if (timeRange === "7d") {
+        daysToSubtract = 7
+      }
+      const startDate = new Date()
+      startDate.setDate(now.getDate() - daysToSubtract)
+      return date >= startDate
+    })
+  }, [processedData, timeRange]);
+
+  const chartConfig = {
+    amount: {
+      label: "Revenue (P)",
+      color: "var(--chart-2)",
+    },
+    count: {
+      label: "Count",
+      color: "var(--primary)",
+    },
+  } satisfies ChartConfig
 
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Total Visitors</CardTitle>
+        <CardTitle>Transfer Tax Revenue Trend</CardTitle>
         <CardDescription>
           <span className="hidden @[540px]/card:block">
-            Total for the last 3 months
+            Total revenue collected over time
           </span>
-          <span className="@[540px]/card:hidden">Last 3 months</span>
+          <span className="@[540px]/card:hidden">Revenue trends</span>
         </CardDescription>
         <CardAction>
           <ToggleGroup
@@ -215,27 +249,15 @@ export function ChartAreaInteractive() {
         >
           <AreaChart data={filteredData}>
             <defs>
-              <linearGradient id="fillDesktop" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="fillAmount" x1="0" y1="0" x2="0" y2="1">
                 <stop
                   offset="5%"
-                  stopColor="var(--color-desktop)"
-                  stopOpacity={1.0}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-desktop)"
-                  stopOpacity={0.1}
-                />
-              </linearGradient>
-              <linearGradient id="fillMobile" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-mobile)"
+                  stopColor="var(--chart-2)"
                   stopOpacity={0.8}
                 />
                 <stop
                   offset="95%"
-                  stopColor="var(--color-mobile)"
+                  stopColor="var(--chart-2)"
                   stopOpacity={0.1}
                 />
               </linearGradient>
@@ -263,6 +285,7 @@ export function ChartAreaInteractive() {
                     return new Date(value).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
+                      year: "numeric",
                     })
                   }}
                   indicator="dot"
@@ -270,17 +293,10 @@ export function ChartAreaInteractive() {
               }
             />
             <Area
-              dataKey="mobile"
+              dataKey="amount"
               type="natural"
-              fill="url(#fillMobile)"
-              stroke="var(--color-mobile)"
-              stackId="a"
-            />
-            <Area
-              dataKey="desktop"
-              type="natural"
-              fill="url(#fillDesktop)"
-              stroke="var(--color-desktop)"
+              fill="url(#fillAmount)"
+              stroke="var(--chart-2)"
               stackId="a"
             />
           </AreaChart>

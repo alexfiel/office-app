@@ -6,6 +6,7 @@ import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import { Label } from "../ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
+import { cn } from "@/lib/utils"
 
 
 interface EJSTransferModalProps {
@@ -50,9 +51,19 @@ export function EJSTransferModal({ isOpen, onClose, property, onAddTransfer }: E
         onClose()
 
     }
+    const getModalWidth = () => {
+        const length = deceasedOwner?.length || 0;
+        if (length > 40) return "sm:max-w-[800px]";
+        if (length > 25) return "sm:max-w-[600px]";
+        return "sm:max-w-[425px]";
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className={cn(
+                "max-h-[95vh] overflow-y-auto transition-all duration-300 ease-in-out",
+                getModalWidth()
+            )}>
                 <DialogHeader>
                     <DialogTitle className="font-small-caps">Add Estate Transfer</DialogTitle>
                 </DialogHeader>
@@ -62,7 +73,7 @@ export function EJSTransferModal({ isOpen, onClose, property, onAddTransfer }: E
                     <div className="space-y-2">
                         <Label>Select Deceased Owner</Label>
                         <Select onValueChange={setDeceasedOwner} value={deceasedOwner}>
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Choose from current owners..." />
                             </SelectTrigger>
                             <SelectContent>

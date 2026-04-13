@@ -8,7 +8,7 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar"
 
-import data from "./data.json"
+import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 
@@ -25,6 +25,38 @@ export default async function Home() {
     role: (session.user as any).role || "USER",
   };
 
+  const transferTaxes = await prisma.transferTax.findMany({
+    include: {
+      user: {
+        select: {
+          name: true,
+        }
+      },
+    },
+    orderBy: {
+      createdAt: 'desc'
+    }
+  });
+
+  // Calculate high-level stats for SectionCards
+  const stats = {
+    totalRevenue: transferTaxes.reduce((sum, tx) => sum + Number(tx.totalamountdue || 0), 0),
+    totalTransactions: transferTaxes.length,
+    activeAssessors: new Set(transferTaxes.map(tx => tx.userId)).size,
+    growthRate: 12.5, // Mock growth for now
+  };
+
+  // Format data for DataTable
+  const tableData = transferTaxes.map((tx, index) => ({
+    id: index + 1,
+    header: tx.transferee,
+    type: tx.transactionType,
+    status: tx.paymentstatus === "PAID" ? "Done" : "In Process",
+    target: Number(tx.totalamountdue || 0).toLocaleString(),
+    limit: Number(tx.totalmarketvalue || 0).toLocaleString(),
+    reviewer: tx.user?.name || "Unknown",
+  }));
+
   return (
     <SidebarProvider
       style={
@@ -40,11 +72,11 @@ export default async function Home() {
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-              <SectionCards />
+              <SectionCards stats={stats} />
               <div className="px-4 lg:px-6">
-                <ChartAreaInteractive />
+                <ChartAreaInteractive records={JSON.parse(JSON.stringify(transferTaxes))} />
               </div>
-              <DataTable data={data} />
+              <DataTable data={tableData} />
             </div>
           </div>
         </div>

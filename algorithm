@@ -44,12 +44,12 @@ Deed of Extrajudicial Settlement
 3. Determining the deceased owner
 4. transfer the share of the deceased to the heirs
 5. compute transfer tax of the deceased to heirs
-6. Update owner name of the property remaining co-owner + heirs of the deceased
-7. add to cart for chaintransaction and save the transfer to the schema chaintransaction 
-8. repeat step 1 until all the deceased owner is transferred to the heirs
-9. compute the total amount due by adding the transfer tax of all the transfers
-10. compute the surcharge and interest if any
-11. save the computation to the transafer tax list 
+6. add to cart for chaintransaction and save the transfer to the schema chaintransaction 
+7. repeat step 1 until all the deceased owner is transferred to the heirs
+8. compute the total amount due by adding the transfer tax of all the transfers
+9. compute the surcharge and interest if any
+10. save the computation to the transafer tax list 
+11. API Update owner name of the property remaining co-owner + heirs of the deceased
 12. User can print the computation sheet
 
 -- end of file --

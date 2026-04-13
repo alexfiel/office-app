@@ -31,13 +31,26 @@ export function useTaxComputation({ notarialDate, transactionType, totalMarketVa
 export function useEJSComputation(properties: any[], notarialDate: string) {
     const [ejsChain, setEjsChain] = useState<any[]>([]);
 
-    const addTransfer = (deceasedName: string, heirs: string[], share: number, mv: number) => {
-        const taxBase = mv * share;
-        const basicTaxDue = Math.max(taxBase * 0.0075, 500);
+    const addTransfer = (deceasedName: string, heirs: string[], share: any, mv: any) => {
+        // Force conversion to numbers and handle potential "1/2" strings
+        const numericMv = Number(String(mv).replace(/,/g, '')) || 0;
+
+        let numericShare = 0;
+        try {
+            numericShare = typeof share === 'string' ? eval(share) : Number(share);
+        } catch {
+            numericShare = 0;
+        }
+
+        const taxBase = numericMv * numericShare;
+
+        // Ensure this doesn't result in NaN
+        const basicTaxDue = isNaN(taxBase) ? 500 : Math.max(taxBase * 0.0075, 500);
+
         const newTransfer = {
             deceasedOwner: deceasedName,
             heirs: heirs.join(", "),
-            share,
+            share: numericShare,
             taxBase,
             basicTaxDue
         };
@@ -46,25 +59,29 @@ export function useEJSComputation(properties: any[], notarialDate: string) {
     };
     // 2. Compute the final totals based on the chain and the date
     const totals = useMemo(() => {
-        // Step 9: sum basic taxes
-        const totalBasicTax = ejsChain.reduce((sum, item) => sum + item.basicTaxDue, 0);
+        // If no one is settled yet, everything is 0
+        if (ejsChain.length === 0) {
+            return {
+                taxBase: 0,
+                basicTaxDue: 0,
+                surcharge: 0,
+                interest: 0,
+                totalAmountDue: 0,
+                daysElapsed: 0,
+                validityDate: "N/A"
+            };
+        }
 
-        // Step 10: Apply penalties to the total sum
-        // We ensure a minimum tax of P500 is applied to the aggregate if required by law
+        const totalBasicTax = ejsChain.reduce((sum, item) => sum + (item.basicTaxDue || 0), 0);
         const adjustedBasicTax = Math.max(totalBasicTax, 500);
 
         const penalties = calculateTaxPenalties(adjustedBasicTax, notarialDate);
 
         return {
-            totalMarketValue: "N/A" as any,
-            consideration: "N/A" as any,
-            taxBase: adjustedBasicTax, // For EJS, taxBase is effectively the sum of shares
-            taxRate: 0.75,
+            taxBase: adjustedBasicTax,
             basicTaxDue: adjustedBasicTax,
-            ...penalties // Includes surcharge, interest, daysElapsed, validityDate, and totalAmountDue
+            ...penalties
         };
-
-        // 3. Include notarialDate in the dependencies
     }, [ejsChain, notarialDate]);
 
     return {
