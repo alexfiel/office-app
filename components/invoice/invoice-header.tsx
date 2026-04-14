@@ -6,7 +6,7 @@ export function InvoiceHeader() {
                     <img src="/header.png" alt="Logo" style={{ width: '550px', height: '80px' }} />
                 </div>
             </div>
-            <h1 className="text-2xl font-black tracking-widest text-slate-800 uppercase">RPT TRANSFER TAX COMPUTATION SHEET</h1>
+            <h1 className="text-2xl font-black tracking-widest text-slate-800 uppercase">REAL PROPERTY TRANSFER TAX COMPUTATION SHEET</h1>
 
         </div>
     );

@@ -5,6 +5,7 @@ import { Download } from "lucide-react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import QRCode from "react-qr-code";
+import { useReactToPrint } from "react-to-print";
 
 import { jsPDF } from "jspdf"
 import * as htmlToImage from "html-to-image"
@@ -47,6 +48,10 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
             maximumFractionDigits: 2,
         })}`;
 
+    const handlePrint = useReactToPrint({
+        contentRef: invoiceRef
+    })
+
     const handleDownloadPdf = async () => {
         if (!invoiceRef.current) return;
         try {
@@ -71,10 +76,11 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const sideMargin = 12.7;
             const topMargin = 0.25;
+            const bottomMargin = 0.25;
             const footerBottomOffset = 10;
 
             const printableWidthMM = pdfWidth - (2 * sideMargin);
-            const printableHeightMM = pdfHeight - topMargin - 20;
+            const printableHeightMM = pdfHeight - topMargin - bottomMargin;
 
             const scale = img.width / printableWidthMM;
             const pixelHeightPerPage = printableHeightMM * scale;
@@ -140,9 +146,12 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
     return (
         <div className="p-4 bg-gray-50 min-h-screen">
             {/* Header/Buttons (not part of the printed PDF) */}
-            <div className="max-w-4xl mx-auto flex justify-between mb-4">
+            <div className="max-w-4xl mx-auto flex justify-between mb-4 gap-2">
                 <Button onClick={onBack} variant="outline">Back</Button>
-                <Button onClick={handleDownloadPdf}>Download PDF</Button>
+                <div className="flex gap-2">
+                    <Button onClick={handlePrint}>Print Invoice</Button> {/* New Print Button */}
+                    <Button onClick={handleDownloadPdf}>Download PDF</Button>
+                </div>
             </div>
 
 
