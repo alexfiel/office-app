@@ -53,6 +53,7 @@ export const notarialDocumentSchema = z.object({
 });
 
 export const chainTransactionSchema = z.object({
+    propertyId: z.string().optional(),
     deceasedOwner: z.string(),
     heirs: z.string(),
     share: z.number(),

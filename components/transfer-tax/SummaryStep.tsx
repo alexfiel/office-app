@@ -118,6 +118,18 @@ export function SummaryStep({
                         <p className="font-bold uppercase">{documentInfo.type}</p>
                         <p className="font-mono">DOC: {documentInfo.docNo} | PAGE: {documentInfo.pageNo} | BOOK: {documentInfo.bookNo}</p>
                         <p className="italic">NOTARIZED BY: {documentInfo.notarizedBy}</p>
+                        {documentInfo.document_url && (
+                            <div className="pt-2">
+                                <a
+                                    href={documentInfo.document_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                >
+                                    📄 VIEW ATTACHED PDF
+                                </a>
+                            </div>
+                        )}
                     </div>
                     <div className="text-xs space-y-2 text-right">
                         <h3 className="font-black uppercase text-muted-foreground">Transaction Details</h3>

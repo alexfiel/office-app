@@ -94,7 +94,7 @@ export default function TransferTxFrm() {
                     number: `DOC: ${documentInfo.docNo}, PAGE: ${documentInfo.pageNo}, BOOK: ${documentInfo.bookNo}`,
                     date: new Date(documentInfo.date).toISOString(),
                     notarizedBy: documentInfo.notarizedBy,
-                    document_url: "", // Add if you have file uploads
+                    document_url: documentInfo.document_url,
                 },
                 // 2. Matches transferTaxInfo in your API
                 transferTaxInfo: {

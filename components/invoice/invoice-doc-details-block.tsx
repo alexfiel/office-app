@@ -47,6 +47,22 @@ export function DetailsBlock({ invoice, formatCurrency }: DetailsBlockProps) {
                             {doc.notarizedDate || doc.date || "N/A"}
                         </span>
                     </div>
+
+                    {doc.document_url && (
+                        <>
+                            <span className="text-slate-300 print:hidden">|</span>
+                            <div className="flex items-center gap-1.5 print:hidden">
+                                <a
+                                    href={doc.document_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-bold text-blue-600 hover:underline uppercase"
+                                >
+                                    📄 VIEW PDF
+                                </a>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
             <hr className="border-slate-200" />

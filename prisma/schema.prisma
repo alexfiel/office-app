@@ -60,6 +60,7 @@ model RealProperty {
   userId             String
   user               User                 @relation(fields: [userId], references: [id])
   transferTaxDetails TransferTaxDetails[]
+  chainTransactions  ChainTransaction[]
 }
 
 model NotarialDocument {
@@ -142,6 +143,9 @@ model ChainTransaction {
   taxBase          Float       // Share * Market Value
   basicTaxDue      Float       // taxBase * 0.0075
   
+  realPropertyId   String?
+  realProperty     RealProperty? @relation(fields: [realPropertyId], references: [id])
+
   createdAt        DateTime    @default(now())
 }
 

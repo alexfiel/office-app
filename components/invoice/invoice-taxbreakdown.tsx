@@ -56,10 +56,16 @@ export function TaxBreakdown({ invoice, isEJS, ejsTotals }: TaxBreakdownProps) {
                 {isEJS ? (
                     /* EJS COMPUTATION VIEW */
                     <>
+                        <div className="flex justify-between items-center bg-white p-3 rounded-xl border-2 border-slate-100 shadow-sm">
+                            <span className="font-black text-slate-800 uppercase tracking-wider text-xs">AGGREGATED TAX BASE:</span>
+                            <span className="font-bold text-slate-900 text-base">
+                                {formatCurrency(ejsTotals?.taxBase || invoice.computation.taxBase)}
+                            </span>
+                        </div>
                         <div className="flex justify-between items-center pt-4 border-t-2 border-slate-200 border-dashed px-1">
-                            <span className="font-bold text-slate-700 uppercase text-xs">SUB TOTAL TAX DUE (CHAIN):</span>
+                            <span className="font-bold text-slate-700 uppercase text-xs">TOTAL BASIC TAX DUE (ALL STEPS):</span>
                             <span className="font-bold text-slate-900">
-                                {formatCurrency(invoice.computation.basicTaxDue)}
+                                {formatCurrency(ejsTotals?.taxDue || invoice.computation.basicTaxDue)}
                             </span>
                         </div>
                         {invoice.transactionInfo.dayselapsed > 60 &&
@@ -114,7 +120,7 @@ export function TaxBreakdown({ invoice, isEJS, ejsTotals }: TaxBreakdownProps) {
                         GRAND TOTAL DUE
                     </span>
                     <span className="text-2xl font-black text-black-600 drop-shadow-sm">
-                        {formatCurrency(invoice.computation.totalAmountDue)}
+                        {formatCurrency(isEJS ? (ejsTotals?.total || invoice.computation.totalAmountDue) : invoice.computation.totalAmountDue)}
                     </span>
                 </div>
             </div>

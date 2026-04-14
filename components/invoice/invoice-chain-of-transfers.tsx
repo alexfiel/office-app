@@ -6,7 +6,7 @@ interface ChainTransfer {
     share: number;
     shareString?: string; // e.g., "1/2"
     taxBase: number;
-    basicTax: number;
+    basicTaxDue: number;
     tdNo?: string;
 }
 
@@ -79,7 +79,7 @@ export function ChainOfTransfers({ invoice, formatCurrency }: ChainOfTransfersPr
                                     Tax Base for this Step: <span className="font-mono">{formatCurrency(t.taxBase)}</span>
                                 </p>
                                 <p className="font-black text-slate-900 text-xs">
-                                    Basic Tax Due: {formatCurrency(t.basicTax)}
+                                    Basic Tax Due: {formatCurrency(t.basicTaxDue)}
                                 </p>
                             </div>
                         </div>
@@ -91,7 +91,7 @@ export function ChainOfTransfers({ invoice, formatCurrency }: ChainOfTransfersPr
             <div className="mt-4 p-3 bg-slate-900 rounded-lg text-white flex justify-between items-center">
                 <span className="text-[10px] font-bold tracking-widest uppercase">Total Basic Tax for All Steps:</span>
                 <span className="text-sm font-black font-mono">
-                    {formatCurrency(invoice.ejsChain.reduce((sum, t) => sum + t.basicTax, 0))}
+                    {formatCurrency(invoice.ejsChain.reduce((sum, t) => sum + t.basicTaxDue, 0))}
                 </span>
             </div>
         </div>
