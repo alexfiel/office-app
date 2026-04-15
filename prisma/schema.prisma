@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../lib/generated/prisma"
@@ -15,26 +9,21 @@ datasource db {
 }
 
 model User {
-  id                 String               @id @default(cuid())
+  id                 String                    @id @default(cuid())
   name               String
-  email              String               @unique
+  email              String                    @unique
   password           String
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  role               Role                      @default(USER)
   designation        String
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  role               Role                 @default(USER)
-  
-  // Relations
+  chainTransactions  ChainTransaction[]
+  liquidations       LibrengSakayLiquidation[]
+  trips              LibrengSakayTrip[]
   notarialDocuments  NotarialDocument[]
+  realProperties     RealProperty[]
   transferTaxes      TransferTax[]
   transferTaxDetails TransferTaxDetails[]
-  realProperties     RealProperty[]
-  chainTransactions  ChainTransaction[]
-}
-
-enum Role {
-  USER
-  ADMIN
 }
 
 model RealProperty {
@@ -54,13 +43,11 @@ model RealProperty {
   marketValue        Decimal
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
-  documentUrl        String?              // Added for your file upload
-
-  // Relations
+  documentUrl        String?
   userId             String
+  chainTransactions  ChainTransaction[]
   user               User                 @relation(fields: [userId], references: [id])
   transferTaxDetails TransferTaxDetails[]
-  chainTransactions  ChainTransaction[]
 }
 
 model NotarialDocument {
@@ -73,19 +60,16 @@ model NotarialDocument {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   document_url   String
-  
-  // Relations
   userId         String
   user           User          @relation(fields: [userId], references: [id])
-  // Added back-relation for TransferTax
-  transferTaxes  TransferTax[] 
+  transferTaxes  TransferTax[]
 }
 
 model TransferTax {
   id                 String               @id @default(cuid())
   transferee         String
   transferor         String
-  transactionType   String
+  transactionType    String
   considerationvalue Decimal
   totalmarketvalue   Decimal
   taxbase            Decimal
@@ -95,19 +79,16 @@ model TransferTax {
   totalamountdue     Decimal
   paymentstatus      String
   transactionDate    DateTime             @default(now())
-  dayselapsed        Int                  @default(0)
   createdAt          DateTime             @default(now())
   validuntil         String
   updatedAt          DateTime             @updatedAt
-
-  // Relations
-  notarialDocument   NotarialDocument     @relation(fields: [notarialDocumentId], references: [id])
   notarialDocumentId String
   userId             String
-  user               User                 @relation(fields: [userId], references: [id])
-  // Added back-relation for TransferTaxDetails
-  details            TransferTaxDetails[] 
+  dayselapsed        Int                  @default(0)
   chainTransactions  ChainTransaction[]
+  notarialDocument   NotarialDocument     @relation(fields: [notarialDocumentId], references: [id])
+  user               User                 @relation(fields: [userId], references: [id])
+  details            TransferTaxDetails[]
 }
 
 model TransferTaxDetails {
@@ -119,44 +100,96 @@ model TransferTaxDetails {
   area           Float
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-
-  // Relations
-  transferTax    TransferTax  @relation(fields: [transferTaxId], references: [id])
   transferTaxId  String
-  realProperty   RealProperty @relation(fields: [realPropertyId], references: [id])
   realPropertyId String
-  // Added the missing User relation field
   userId         String
+  realProperty   RealProperty @relation(fields: [realPropertyId], references: [id])
+  transferTax    TransferTax  @relation(fields: [transferTaxId], references: [id])
   user           User         @relation(fields: [userId], references: [id])
 }
 
 model ChainTransaction {
-  id               String      @id @default(cuid())
-  transferTaxId    String
-  transferTax      TransferTax @relation(fields: [transferTaxId], references: [id])
-  userId           String
-  user             User        @relation(fields: [userId], references: [id])
-  
-  deceasedOwner    String      // Step 3
-  heirs            String      // Step 4
-  deceasedShare    Float       // e.g., 0.25 (if 1 of 4 owners)
-  taxBase          Float       // Share * Market Value
-  basicTaxDue      Float       // taxBase * 0.0075
-  
-  realPropertyId   String?
-  realProperty     RealProperty? @relation(fields: [realPropertyId], references: [id])
-
-  createdAt        DateTime    @default(now())
+  id             String        @id @default(cuid())
+  userId         String
+  transferTaxId  String
+  basicTaxDue    Float
+  createdAt      DateTime      @default(now())
+  deceasedOwner  String
+  deceasedShare  Float
+  heirs          String
+  taxBase        Float
+  realPropertyId String?
+  realProperty   RealProperty? @relation(fields: [realPropertyId], references: [id])
+  transferTax    TransferTax   @relation(fields: [transferTaxId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
 }
 
-  
-
-
 model OfficeSignature {
-  id        String   @id @default(cuid())
-  name      String
-  designation String
+  id           String   @id @default(cuid())
+  name         String
+  designation  String
   signatureUrl String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model LibrengSakayRoute {
+  id        String             @id @default(cuid())
+  code      String
+  routeName String
+  fare      Float
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  trips     LibrengSakayTrip[]
+}
+
+model LibrengSakayTrip {
+  id                 String                    @id @default(cuid())
+  departureDate      DateTime
+  driverName         String
+  vehiclePlateNumber String
+  numberofPax        Int
+  fare               Float
+  amount             Float
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  routeId            String
+  userId             String
+  liquidations       LibrengSakayLiquidation[]
+  route              LibrengSakayRoute         @relation(fields: [routeId], references: [id])
+  user               User                      @relation(fields: [userId], references: [id])
+}
+
+model LibrengSakayLiquidation {
+  id                 String           @id @default(cuid())
+  departureDate      DateTime
+  paymentDate        DateTime
+  arnumber           String
+  driverName         String
+  vehiclePlateNumber String
+  numberofPax        Int
+  fare               Float
+  amount             Float
+  preparedby         String
+  approvedby         String
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  tripId             String
+  userId             String
+  trip               LibrengSakayTrip @relation(fields: [tripId], references: [id])
+  user               User             @relation(fields: [userId], references: [id])
+}
+
+model LibrengSakayBudget {
+  id          String   @id @default(cuid())
+  year        Int
+  month       Int?
+  totalBudget Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum Role {
+  USER
+  ADMIN
 }

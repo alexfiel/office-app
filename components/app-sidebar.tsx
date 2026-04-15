@@ -23,6 +23,7 @@ import {
   IconSettings,
   IconUsers,
   IconBuildingSkyscraper,
+  IconBus,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -53,9 +54,9 @@ const data = {
       icon: IconListDetails,
     },
     {
-      title: "Create New Accomplishment",
-      url: "#",
-      icon: IconFileWord,
+      title: "Libreng Sakay",
+      url: "/librengsakay",
+      icon: IconBus,
     },
 
 
