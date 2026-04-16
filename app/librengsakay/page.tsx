@@ -110,7 +110,7 @@ export default async function LibrengSakay() {
                             <div className="border rounded-xl p-6 bg-white shadow-sm">
                                 <h2 className="text-lg font-semibold mb-4">Liquidation Report</h2>
                                 <p className="text-sm text-gray-500 mb-6">View and export historical liquidation data.</p>
-                                <LiquidationReport routes={routes} />
+                                <LiquidationReport routes={routes} userName={user.name} />
                             </div>
                         </TabsContent>
                     </Tabs>

@@ -2,8 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { getLiquidationReport } from '@/lib/upload/librengsakay/liquidation';
+import { Report } from './reports/report';
+import jsPDF from 'jspdf';
+import { toPng } from 'html-to-image';
 
-export default function LiquidationReport({ routes }: { routes: any[] }) {
+export default function LiquidationReport({ routes, userName }: { routes: any[], userName: string }) {
     const today = new Date().toISOString().split('T')[0];
     const [filters, setFilters] = useState({
         startDate: today,
@@ -12,6 +15,8 @@ export default function LiquidationReport({ routes }: { routes: any[] }) {
     });
     const [reportData, setReportData] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [showPrintView, setShowPrintView] = useState(false);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
     const loadReport = async () => {
         setIsLoading(true);
@@ -59,6 +64,69 @@ export default function LiquidationReport({ routes }: { routes: any[] }) {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    };
+
+    const downloadAsPDF = async () => {
+        const reportElement = document.getElementById('pdf-report-content');
+        if (!reportElement) return;
+
+        setIsGeneratingPdf(true);
+        try {
+            // Force a standard desktop width for the capture so it never gets squashed on small screens
+            const targetWidth = Math.max(reportElement.scrollWidth, 1000);
+
+            const imgData = await toPng(reportElement, {
+                pixelRatio: 2,
+                backgroundColor: '#ffffff',
+                cacheBust: true,
+                width: targetWidth,
+                style: {
+                    width: `${targetWidth}px`,
+                    transform: 'none'
+                }
+            });
+
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const padding = 10; // 10mm margins
+            const maxContentWidth = pdfWidth - (padding * 2);
+            
+            const img = new Image();
+            img.src = imgData;
+            await new Promise((resolve) => { img.onload = resolve; });
+
+            // Calculate dimensions to fit exactly within margins
+            const imgWidth = maxContentWidth;
+            const imgHeight = (img.height * imgWidth) / img.width;
+            
+            // Center element exactly
+            const xOffset = (pdfWidth - imgWidth) / 2;
+            
+            let heightLeft = imgHeight;
+            let position = padding;
+
+            // First page
+            pdf.addImage(imgData, 'PNG', xOffset, position, imgWidth, imgHeight);
+            heightLeft -= (pdfHeight - (padding * 2));
+
+            // Support for incredibly long reports spanning multiple pages
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight + padding;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', xOffset, position, imgWidth, imgHeight);
+                heightLeft -= (pdfHeight - (padding * 2));
+            }
+            
+            const startDateStr = filters.startDate ? filters.startDate.split('T')[0] : 'start';
+            const endDateStr = filters.endDate ? filters.endDate.split('T')[0] : 'end';
+            pdf.save(`Liquidation_Report_${startDateStr}_to_${endDateStr}.pdf`);
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Failed to generate PDF. Please check console for details.');
+        } finally {
+            setIsGeneratingPdf(false);
+        }
     };
 
     const totalPax = reportData.reduce((sum, item) => sum + item.numberofPax, 0);
@@ -114,6 +182,14 @@ export default function LiquidationReport({ routes }: { routes: any[] }) {
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                     CSV Export
+                </button>
+                <button 
+                    onClick={() => setShowPrintView(true)}
+                    disabled={isLoading || reportData.length === 0}
+                    className="bg-slate-800 text-white rounded-xl py-2.5 font-bold text-sm hover:bg-slate-900 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                    Print Report
                 </button>
             </div>
 
@@ -190,6 +266,45 @@ export default function LiquidationReport({ routes }: { routes: any[] }) {
                     </table>
                 </div>
             </div>
+
+            {/* Official Print Preview Overlay */}
+            {showPrintView && (
+                <div className="fixed inset-0 z-[100] bg-white overflow-y-auto print:static print:bg-transparent">
+                    <div className="sticky top-0 right-0 p-4 flex justify-end gap-4 bg-slate-900/10 backdrop-blur-md print:hidden">
+                        <button 
+                            onClick={downloadAsPDF}
+                            disabled={isGeneratingPdf}
+                            className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:active:scale-100"
+                        >
+                            {isGeneratingPdf ? (
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            ) : (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                            )}
+                            {isGeneratingPdf ? 'Generating PDF...' : 'Download PDF'}
+                        </button>
+                        <button 
+                            onClick={() => setShowPrintView(false)}
+                            className="bg-white text-slate-900 border border-slate-200 px-6 py-2 rounded-lg font-bold hover:bg-slate-50 transition-all active:scale-95"
+                        >
+                            Close Preview
+                        </button>
+                    </div>
+                    <div className="min-h-screen py-8 bg-slate-100 flex items-start justify-center print:bg-white print:py-0">
+                        {/* We give the report container a fixed minimum width so html-to-image never captures a squashed version */}
+                        <div id="pdf-report-content" className="bg-white p-12 shadow-2xl w-[1000px] max-w-none print:shadow-none print:p-0 print:w-full">
+                            <Report 
+                                routeName={routes.find(r => r.id === filters.routeId)?.routeName || "Summarized Report"} 
+                                data={reportData} 
+                                userName={userName}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

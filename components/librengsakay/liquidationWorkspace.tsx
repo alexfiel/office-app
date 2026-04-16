@@ -68,6 +68,20 @@ export default function LiquidationWorkspace({ routes, userId, userName }: any){
         setEditingTrips(selectedTrips);
     };
 
+    const updatePax = (tripId: string, newPax: number) => {
+        if (!editingTrips) return;
+        setEditingTrips(prev => prev?.map(trip => {
+            if (trip.id === tripId) {
+                return {
+                    ...trip,
+                    numberofPax: newPax,
+                    amount: newPax * trip.fare
+                };
+            }
+            return trip;
+        }) || null);
+    };
+
     const totalPax = editingTrips?.reduce((sum, t) => sum + t.numberofPax, 0) || 0;
     const totalAmount = editingTrips?.reduce((sum, t) => sum + t.amount, 0) || 0;
 
@@ -179,11 +193,42 @@ export default function LiquidationWorkspace({ routes, userId, userName }: any){
                         <div className="grid grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
                             <div>
                                 <label className="text-[10px] font-bold uppercase text-slate-400 block tracking-widest">Aggregate Pax</label>
-                                <p className="text-xl font-bold text-slate-800">{totalPax}</p>
+                                <p className="text-xl font-bold text-slate-800">{totalPax.toLocaleString()}</p>
                             </div>
                             <div>
                                 <label className="text-[10px] font-bold uppercase text-slate-400 block tracking-widest">Total Amount</label>
                                 <p className="text-xl font-bold text-blue-600">₱{totalAmount.toLocaleString()}</p>
+                            </div>
+                        </div>
+
+                        {/* Editable Trip List */}
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-bold uppercase text-gray-400 block tracking-widest px-1">Adjust Trip Details</label>
+                            <div className="max-h-52 overflow-y-auto space-y-2.5 pr-2 custom-scrollbar">
+                                {editingTrips.map((trip) => (
+                                    <div key={trip.id} className="flex items-center justify-between gap-4 p-3 bg-white rounded-xl border border-gray-100 shadow-sm hover:border-blue-200 transition-colors">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-gray-900 truncate">{trip.driverName}</p>
+                                            <p className="text-[10px] text-gray-500 font-mono tracking-tight">{trip.vehiclePlateNumber}</p>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-20">
+                                                <label className="text-[8px] uppercase font-black text-gray-400 block mb-1">Pax</label>
+                                                <input 
+                                                    type="number"
+                                                    min="0"
+                                                    value={trip.numberofPax}
+                                                    onChange={(e) => updatePax(trip.id, parseInt(e.target.value) || 0)}
+                                                    className="w-full border bg-gray-50 rounded-lg py-1 px-2 text-sm font-bold text-center focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition-all"
+                                                />
+                                            </div>
+                                            <div className="text-right min-w-[70px]">
+                                                <label className="text-[8px] uppercase font-black text-gray-400 block mb-1">Amount</label>
+                                                <p className="text-sm font-bold text-blue-600">₱{trip.amount.toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
