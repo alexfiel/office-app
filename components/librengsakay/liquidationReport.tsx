@@ -31,13 +31,43 @@ export default function LiquidationReport({ routes }: { routes: any[] }) {
         loadReport();
     }, []);
 
+    const downloadAsCSV = () => {
+        if (reportData.length === 0) return;
+
+        const headers = ["AR #", "Departure Date", "Payment Date", "Route", "Driver", "Plate Number", "Pax", "Fare", "Amount", "Prepared By", "Approved By"];
+        const rows = reportData.map(item => [
+            item.arnumber,
+            new Date(item.departureDate).toLocaleDateString(),
+            new Date(item.paymentDate).toLocaleDateString(),
+            item.trip.route.routeName,
+            item.driverName,
+            item.vehiclePlateNumber,
+            item.numberofPax,
+            item.fare,
+            item.amount,
+            item.preparedby,
+            item.approvedby
+        ]);
+
+        const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Liquidation_Report_${filters.startDate}_to_${filters.endDate}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const totalPax = reportData.reduce((sum, item) => sum + item.numberofPax, 0);
     const totalAmount = reportData.reduce((sum, item) => sum + item.amount, 0);
 
     return (
         <div className="space-y-6">
             {/* Report Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 bg-white border rounded-2xl shadow-sm items-end">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-5 bg-white border rounded-2xl shadow-sm items-end">
                 <div>
                     <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Start Date</label>
                     <input 
@@ -72,9 +102,18 @@ export default function LiquidationReport({ routes }: { routes: any[] }) {
                 <button 
                     onClick={loadReport}
                     disabled={isLoading}
-                    className="bg-blue-600 text-white rounded-xl py-2.5 font-bold text-sm hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
+                    className="bg-blue-600 text-white rounded-xl py-2.5 font-bold text-sm hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     {isLoading ? "Generating..." : "Generate Report"}
+                </button>
+                <button 
+                    onClick={downloadAsCSV}
+                    disabled={isLoading || reportData.length === 0}
+                    className="bg-emerald-600 text-white rounded-xl py-2.5 font-bold text-sm hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    CSV Export
                 </button>
             </div>
 

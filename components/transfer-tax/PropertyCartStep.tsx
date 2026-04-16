@@ -11,6 +11,7 @@ interface PropertyCartStepProps {
     onRemove: (id: string) => void;
     onBack: () => void;
     onNext: () => void;
+    onTriggerEjsTransfer?: (property: RealPropertyInfo) => void;
     isEJS?: boolean;
     ejsChain?: any[];
 }

@@ -59,9 +59,17 @@ export function useEJSComputation(properties: any[], notarialDate: string) {
     };
     // 2. Compute the final totals based on the chain and the date
     const totals = useMemo(() => {
+        const totalMV = properties.reduce((sum, item) => {
+            const val = typeof item.marketValue === 'string' ? parseFloat(item.marketValue) : item.marketValue;
+            return sum + (isNaN(val) ? 0 : val);
+        }, 0);
+
         // If no one is settled yet, everything is 0
         if (ejsChain.length === 0) {
             return {
+                totalMarketValue: totalMV,
+                taxRate: 0.75,
+                consideration: 0,
                 taxBase: 0,
                 basicTaxDue: 0,
                 surcharge: 0,
@@ -78,11 +86,14 @@ export function useEJSComputation(properties: any[], notarialDate: string) {
         const penalties = calculateTaxPenalties(adjustedBasicTax, notarialDate);
 
         return {
+            totalMarketValue: totalMV,
+            taxRate: 0.75,
+            consideration: 0,
             taxBase: adjustedBasicTax,
             basicTaxDue: adjustedBasicTax,
             ...penalties
         };
-    }, [ejsChain, notarialDate]);
+    }, [ejsChain, notarialDate, properties]);
 
     return {
         ejsChain,

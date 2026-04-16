@@ -29,8 +29,61 @@ export default function TripViewList() {
         trip.vehiclePlateNumber.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    // Calculate Stats
+    const totalTrips = trips.length;
+    const totalRevenue = trips.reduce((sum, trip) => sum + (trip.amount || 0), 0);
+    const liquidatedCount = trips.filter(t => t.liquidations.length > 0).length;
+    const progressPercent = totalTrips > 0 ? (liquidatedCount / totalTrips) * 100 : 0;
+
     return (
         <div className="space-y-6">
+            {/* STATS RIBBON */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-5 rounded-2xl shadow-sm text-white">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Trips Logged</p>
+                    <div className="flex justify-between items-end mt-1">
+                        <p className="text-3xl font-black">{totalTrips.toLocaleString()}</p>
+                        <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl shadow-sm text-white">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Potential Revenue (PHP)</p>
+                    <div className="flex justify-between items-end mt-1">
+                        <p className="text-3xl font-black italic">₱{totalRevenue.toLocaleString()}</p>
+                        <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3zM12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Liquidation Progress</p>
+                            <p className="text-3xl font-black text-slate-800 mt-1">{progressPercent.toFixed(1)}%</p>
+                        </div>
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full mt-4 overflow-hidden">
+                        <div 
+                            className="bg-blue-500 h-full transition-all duration-1000 ease-out"
+                            style={{ width: `${progressPercent}%` }}
+                        ></div>
+                    </div>
+                </div>
+            </div>
+
             <div className="flex justify-between items-center bg-white p-4 border rounded-2xl shadow-sm">
                 <div className="relative flex-1 max-w-md">
                     <span className="absolute inset-y-0 left-3 flex items-center text-gray-400">
