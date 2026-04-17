@@ -114,6 +114,7 @@ export async function getTripLogs() {
             include: {
                 route: {
                     select: {
+                        id: true,
                         routeName: true
                     }
                 },
@@ -207,6 +208,25 @@ export async function updateLiquidation(liquidationId: string, data: any, userId
         return result;
     } catch (error: any) {
         console.error("Update Liquidation Error:", error.message);
+        throw error;
+    }
+}
+
+// 7. Transfer Trips Route
+export async function transferTripRoutes(tripIds: string[], newRouteId: string) {
+    try {
+        if (!tripIds || tripIds.length === 0) throw new Error("No trips selected");
+        if (!newRouteId) throw new Error("New route is required");
+        
+        const result = await prisma.librengSakayTrip.updateMany({
+            where: { id: { in: tripIds } },
+            data: { routeId: newRouteId }
+        });
+        
+        revalidatePath("/librengsakay");
+        return result;
+    } catch (error: any) {
+        console.error("Transfer Trip Routes Error:", error.message);
         throw error;
     }
 }

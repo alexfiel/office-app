@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { getTripLogs, updateTripLog } from '@/lib/upload/librengsakay/liquidation';
+import { getTripLogs, updateTripLog, transferTripRoutes } from '@/lib/upload/librengsakay/liquidation';
 import { useSession } from "next-auth/react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-export default function TripViewList() {
+export default function TripViewList({ routes = [] }: { routes?: any[] }) {
     const { data: session } = useSession();
     const isAdmin = (session?.user as any)?.role === "ADMIN";
     const [trips, setTrips] = useState<any[]>([]);
@@ -23,6 +23,12 @@ export default function TripViewList() {
     const [editingTrip, setEditingTrip] = useState<any>(null);
     const [editForm, setEditForm] = useState({ driverName: '', numberofPax: 0, fare: 0, amount: 0 });
     const [isUpdating, setIsUpdating] = useState(false);
+
+    // Transfer route state
+    const [selectedTripIds, setSelectedTripIds] = useState<string[]>([]);
+    const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+    const [targetRouteId, setTargetRouteId] = useState('');
+    const [isTransferring, setIsTransferring] = useState(false);
 
     const handleEditClick = (trip: any) => {
         setEditingTrip(trip);
@@ -47,6 +53,23 @@ export default function TripViewList() {
             toast.error(error.message || "Failed to update trip");
         } finally {
             setIsUpdating(false);
+        }
+    };
+
+    const handleTransferSubmit = async () => {
+        if (!targetRouteId || selectedTripIds.length === 0) return;
+        setIsTransferring(true);
+        try {
+            await transferTripRoutes(selectedTripIds, targetRouteId);
+            toast.success(`${selectedTripIds.length} trips transferred successfully!`);
+            setIsTransferModalOpen(false);
+            setSelectedTripIds([]);
+            setTargetRouteId('');
+            loadTrips();
+        } catch (error: any) {
+            toast.error(error.message || "Failed to transfer trips");
+        } finally {
+            setIsTransferring(false);
         }
     };
 
@@ -79,6 +102,20 @@ export default function TripViewList() {
     });
 
     const uniqueRoutes = Array.from(new Set(trips.map(t => t.route?.routeName).filter(Boolean)));
+
+    const toggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            setSelectedTripIds(filteredTrips.map(t => t.id));
+        } else {
+            setSelectedTripIds([]);
+        }
+    };
+
+    const toggleTripSelect = (id: string) => {
+        setSelectedTripIds(prev => 
+            prev.includes(id) ? prev.filter(tId => tId !== id) : [...prev, id]
+        );
+    };
 
     // Calculate Stats
     const totalTrips = trips.length;
@@ -152,6 +189,14 @@ export default function TripViewList() {
                 </div>
                 
                 <div className="flex items-center gap-3">
+                    {isAdmin && selectedTripIds.length > 0 && (
+                        <button
+                            onClick={() => setIsTransferModalOpen(true)}
+                            className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl transition-colors font-semibold"
+                        >
+                            Transfer ({selectedTripIds.length})
+                        </button>
+                    )}
                     <select
                         className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                         value={filterRoute}
@@ -184,6 +229,16 @@ export default function TripViewList() {
                 <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500 font-bold border-b">
                         <tr>
+                            {isAdmin && (
+                                <th className="p-4 w-10 text-center">
+                                    <input 
+                                        type="checkbox" 
+                                        className="rounded border-slate-300"
+                                        checked={filteredTrips.length > 0 && selectedTripIds.length === filteredTrips.length}
+                                        onChange={toggleSelectAll}
+                                    />
+                                </th>
+                            )}
                             <th className="p-4 uppercase text-[10px] tracking-widest">Date</th>
                             <th className="p-4 uppercase text-[10px] tracking-widest">Route</th>
                             <th className="p-4 uppercase text-[10px] tracking-widest">Driver / Vehicle</th>
@@ -197,12 +252,12 @@ export default function TripViewList() {
                         {isLoading && filteredTrips.length === 0 ? (
                             Array.from({ length: 5 }).map((_, i) => (
                                 <tr key={i} className="animate-pulse">
-                                    <td colSpan={6} className="p-4 bg-slate-50/50 h-12"></td>
+                                    <td colSpan={100} className="p-4 bg-slate-50/50 h-12"></td>
                                 </tr>
                             ))
                         ) : filteredTrips.length === 0 ? (
                             <tr>
-                                <td colSpan={6} className="p-12 text-center text-slate-400 italic">No trips found.</td>
+                                <td colSpan={100} className="p-12 text-center text-slate-400 italic">No trips found.</td>
                             </tr>
                         ) : (
                             filteredTrips.map((trip) => {
@@ -211,6 +266,16 @@ export default function TripViewList() {
 
                                 return (
                                     <tr key={trip.id} className="hover:bg-slate-50/50 transition-colors">
+                                        {isAdmin && (
+                                            <td className="p-4 text-center">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="rounded border-slate-300"
+                                                    checked={selectedTripIds.includes(trip.id)}
+                                                    onChange={() => toggleTripSelect(trip.id)}
+                                                />
+                                            </td>
+                                        )}
                                         <td className="p-4 text-slate-600 text-xs whitespace-nowrap">
                                             {new Date(trip.departureDate).toLocaleDateString()}
                                         </td>
@@ -332,6 +397,45 @@ export default function TripViewList() {
                             disabled={isUpdating || !editForm.driverName}
                         >
                             {isUpdating ? "Saving..." : "Save Changes"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Transfer Trips Modal */}
+            <Dialog open={isTransferModalOpen} onOpenChange={setIsTransferModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Transfer Trips Route</DialogTitle>
+                        <DialogDescription>
+                            Select the destination route for the {selectedTripIds.length} selected trips.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Destination Route</Label>
+                            <select
+                                className="w-full px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                value={targetRouteId}
+                                onChange={(e) => setTargetRouteId(e.target.value)}
+                            >
+                                <option value="">Select a route...</option>
+                                {routes?.map((route: any) => (
+                                    <option key={route.id} value={route.id}>
+                                        {route.routeName}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsTransferModalOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={handleTransferSubmit}
+                            disabled={isTransferring || !targetRouteId}
+                            className="bg-amber-500 hover:bg-amber-600 text-white"
+                        >
+                            {isTransferring ? "Transferring..." : "Confirm Transfer"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

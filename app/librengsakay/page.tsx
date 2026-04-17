@@ -88,7 +88,7 @@ export default async function LibrengSakay() {
                             <div className="border rounded-xl p-6 bg-white shadow-sm">
                                 <h2 className="text-lg font-semibold mb-4">All Trip Logs</h2>
                                 <p className="text-sm text-gray-500 mb-6">Master list of all uploaded trips and their current liquidation status.</p>
-                                <TripViewList />
+                                <TripViewList routes={routes} />
                             </div>
                         </TabsContent>
 
