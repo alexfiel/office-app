@@ -1,12 +1,19 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { getLiquidationReport } from '@/lib/upload/librengsakay/liquidation';
+import { getLiquidationReport, updateLiquidation } from '@/lib/upload/librengsakay/liquidation';
 import { Report } from './reports/report';
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
+import { useSession } from "next-auth/react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 export default function LiquidationReport({ routes, userName }: { routes: any[], userName: string }) {
+    const { data: session } = useSession();
     const today = new Date().toISOString().split('T')[0];
     const [filters, setFilters] = useState({
         startDate: today,
@@ -17,6 +24,52 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
     const [isLoading, setIsLoading] = useState(false);
     const [showPrintView, setShowPrintView] = useState(false);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+    // Edit State
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingLiquidation, setEditingLiquidation] = useState<any>(null);
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [editForm, setEditForm] = useState({
+        arnumber: '',
+        driverName: '',
+        vehiclePlateNumber: '',
+        numberofPax: 0,
+        fare: 0,
+        amount: 0,
+        departureDate: '',
+        paymentDate: ''
+    });
+
+    const handleEditClick = (item: any) => {
+        setEditingLiquidation(item);
+        setEditForm({
+            arnumber: item.arnumber,
+            driverName: item.driverName,
+            vehiclePlateNumber: item.vehiclePlateNumber,
+            numberofPax: item.numberofPax,
+            fare: item.fare,
+            amount: item.amount,
+            departureDate: new Date(item.departureDate).toISOString().split('T')[0],
+            paymentDate: new Date(item.paymentDate).toISOString().split('T')[0]
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateSubmit = async () => {
+        if (!editingLiquidation || !session?.user?.id) return;
+        setIsUpdating(true);
+        try {
+            const role = (session.user as any).role || "USER";
+            await updateLiquidation(editingLiquidation.id, editForm, session.user.id, role);
+            toast.success("Liquidation updated successfully");
+            setIsEditModalOpen(false);
+            loadReport();
+        } catch (error: any) {
+            toast.error(error.message || "Failed to update liquidation");
+        } finally {
+            setIsUpdating(false);
+        }
+    };
 
     const loadReport = async () => {
         setIsLoading(true);
@@ -209,6 +262,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                                 <th className="p-4 uppercase text-[10px] tracking-widest whitespace-nowrap text-right">Amount</th>
                                 <th className="p-4 uppercase text-[10px] tracking-widest whitespace-nowrap">Prepared By</th>
                                 <th className="p-4 uppercase text-[10px] tracking-widest whitespace-nowrap">Approved By</th>
+                                <th className="p-4 uppercase text-[10px] tracking-widest whitespace-nowrap text-center">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -248,6 +302,16 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                                                 {item.approvedby}
                                             </span>
                                         </td>
+                                        <td className="p-4 text-center">
+                                            {(item.userId === session?.user?.id || (session?.user as any)?.role === "ADMIN") && (
+                                                <button
+                                                    onClick={() => handleEditClick(item)}
+                                                    className="text-[10px] text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 font-bold px-3 py-1.5 rounded border border-blue-200 transition-colors"
+                                                >
+                                                    Edit
+                                                </button>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))
                             )}
@@ -259,7 +323,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                                     <td className="p-4 text-right tabular-nums text-lg border-x border-slate-800 tracking-tighter">{totalPax.toLocaleString()}</td>
                                     <td className="p-4 bg-slate-800/50"></td>
                                     <td className="p-4 text-right tabular-nums text-lg text-emerald-400 tracking-tighter">₱{totalAmount.toLocaleString()}</td>
-                                    <td colSpan={2} className="p-4 bg-slate-800/50"></td>
+                                    <td colSpan={3} className="p-4 bg-slate-800/50"></td>
                                 </tr>
                             </tfoot>
                         )}
@@ -305,6 +369,113 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                     </div>
                 </div>
             )}
+
+            {/* Edit Liquidation Modal */}
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Edit Liquidation</DialogTitle>
+                        <DialogDescription>
+                            Update the liquidation details below.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>AR Number</Label>
+                                <Input
+                                    value={editForm.arnumber}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, arnumber: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Plate Number</Label>
+                                <Input
+                                    value={editForm.vehiclePlateNumber}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, vehiclePlateNumber: e.target.value }))}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Driver Name</Label>
+                            <Input
+                                value={editForm.driverName}
+                                onChange={(e) => setEditForm(prev => ({ ...prev, driverName: e.target.value }))}
+                            />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Departure Date</Label>
+                                <Input
+                                    type="date"
+                                    value={editForm.departureDate}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, departureDate: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Payment Date</Label>
+                                <Input
+                                    type="date"
+                                    value={editForm.paymentDate}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, paymentDate: e.target.value }))}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4 border p-3 rounded-lg bg-slate-50">
+                            <div className="space-y-2">
+                                <Label>Pax</Label>
+                                <Input
+                                    type="number"
+                                    value={editForm.numberofPax || ""}
+                                    onChange={(e) => {
+                                        const pax = Number(e.target.value);
+                                        setEditForm(prev => ({ 
+                                            ...prev, 
+                                            numberofPax: pax,
+                                            amount: pax * prev.fare 
+                                        }));
+                                    }}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Fare (₱)</Label>
+                                <Input
+                                    type="number"
+                                    value={editForm.fare || ""}
+                                    onChange={(e) => {
+                                        const fare = Number(e.target.value);
+                                        setEditForm(prev => ({ 
+                                            ...prev, 
+                                            fare: fare,
+                                            amount: prev.numberofPax * fare 
+                                        }));
+                                    }}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Total (₱)</Label>
+                                <Input
+                                    type="number"
+                                    value={editForm.amount || ""}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={handleUpdateSubmit}
+                            disabled={isUpdating || !editForm.driverName || !editForm.arnumber}
+                        >
+                            {isUpdating ? "Saving..." : "Save Changes"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

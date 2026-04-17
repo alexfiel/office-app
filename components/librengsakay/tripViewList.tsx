@@ -1,12 +1,54 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { getTripLogs } from '@/lib/upload/librengsakay/liquidation';
+import { getTripLogs, updateTripLog } from '@/lib/upload/librengsakay/liquidation';
+import { useSession } from "next-auth/react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 export default function TripViewList() {
+    const { data: session } = useSession();
+    const isAdmin = (session?.user as any)?.role === "ADMIN";
     const [trips, setTrips] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterRoute, setFilterRoute] = useState('');
+    const [filterDate, setFilterDate] = useState('');
+
+    // Edit state
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingTrip, setEditingTrip] = useState<any>(null);
+    const [editForm, setEditForm] = useState({ driverName: '', numberofPax: 0, fare: 0, amount: 0 });
+    const [isUpdating, setIsUpdating] = useState(false);
+
+    const handleEditClick = (trip: any) => {
+        setEditingTrip(trip);
+        setEditForm({
+            driverName: trip.driverName,
+            numberofPax: trip.numberofPax,
+            fare: trip.fare,
+            amount: trip.amount
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateSubmit = async () => {
+        if (!editingTrip) return;
+        setIsUpdating(true);
+        try {
+            await updateTripLog(editingTrip.id, editForm);
+            toast.success("Trip updated successfully");
+            setIsEditModalOpen(false);
+            loadTrips(); // Reload after update
+        } catch (error: any) {
+            toast.error(error.message || "Failed to update trip");
+        } finally {
+            setIsUpdating(false);
+        }
+    };
 
     const loadTrips = async () => {
         setIsLoading(true);
@@ -24,10 +66,19 @@ export default function TripViewList() {
         loadTrips();
     }, []);
 
-    const filteredTrips = trips.filter(trip => 
-        trip.driverName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trip.vehiclePlateNumber.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredTrips = trips.filter(trip => {
+        const matchesSearch = trip.driverName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              trip.vehiclePlateNumber.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesRoute = filterRoute ? trip.route?.routeName === filterRoute : true;
+        
+        // Correctly handle the date parsing (trip.departureDate could be a Date object instead of a string)
+        const tripDateStr = new Date(trip.departureDate).toLocaleDateString('en-CA'); // Outputs 'YYYY-MM-DD'
+        const matchesDate = filterDate ? tripDateStr === filterDate : true;
+        
+        return matchesSearch && matchesRoute && matchesDate;
+    });
+
+    const uniqueRoutes = Array.from(new Set(trips.map(t => t.route?.routeName).filter(Boolean)));
 
     // Calculate Stats
     const totalTrips = trips.length;
@@ -52,7 +103,7 @@ export default function TripViewList() {
                 </div>
 
                 <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl shadow-sm text-white">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Potential Revenue (PHP)</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Potential Disbursement (PHP)</p>
                     <div className="flex justify-between items-end mt-1">
                         <p className="text-3xl font-black italic">₱{totalRevenue.toLocaleString()}</p>
                         <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
@@ -76,7 +127,7 @@ export default function TripViewList() {
                         </div>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full mt-4 overflow-hidden">
-                        <div 
+                        <div
                             className="bg-blue-500 h-full transition-all duration-1000 ease-out"
                             style={{ width: `${progressPercent}%` }}
                         ></div>
@@ -91,15 +142,35 @@ export default function TripViewList() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     </span>
-                    <input 
-                        type="text" 
-                        placeholder="Search Driver or Plate Number..." 
+                    <input
+                        type="text"
+                        placeholder="Search Driver or Plate Number..."
                         className="w-full pl-10 pr-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <button 
+                
+                <div className="flex items-center gap-3">
+                    <select
+                        className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        value={filterRoute}
+                        onChange={(e) => setFilterRoute(e.target.value)}
+                    >
+                        <option value="">All Routes</option>
+                        {uniqueRoutes.map((route: any) => (
+                            <option key={route} value={route}>{route}</option>
+                        ))}
+                    </select>
+
+                    <input
+                        type="date"
+                        className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        value={filterDate}
+                        onChange={(e) => setFilterDate(e.target.value)}
+                    />
+                </div>
+                <button
                     onClick={loadTrips}
                     className="p-2 text-gray-500 hover:text-blue-600 transition-colors"
                 >
@@ -119,6 +190,7 @@ export default function TripViewList() {
                             <th className="p-4 uppercase text-[10px] tracking-widest text-right">Amount</th>
                             <th className="p-4 uppercase text-[10px] tracking-widest text-center">Status</th>
                             <th className="p-4 uppercase text-[10px] tracking-widest">Reference (AR)</th>
+                            {isAdmin && <th className="p-4 uppercase text-[10px] tracking-widest text-center">Action</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -152,7 +224,8 @@ export default function TripViewList() {
                                             </div>
                                         </td>
                                         <td className="p-4 text-right font-black text-slate-900">
-                                            ₱{trip.amount.toLocaleString()}
+                                            ₱{trip.amount.toLocaleString()} <br/>
+                                            <span className="text-[9px] font-normal text-slate-400">Pax: {trip.numberofPax} | Fare: ₱{trip.fare}</span>
                                         </td>
                                         <td className="p-4 text-center">
                                             {isLiquidated ? (
@@ -176,6 +249,18 @@ export default function TripViewList() {
                                                 <span className="text-[10px] text-slate-300 italic">No record</span>
                                             )}
                                         </td>
+                                        {isAdmin && (
+                                            <td className="p-4 text-center">
+                                                {!isLiquidated && (
+                                                    <button
+                                                        onClick={() => handleEditClick(trip)}
+                                                        className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 transition-colors"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                )}
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })
@@ -183,6 +268,75 @@ export default function TripViewList() {
                     </tbody>
                 </table>
             </div>
+
+            {/* Edit Trip Modal */}
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Trip Logs</DialogTitle>
+                        <DialogDescription>
+                            Update the selected trip's details. Liquidated trips cannot be modified.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Driver Name</Label>
+                            <Input
+                                value={editForm.driverName}
+                                onChange={(e) => setEditForm(prev => ({ ...prev, driverName: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Number of Pax</Label>
+                            <Input
+                                type="number"
+                                value={editForm.numberofPax || ""}
+                                onChange={(e) => {
+                                    const pax = Number(e.target.value);
+                                    setEditForm(prev => ({ 
+                                        ...prev, 
+                                        numberofPax: pax,
+                                        amount: pax * prev.fare 
+                                    }));
+                                }}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Fare (₱)</Label>
+                            <Input
+                                type="number"
+                                value={editForm.fare || ""}
+                                onChange={(e) => {
+                                    const newFare = Number(e.target.value);
+                                    setEditForm(prev => ({ 
+                                        ...prev, 
+                                        fare: newFare,
+                                        amount: prev.numberofPax * newFare 
+                                    }));
+                                }}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Total Amount (₱)</Label>
+                            <Input
+                                type="number"
+                                value={editForm.amount || ""}
+                                onChange={(e) => setEditForm(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={handleUpdateSubmit}
+                            disabled={isUpdating || !editForm.driverName}
+                        >
+                            {isUpdating ? "Saving..." : "Save Changes"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }

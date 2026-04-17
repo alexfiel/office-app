@@ -132,3 +132,81 @@ export async function getTripLogs() {
         throw error;
     }
 }
+
+// 5. Update Trip Log (Only if not liquidated)
+export async function updateTripLog(tripId: string, data: { driverName: string, numberofPax: number, fare: number, amount: number }) {
+    try {
+        const trip = await prisma.librengSakayTrip.findUnique({
+            where: { id: tripId },
+            include: { liquidations: true }
+        });
+        
+        if (!trip) throw new Error("Trip not found");
+        if (trip.liquidations.length > 0) throw new Error("Cannot update a liquidated trip");
+
+        const result = await prisma.librengSakayTrip.update({
+            where: { id: tripId },
+            data: {
+                driverName: data.driverName,
+                numberofPax: data.numberofPax,
+                fare: data.fare,
+                amount: data.amount
+            }
+        });
+
+        revalidatePath("/librengsakay");
+        return result;
+    } catch (error: any) {
+        console.error("Update Trip Log Error:", error.message);
+        throw error;
+    }
+}
+
+// 6. Update Liquidation Record
+export async function updateLiquidation(liquidationId: string, data: any, userId: string, userRole: string) {
+    try {
+        const liquidation = await prisma.librengSakayLiquidation.findUnique({
+            where: { id: liquidationId }
+        });
+
+        if (!liquidation) throw new Error("Liquidation record not found");
+        if (liquidation.userId !== userId && userRole !== "ADMIN") {
+            throw new Error("You are not authorized to edit this record");
+        }
+
+        const result = await prisma.librengSakayLiquidation.update({
+            where: { id: liquidationId },
+            data: {
+                arnumber: data.arnumber,
+                driverName: data.driverName,
+                vehiclePlateNumber: data.vehiclePlateNumber,
+                numberofPax: data.numberofPax,
+                fare: data.fare,
+                amount: data.amount,
+                departureDate: new Date(data.departureDate),
+                paymentDate: new Date(data.paymentDate)
+            }
+        });
+
+        // Also sync the Trip amount/fare if desired, but for now we just sync the Liquidation logic 
+        // to match requirements "edit liquidation". We will update corresponding Trip fields too:
+        if (liquidation.tripId) {
+            await prisma.librengSakayTrip.update({
+                where: { id: liquidation.tripId },
+                data: {
+                    driverName: data.driverName,
+                    vehiclePlateNumber: data.vehiclePlateNumber,
+                    numberofPax: data.numberofPax,
+                    fare: data.fare,
+                    amount: data.amount
+                }
+            })
+        }
+
+        revalidatePath("/librengsakay");
+        return result;
+    } catch (error: any) {
+        console.error("Update Liquidation Error:", error.message);
+        throw error;
+    }
+}
