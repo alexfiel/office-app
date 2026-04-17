@@ -69,7 +69,7 @@ export async function getLiquidationReport(startDate: string, endDate: string, r
         end.setHours(23, 59, 59, 999);
 
         const where: any = {
-            departureDate: {
+            paymentDate: {
                 gte: start,
                 lte: end
             }
@@ -99,7 +99,7 @@ export async function getLiquidationReport(startDate: string, endDate: string, r
                     }
                 }
             },
-            orderBy: { departureDate: "desc" }
+            orderBy: { paymentDate: "desc" }
         });
     } catch (error: any) {
         console.error("Liquidation Report Error:", error.message);

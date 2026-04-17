@@ -6,15 +6,16 @@ interface ReportProps {
     routeName: string;
     data: any[];
     userName: string;
+    dateRange?: { start: string, end: string };
 }
 
-export function Report({ routeName, data, userName }: ReportProps) {
+export function Report({ routeName, data, userName, dateRange }: ReportProps) {
     const totalPax = data.reduce((sum, item) => sum + item.numberofPax, 0);
     const totalAmount = data.reduce((sum, item) => sum + item.amount, 0);
 
     return (
         <div className="w-full p-8 bg-white text-black min-h-screen">
-            <ReportHeader />
+            <ReportHeader dateRange={dateRange} />
             <ReportDetails 
                 routeName={routeName} 
                 data={data} 

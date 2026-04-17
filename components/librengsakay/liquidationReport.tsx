@@ -144,7 +144,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const padding = 10; // 10mm margins
             const maxContentWidth = pdfWidth - (padding * 2);
-            
+
             const img = new Image();
             img.src = imgData;
             await new Promise((resolve) => { img.onload = resolve; });
@@ -152,10 +152,10 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             // Calculate dimensions to fit exactly within margins
             const imgWidth = maxContentWidth;
             const imgHeight = (img.height * imgWidth) / img.width;
-            
+
             // Center element exactly
             const xOffset = (pdfWidth - imgWidth) / 2;
-            
+
             let heightLeft = imgHeight;
             let position = padding;
 
@@ -170,7 +170,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                 pdf.addImage(imgData, 'PNG', xOffset, position, imgWidth, imgHeight);
                 heightLeft -= (pdfHeight - (padding * 2));
             }
-            
+
             const startDateStr = filters.startDate ? filters.startDate.split('T')[0] : 'start';
             const endDateStr = filters.endDate ? filters.endDate.split('T')[0] : 'end';
             pdf.save(`Liquidation_Report_${startDateStr}_to_${endDateStr}.pdf`);
@@ -190,29 +190,29 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             {/* Report Filters */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-5 bg-white border rounded-2xl shadow-sm items-end">
                 <div>
-                    <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Start Date</label>
-                    <input 
-                        type="date" 
-                        className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                    <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Payment Start Date</label>
+                    <input
+                        type="date"
+                        className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         value={filters.startDate}
-                        onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+                        onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
                     />
                 </div>
                 <div>
-                    <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">End Date</label>
-                    <input 
-                        type="date" 
-                        className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                    <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Payment End Date</label>
+                    <input
+                        type="date"
+                        className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         value={filters.endDate}
-                        onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+                        onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
                     />
                 </div>
                 <div>
                     <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Route</label>
-                    <select 
+                    <select
                         className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         value={filters.routeId}
-                        onChange={(e) => setFilters({...filters, routeId: e.target.value})}
+                        onChange={(e) => setFilters({ ...filters, routeId: e.target.value })}
                     >
                         <option value="">All Routes</option>
                         {routes.map(route => (
@@ -220,7 +220,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                         ))}
                     </select>
                 </div>
-                <button 
+                <button
                     onClick={loadReport}
                     disabled={isLoading}
                     className="bg-blue-600 text-white rounded-xl py-2.5 font-bold text-sm hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
@@ -228,7 +228,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     {isLoading ? "Generating..." : "Generate Report"}
                 </button>
-                <button 
+                <button
                     onClick={downloadAsCSV}
                     disabled={isLoading || reportData.length === 0}
                     className="bg-emerald-600 text-white rounded-xl py-2.5 font-bold text-sm hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
@@ -236,7 +236,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                     CSV Export
                 </button>
-                <button 
+                <button
                     onClick={() => setShowPrintView(true)}
                     disabled={isLoading || reportData.length === 0}
                     className="bg-slate-800 text-white rounded-xl py-2.5 font-bold text-sm hover:bg-slate-900 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
@@ -335,7 +335,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             {showPrintView && (
                 <div className="fixed inset-0 z-[100] bg-white overflow-y-auto print:static print:bg-transparent">
                     <div className="sticky top-0 right-0 p-4 flex justify-end gap-4 bg-slate-900/10 backdrop-blur-md print:hidden">
-                        <button 
+                        <button
                             onClick={downloadAsPDF}
                             disabled={isGeneratingPdf}
                             className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:active:scale-100"
@@ -350,7 +350,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                             )}
                             {isGeneratingPdf ? 'Generating PDF...' : 'Download PDF'}
                         </button>
-                        <button 
+                        <button
                             onClick={() => setShowPrintView(false)}
                             className="bg-white text-slate-900 border border-slate-200 px-6 py-2 rounded-lg font-bold hover:bg-slate-50 transition-all active:scale-95"
                         >
@@ -360,10 +360,11 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                     <div className="min-h-screen py-8 bg-slate-100 flex items-start justify-center print:bg-white print:py-0">
                         {/* We give the report container a fixed minimum width so html-to-image never captures a squashed version */}
                         <div id="pdf-report-content" className="bg-white p-12 shadow-2xl w-[1000px] max-w-none print:shadow-none print:p-0 print:w-full">
-                            <Report 
-                                routeName={routes.find(r => r.id === filters.routeId)?.routeName || "Summarized Report"} 
-                                data={reportData} 
+                            <Report
+                                routeName={routes.find(r => r.id === filters.routeId)?.routeName || "Summarized Report"}
+                                data={reportData}
                                 userName={userName}
+                                dateRange={{ start: filters.startDate, end: filters.endDate }}
                             />
                         </div>
                     </div>
@@ -404,7 +405,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                                 onChange={(e) => setEditForm(prev => ({ ...prev, driverName: e.target.value }))}
                             />
                         </div>
-                        
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Departure Date</Label>
@@ -432,10 +433,10 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                                     value={editForm.numberofPax || ""}
                                     onChange={(e) => {
                                         const pax = Number(e.target.value);
-                                        setEditForm(prev => ({ 
-                                            ...prev, 
+                                        setEditForm(prev => ({
+                                            ...prev,
                                             numberofPax: pax,
-                                            amount: pax * prev.fare 
+                                            amount: pax * prev.fare
                                         }));
                                     }}
                                 />
@@ -447,10 +448,10 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                                     value={editForm.fare || ""}
                                     onChange={(e) => {
                                         const fare = Number(e.target.value);
-                                        setEditForm(prev => ({ 
-                                            ...prev, 
+                                        setEditForm(prev => ({
+                                            ...prev,
                                             fare: fare,
-                                            amount: prev.numberofPax * fare 
+                                            amount: prev.numberofPax * fare
                                         }));
                                     }}
                                 />
