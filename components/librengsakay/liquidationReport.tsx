@@ -152,7 +152,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
 
             // Variable for Totals
             let grandTotalAmount = 0;
-            let pageSubtotals = {} // Object to store totals per page index
+            let pageSubtotals: Record<number, number> = {} // Object to store totals per page index
 
             // 1. Capture and Add Header
             const headerImg = await toPng(headerElement, { pixelRatio: 3, backgroundColor: '#ffffff' });
@@ -189,7 +189,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                 didParseCell: (data) => {
                     // Format Amount (Index 9) and Fare (Index 8) to Currency for display
                     if (data.section === 'body' && (data.column.index === 8 || data.column.index === 9)) {
-                        const val = parseFloat(data.cell.raw) || 0;
+                        const val = parseFloat(String(data.cell.raw)) || 0;
                         data.cell.text = [`P${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
                     }
                 },
@@ -197,21 +197,21 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                 willDrawCell: (data) => {
                     // Track the sum for the current page
                     if (data.section === 'body' && data.column.index === 9) {
-                        const amount = parseFloat(data.cell.raw) || 0;
-                        const currentPage = pdf.internal.getNumberOfPages();
+                        const amount = parseFloat(String(data.cell.raw)) || 0;
+                        const currentPage = (pdf.internal as any).getNumberOfPages();
                         pageSubtotals[currentPage] = (pageSubtotals[currentPage] || 0) + amount;
                     }
 
                     // Inject the calculated subset into the foot cell before drawing
                     if (data.section === 'foot' && data.column.index === 9) {
-                        const currentPage = pdf.internal.getNumberOfPages();
+                        const currentPage = (pdf.internal as any).getNumberOfPages();
                         const subtotal = pageSubtotals[currentPage] || 0;
                         data.cell.text = [`P${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
                     }
                 },
 
                 didDrawPage: (data) => {
-                    const pageCount = pdf.internal.getNumberOfPages();
+                    const pageCount = (pdf.internal as any).getNumberOfPages();
 
                     // Page Numbering
                     pdf.setFont("helvetica", "normal");
@@ -236,7 +236,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             });
 
             // 4. Draw Grand Total Below Table
-            let finalY = pdf.lastAutoTable.finalY + 10;
+            let finalY = (pdf as any).lastAutoTable.finalY + 10;
             const grandTotalValue = reportData.reduce((sum, item) => sum + item.amount, 0);
             const totalPaxValue = reportData.reduce((sum, item) => sum + (Number(item.numberofPax) || 0), 0);
 
@@ -320,7 +320,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
     return (
         <div className="space-y-6">
             {/* Report Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-5 bg-white border rounded-2xl shadow-sm items-end">
+            <div suppressHydrationWarning className="grid grid-cols-1 md:grid-cols-5 gap-4 p-5 bg-white border rounded-2xl shadow-sm items-end">
                 <div>
                     <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Payment Start Date</label>
                     <input

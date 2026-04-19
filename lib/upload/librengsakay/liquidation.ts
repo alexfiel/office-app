@@ -101,8 +101,7 @@ export async function getLiquidationReport(startDate: string, endDate: string, r
                         name: true
                     }
                 }
-            },
-            orderBy: { paymentDate: "desc" }
+            }
         });
     } catch (error: any) {
         console.error("Liquidation Report Error:", error.message);

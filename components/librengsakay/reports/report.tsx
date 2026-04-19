@@ -20,7 +20,7 @@ export function Report({ routeName, data, userName, dateRange }: ReportProps) {
                 <ReportHeader dateRange={dateRange} />
                 <div className="mt-4 mb-4">
                     <p className="text-center text-sm font-bold italic">Route: {routeName}</p>
-                    <span className="text-[10px] text-gray-500">Date Printed: {new Date().toLocaleDateString()}</span>
+                    <span suppressHydrationWarning className="text-[10px] text-gray-500">Date Printed: {new Date().toLocaleDateString()}</span>
                 </div>
             </div>
             <br />
