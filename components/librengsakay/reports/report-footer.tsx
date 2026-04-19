@@ -16,7 +16,7 @@ export function ReportFooter({ userName }: ReportFooterProps) {
             <div className="flex flex-col">
                 <p className="mb-10 text-gray-600 italic text-xs">Approved by:</p>
                 <div className="border-b border-black pb-1">
-                    <p className="font-bold uppercase text-center">HUBERT M. INAS, CPA</p>
+                    <p className="font-bold uppercase text-center">HUBERT M. INAS, CPA, BCLTE</p>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-1 text-center">City Treasurer</p>
             </div>

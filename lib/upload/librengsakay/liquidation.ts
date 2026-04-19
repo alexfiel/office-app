@@ -64,7 +64,7 @@ export async function getLiquidationReport(startDate: string, endDate: string, r
     try {
         const start = new Date(startDate);
         start.setHours(0, 0, 0, 0);
-        
+
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
 
@@ -83,6 +83,9 @@ export async function getLiquidationReport(startDate: string, endDate: string, r
 
         return await prisma.librengSakayLiquidation.findMany({
             where,
+            orderBy: [
+                { paymentDate: 'desc' }
+            ],
             include: {
                 trip: {
                     include: {
@@ -141,7 +144,7 @@ export async function updateTripLog(tripId: string, data: { driverName: string, 
             where: { id: tripId },
             include: { liquidations: true }
         });
-        
+
         if (!trip) throw new Error("Trip not found");
         if (trip.liquidations.length > 0) throw new Error("Cannot update a liquidated trip");
 
@@ -217,12 +220,12 @@ export async function transferTripRoutes(tripIds: string[], newRouteId: string) 
     try {
         if (!tripIds || tripIds.length === 0) throw new Error("No trips selected");
         if (!newRouteId) throw new Error("New route is required");
-        
+
         const result = await prisma.librengSakayTrip.updateMany({
             where: { id: { in: tripIds } },
             data: { routeId: newRouteId }
         });
-        
+
         revalidatePath("/librengsakay");
         return result;
     } catch (error: any) {
@@ -230,3 +233,77 @@ export async function transferTripRoutes(tripIds: string[], newRouteId: string) 
         throw error;
     }
 }
+
+// 8. Create Trip Log
+export async function createTripLog(data: { driverName: string; vehiclePlateNumber: string; numberofPax: number; fare: number; amount: number; routeId: string; departureDate: Date }, userId: string) {
+    try {
+        const result = await prisma.librengSakayTrip.create({
+            data: {
+                driverName: data.driverName,
+                vehiclePlateNumber: data.vehiclePlateNumber,
+                numberofPax: data.numberofPax,
+                fare: data.fare,
+                amount: data.amount,
+                routeId: data.routeId,
+                departureDate: new Date(data.departureDate),
+                userId: userId,
+            }
+        });
+        revalidatePath("/librengsakay");
+        return result;
+    } catch (error: any) {
+        console.error("Create Trip Log Error:", error.message);
+        throw error;
+    }
+}
+
+// 9. Delete Trip Log
+export async function deleteTripLog(tripId: string) {
+    try {
+        const trip = await prisma.librengSakayTrip.findUnique({
+            where: { id: tripId },
+            include: { liquidations: true }
+        });
+
+        if (!trip) throw new Error("Trip not found");
+        if (trip.liquidations.length > 0) throw new Error("Cannot delete a liquidated trip");
+
+        const result = await prisma.librengSakayTrip.delete({
+            where: { id: tripId }
+        });
+
+        revalidatePath("/librengsakay");
+        return result;
+    } catch (error: any) {
+        console.error("Delete Trip Log Error:", error.message);
+        throw error;
+    }
+}
+
+// 10. Delete Multiple Trip Logs
+export async function deleteTripLogs(tripIds: string[]) {
+    try {
+        if (!tripIds || tripIds.length === 0) throw new Error("No trips selected for deletion");
+
+        const trips = await prisma.librengSakayTrip.findMany({
+            where: { id: { in: tripIds } },
+            include: { liquidations: true }
+        });
+
+        const invalidTrips = trips.filter(t => t.liquidations.length > 0);
+        if (invalidTrips.length > 0) {
+            throw new Error(`Cannot delete ${invalidTrips.length} trip(s) because they are already liquidated`);
+        }
+
+        const result = await prisma.librengSakayTrip.deleteMany({
+            where: { id: { in: tripIds } }
+        });
+
+        revalidatePath("/librengsakay");
+        return result;
+    } catch (error: any) {
+        console.error("Bulk Delete Trip Logs Error:", error.message);
+        throw error;
+    }
+}
+

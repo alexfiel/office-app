@@ -21,6 +21,7 @@ export function ReportHeader({ dateRange }: { dateRange?: { start: string, end: 
             </div>
             <h1 className="text-2xl font-black tracking-widest text-slate-800 uppercase">LIBRENG SAKAY PROGRAM</h1>
             <span className="text-md font-black tracking-widest text-slate-800 uppercase">Payment Date: {dateRangeText}</span>
+
         </div>
     )
-}
+}   

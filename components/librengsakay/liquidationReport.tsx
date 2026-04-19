@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { getLiquidationReport, updateLiquidation } from '@/lib/upload/librengsakay/liquidation';
 import { Report } from './reports/report';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { toPng } from 'html-to-image';
 import { useSession } from "next-auth/react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+
 
 export default function LiquidationReport({ routes, userName }: { routes: any[], userName: string }) {
     const { data: session } = useSession();
@@ -119,68 +121,198 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
         document.body.removeChild(link);
     };
 
+
+
     const downloadAsPDF = async () => {
-        const reportElement = document.getElementById('pdf-report-content');
-        if (!reportElement) return;
+        const headerElement = document.getElementById('report-header');
+        const footerElement = document.getElementById('report-footer');
+
+        if (!headerElement || !footerElement) {
+            alert("Report components not found. Ensure IDs are set in Report.tsx");
+            return;
+        }
 
         setIsGeneratingPdf(true);
-        try {
-            // Force a standard desktop width for the capture so it never gets squashed on small screens
-            const targetWidth = Math.max(reportElement.scrollWidth, 1000);
 
-            const imgData = await toPng(reportElement, {
-                pixelRatio: 2,
-                backgroundColor: '#ffffff',
-                cacheBust: true,
-                width: targetWidth,
-                style: {
-                    width: `${targetWidth}px`,
-                    transform: 'none'
-                }
+        try {
+            const totalPax = reportData.reduce((sum, item) => sum + (Number(item.numberofPax) || 0), 0);
+            const totalAmount = reportData.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+
+            const FOLIO_WIDTH = 215.9;
+            const FOLIO_HEIGHT = 330.2;
+            const M = 6.35; // Your 0.25inches margin
+            const safeWidth = FOLIO_WIDTH - (M * 2);
+
+            const pdf = new jsPDF({
+                orientation: 'p',
+                unit: 'mm',
+                format: [FOLIO_WIDTH, FOLIO_HEIGHT]
             });
 
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const padding = 10; // 10mm margins
-            const maxContentWidth = pdfWidth - (padding * 2);
+            // Variable for Totals
+            let grandTotalAmount = 0;
+            let pageSubtotals = {} // Object to store totals per page index
 
-            const img = new Image();
-            img.src = imgData;
-            await new Promise((resolve) => { img.onload = resolve; });
+            // 1. Capture and Add Header
+            const headerImg = await toPng(headerElement, { pixelRatio: 3, backgroundColor: '#ffffff' });
+            const hProps = pdf.getImageProperties(headerImg);
+            const hHeight = (hProps.height * safeWidth) / hProps.width;
+            pdf.addImage(headerImg, 'PNG', M, M, safeWidth, hHeight);
 
-            // Calculate dimensions to fit exactly within margins
-            const imgWidth = maxContentWidth;
-            const imgHeight = (img.height * imgWidth) / img.width;
+            // 2. Prepare Table Data
+            const headers = [["#", "AR #", "Operation Date", "Payment Date", "Route", "Driver", "Plate Number", "Pax", "Fare", "Amount"]];
+            const rows = reportData.map((item, index) => [
+                index + 1,
+                item.arnumber,
+                new Date(item.departureDate).toLocaleDateString(),
+                new Date(item.paymentDate).toLocaleDateString(),
+                item.trip.route.routeName,
+                item.driverName,
+                item.vehiclePlateNumber,
+                item.numberofPax,
+                item.fare.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })
+            ]);
 
-            // Center element exactly
-            const xOffset = (pdfWidth - imgWidth) / 2;
 
-            let heightLeft = imgHeight;
-            let position = padding;
+            // 3. Generate Table (Handles 50+ pages without overlap)
+            autoTable(pdf, {
+                head: headers,
+                body: rows,
+                startY: hHeight + 5,
+                margin: { top: 15, right: M, bottom: 30, left: M },
+                theme: 'grid',
+                styles: { fontSize: 7, cellPadding: 1 },
 
-            // First page
-            pdf.addImage(imgData, 'PNG', xOffset, position, imgWidth, imgHeight);
-            heightLeft -= (pdfHeight - (padding * 2));
+                // Format cells for currency and calculate totals
+                didParseCell: (data) => {
+                    // Format Amount (Index 9) and Fare (Index 8) to Currency for display
+                    if (data.section === 'body' && (data.column.index === 8 || data.column.index === 9)) {
+                        const val = parseFloat(data.cell.raw) || 0;
+                        data.cell.text = [`P${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
+                    }
+                },
 
-            // Support for incredibly long reports spanning multiple pages
-            while (heightLeft > 0) {
-                position = heightLeft - imgHeight + padding;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', xOffset, position, imgWidth, imgHeight);
-                heightLeft -= (pdfHeight - (padding * 2));
+                willDrawCell: (data) => {
+                    // Track the sum for the current page
+                    if (data.section === 'body' && data.column.index === 9) {
+                        const amount = parseFloat(data.cell.raw) || 0;
+                        const currentPage = pdf.internal.getNumberOfPages();
+                        pageSubtotals[currentPage] = (pageSubtotals[currentPage] || 0) + amount;
+                    }
+
+                    // Inject the calculated subset into the foot cell before drawing
+                    if (data.section === 'foot' && data.column.index === 9) {
+                        const currentPage = pdf.internal.getNumberOfPages();
+                        const subtotal = pageSubtotals[currentPage] || 0;
+                        data.cell.text = [`P${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
+                    }
+                },
+
+                didDrawPage: (data) => {
+                    const pageCount = pdf.internal.getNumberOfPages();
+
+                    // Page Numbering
+                    pdf.setFont("helvetica", "normal");
+                    pdf.setTextColor(150);
+                    pdf.setFontSize(7);
+                    pdf.text(`Page ${pageCount}`, FOLIO_WIDTH / 2, FOLIO_HEIGHT - 5, { align: 'center' });
+                },
+
+                // Page Sub Total (appears on every page)
+                showFoot: 'everyPage',
+                foot: [[
+                    {
+                        content: `PAGE SUB TOTAL`,
+                        colSpan: 9,
+                        styles: { halign: 'right', fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0, 0, 0] }
+                    },
+                    {
+                        content: ``,
+                        styles: { halign: 'right', fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0, 0, 0] }
+                    }
+                ]],
+            });
+
+            // 4. Draw Grand Total Below Table
+            let finalY = pdf.lastAutoTable.finalY + 10;
+            const grandTotalValue = reportData.reduce((sum, item) => sum + item.amount, 0);
+            const totalPaxValue = reportData.reduce((sum, item) => sum + (Number(item.numberofPax) || 0), 0);
+
+            pdf.setFontSize(9);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(0);
+            
+            // Draw Total Rows left-aligned
+            pdf.text(`TOTAL TRANSACTIONS: ${reportData.length}`, M + 5, finalY);
+            pdf.text(`TOTAL PAX: ${totalPaxValue}`, M + 5, finalY + 5);
+
+            // Draw Grand Total Amount right-aligned
+            pdf.setFontSize(10);
+            pdf.text(`GRAND TOTAL AMOUNT: P${grandTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, FOLIO_WIDTH - M - 5, finalY, { align: 'right' });
+
+            finalY += 20; // gap before signatures
+            const footerHeight = 35; // approximate height needed for signatures
+
+            // if signatures won't fit, add a new page
+            if (finalY + footerHeight > FOLIO_HEIGHT - M) {
+                pdf.addPage([FOLIO_WIDTH, FOLIO_HEIGHT], 'p');
+                finalY = 20;
             }
 
-            const startDateStr = filters.startDate ? filters.startDate.split('T')[0] : 'start';
-            const endDateStr = filters.endDate ? filters.endDate.split('T')[0] : 'end';
-            pdf.save(`Liquidation_Report_${startDateStr}_to_${endDateStr}.pdf`);
+            // Draw Signatures Text
+            pdf.setFontSize(8);
+            pdf.setFont("helvetica", "italic");
+            pdf.setTextColor(100);
+            const leftX = M + 15;
+            const rightX = FOLIO_WIDTH / 2 + 15;
+
+            pdf.text("Prepared by:", leftX, finalY);
+            pdf.text("Approved by:", rightX, finalY);
+
+            finalY += 12; // space before names
+
+            pdf.setFontSize(9);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(0);
+
+            // Prepared by Name
+            const preparedByName = userName.toUpperCase();
+            pdf.text(preparedByName, leftX + 25, finalY, { align: "center" });
+
+            // Approved by Name
+            const approvedByName = "HUBERT M. INAS, CPA, BCLTE";
+            pdf.text(approvedByName, rightX + 25, finalY, { align: "center" });
+
+            // Underlines
+            pdf.setLineWidth(0.3);
+            pdf.setDrawColor(0);
+            pdf.line(leftX, finalY + 2, leftX + 50, finalY + 2);
+            pdf.line(rightX - 5, finalY + 2, rightX + 55, finalY + 2);
+
+            finalY += 6; // space before titles
+
+            pdf.setFontSize(8);
+            pdf.setFont("helvetica", "normal");
+            pdf.setTextColor(100);
+            pdf.text("Authorized Personnel / Staff", leftX + 25, finalY, { align: "center" });
+            pdf.text("City Treasurer", rightX + 25, finalY, { align: "center" });
+
+
+            // 7. SAVE
+            const dateTag = new Date().toISOString().split('T')[0];
+            pdf.save(`Liquidation_Report_${dateTag}.pdf`);
+
         } catch (error) {
-            console.error('Error generating PDF:', error);
-            alert('Failed to generate PDF. Please check console for details.');
+            console.error("PDF Export Error:", error);
+            alert("Error capturing footer. Try again.");
         } finally {
             setIsGeneratingPdf(false);
         }
     };
+
+
 
     const totalPax = reportData.reduce((sum, item) => sum + item.numberofPax, 0);
     const totalAmount = reportData.reduce((sum, item) => sum + item.amount, 0);

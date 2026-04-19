@@ -1,13 +1,15 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { getTripLogs, updateTripLog, transferTripRoutes } from '@/lib/upload/librengsakay/liquidation';
+import { getTripLogs, updateTripLog, transferTripRoutes, deleteTripLogs } from '@/lib/upload/librengsakay/liquidation';
 import { useSession } from "next-auth/react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import AddNewTrip from './addNewTrip';
+import DeleteTrip from './deleteTrip';
 
 export default function TripViewList({ routes = [] }: { routes?: any[] }) {
     const { data: session } = useSession();
@@ -29,6 +31,10 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [targetRouteId, setTargetRouteId] = useState('');
     const [isTransferring, setIsTransferring] = useState(false);
+
+    // Bulk Delete state
+    const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
     const handleEditClick = (trip: any) => {
         setEditingTrip(trip);
@@ -70,6 +76,22 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
             toast.error(error.message || "Failed to transfer trips");
         } finally {
             setIsTransferring(false);
+        }
+    };
+
+    const handleBulkDeleteSubmit = async () => {
+        if (selectedTripIds.length === 0) return;
+        setIsBulkDeleting(true);
+        try {
+            await deleteTripLogs(selectedTripIds);
+            toast.success(`${selectedTripIds.length} trips deleted successfully!`);
+            setIsBulkDeleteModalOpen(false);
+            setSelectedTripIds([]);
+            loadTrips();
+        } catch (error: any) {
+            toast.error(error.message || "Failed to delete trips");
+        } finally {
+            setIsBulkDeleting(false);
         }
     };
 
@@ -118,31 +140,42 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
     };
 
     // Calculate Stats
-    const totalTrips = trips.length;
-    const totalRevenue = trips.reduce((sum, trip) => sum + (trip.amount || 0), 0);
-    const liquidatedCount = trips.filter(t => t.liquidations.length > 0).length;
-    const progressPercent = totalTrips > 0 ? (liquidatedCount / totalTrips) * 100 : 0;
+    const pendingTrips = trips.filter(t => t.liquidations.length === 0);
+    const doneTrips = trips.filter(t => t.liquidations.length > 0);
+
+    const pendingTripsCount = pendingTrips.length;
+    const potentialDisbursed = pendingTrips.reduce((sum, trip) => sum + (trip.amount || 0), 0);
+
+    const doneTripsCount = doneTrips.length;
+    const totalDisbursed = doneTrips.reduce((sum, trip) => sum + (trip.amount || 0), 0);
+
+    const hasLiquidatedInSelection = selectedTripIds.some(id => {
+        const t = trips.find(trip => trip.id === id);
+        return t && t.liquidations && t.liquidations.length > 0;
+    });
 
     return (
         <div className="space-y-6">
             {/* STATS RIBBON */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-5 rounded-2xl shadow-sm text-white">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Trips Logged</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Pending Trips */}
+                <div className="bg-gradient-to-br from-amber-400 to-amber-500 p-5 rounded-2xl shadow-sm text-white">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-90">Total Trips Pending</p>
                     <div className="flex justify-between items-end mt-1">
-                        <p className="text-3xl font-black">{totalTrips.toLocaleString()}</p>
+                        <p className="text-3xl font-black">{pendingTripsCount.toLocaleString()}</p>
                         <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
                             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl shadow-sm text-white">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Potential Disbursement (PHP)</p>
+                {/* Potential Disbursed */}
+                <div className="bg-gradient-to-br from-orange-400 to-orange-500 p-5 rounded-2xl shadow-sm text-white">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-90">Potential Disbursed</p>
                     <div className="flex justify-between items-end mt-1">
-                        <p className="text-3xl font-black italic">₱{totalRevenue.toLocaleString()}</p>
+                        <p className="text-3xl font-black italic">₱{potentialDisbursed.toLocaleString()}</p>
                         <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
                             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3zM12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" />
@@ -151,23 +184,29 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
                     </div>
                 </div>
 
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Liquidation Progress</p>
-                            <p className="text-3xl font-black text-slate-800 mt-1">{progressPercent.toFixed(1)}%</p>
-                        </div>
-                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* Done Trips */}
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-5 rounded-2xl shadow-sm text-white">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-90">Total Trips Done</p>
+                    <div className="flex justify-between items-end mt-1">
+                        <p className="text-3xl font-black">{doneTripsCount.toLocaleString()}</p>
+                        <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                     </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full mt-4 overflow-hidden">
-                        <div
-                            className="bg-blue-500 h-full transition-all duration-1000 ease-out"
-                            style={{ width: `${progressPercent}%` }}
-                        ></div>
+                </div>
+
+                {/* Total Disbursed */}
+                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 rounded-2xl shadow-sm text-white">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-90">Total Disburse Trip</p>
+                    <div className="flex justify-between items-end mt-1">
+                        <p className="text-3xl font-black italic">₱{totalDisbursed.toLocaleString()}</p>
+                        <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3zM12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" />
+                            </svg>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -189,13 +228,30 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
                 </div>
                 
                 <div className="flex items-center gap-3">
+                    {isAdmin && (
+                        <AddNewTrip routes={routes} onSuccess={loadTrips} />
+                    )}
                     {isAdmin && selectedTripIds.length > 0 && (
-                        <button
-                            onClick={() => setIsTransferModalOpen(true)}
-                            className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl transition-colors font-semibold"
-                        >
-                            Transfer ({selectedTripIds.length})
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setIsTransferModalOpen(true)}
+                                className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl transition-colors font-semibold"
+                            >
+                                Transfer ({selectedTripIds.length})
+                            </button>
+                            <button
+                                onClick={() => setIsBulkDeleteModalOpen(true)}
+                                disabled={hasLiquidatedInSelection}
+                                title={hasLiquidatedInSelection ? "Cannot delete selected trips because one or more are liquidated (Done)." : `Delete ${selectedTripIds.length} trips`}
+                                className={`text-xs px-4 py-2 rounded-xl transition-colors font-semibold ${
+                                    hasLiquidatedInSelection 
+                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-70' 
+                                        : 'bg-red-500 hover:bg-red-600 text-white shadow-sm'
+                                }`}
+                            >
+                                Delete ({selectedTripIds.length})
+                            </button>
+                        </div>
                     )}
                     <select
                         className="px-4 py-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
@@ -324,6 +380,7 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
                                                         Edit
                                                     </button>
                                                 )}
+                                                <DeleteTrip trip={trip} isPending={!isLiquidated} onSuccess={loadTrips} />
                                             </td>
                                         )}
                                     </tr>
@@ -436,6 +493,24 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
                             className="bg-amber-500 hover:bg-amber-600 text-white"
                         >
                             {isTransferring ? "Transferring..." : "Confirm Transfer"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Bulk Delete Trips Modal */}
+            <Dialog open={isBulkDeleteModalOpen} onOpenChange={setIsBulkDeleteModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Selected Trips</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete the {selectedTripIds.length} selected trip(s)? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setIsBulkDeleteModalOpen(false)}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleBulkDeleteSubmit} disabled={isBulkDeleting}>
+                            {isBulkDeleting ? "Deleting..." : "Delete Trips"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
