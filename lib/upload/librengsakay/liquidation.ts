@@ -84,6 +84,7 @@ export async function getLiquidationReport(startDate: string, endDate: string, r
         return await prisma.librengSakayLiquidation.findMany({
             where,
             orderBy: [
+                { arnumber: 'desc' },
                 { paymentDate: 'desc' }
             ],
             include: {
