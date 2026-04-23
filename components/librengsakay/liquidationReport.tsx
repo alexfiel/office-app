@@ -152,7 +152,8 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
 
             // Variable for Totals
             let grandTotalAmount = 0;
-            let pageSubtotals: Record<number, number> = {} // Object to store totals per page index
+            let pageSubtotalsAmount: Record<number, number> = {}; // Object to store amount totals per page index
+            let pageSubtotalsTotal: Record<number, number> = {}; // Object to store Total per page index
 
             // 1. Capture and Add Header
             const headerImg = await toPng(headerElement, { pixelRatio: 3, backgroundColor: '#ffffff' });
@@ -160,21 +161,48 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             const hHeight = (hProps.height * safeWidth) / hProps.width;
             pdf.addImage(headerImg, 'PNG', M, M, safeWidth, hHeight);
 
-            // 2. Prepare Table Data
-            const headers = [["#", "AR #", "Operation Date", "Payment Date", "Route", "Driver", "Plate Number", "Pax", "Fare", "Amount"]];
-            const rows = reportData.map((item, index) => [
-                index + 1,
-                item.arnumber,
-                new Date(item.departureDate).toLocaleDateString(),
-                new Date(item.paymentDate).toLocaleDateString(),
-                item.trip.route.routeName,
-                item.driverName,
-                item.vehiclePlateNumber,
-                item.numberofPax,
-                item.fare.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })
-            ]);
+            // Pre-calculate Total and Count per AR
+            const arTotals: Record<string, { total: number, count: number }> = {};
+            reportData.forEach(item => {
+                const k = item.arnumber ? item.arnumber : `no-ar-${item.id}`;
+                if (!arTotals[k]) {
+                    arTotals[k] = { total: 0, count: 0 };
+                }
+                arTotals[k].total += item.amount;
+                arTotals[k].count += 1;
+            });
+            const seenArs = new Set<string>();
 
+            // 2. Prepare Table Data
+            const headers = [["#", "AR #", "Operation Date", "Payment Date", "Route", "Driver", "Plate Number", "Pax", "Fare", "Amount", "Total"]];
+            const rows = reportData.map((item, index) => {
+                const k = item.arnumber ? item.arnumber : `no-ar-${item.id}`;
+                const row: any[] = [
+                    index + 1,
+                    item.arnumber || "-",
+                    new Date(item.departureDate).toLocaleDateString(),
+                    new Date(item.paymentDate).toLocaleDateString(),
+                    item.trip.route.routeName,
+                    item.driverName,
+                    item.vehiclePlateNumber,
+                    item.numberofPax,
+                    item.fare,
+                    item.amount
+                ];
+
+                if (!seenArs.has(k)) {
+                    seenArs.add(k);
+                    const arInfo = arTotals[k];
+                    // Add Total cell with rowSpan for merging
+                    row.push({
+                        content: arInfo.total,
+                        rowSpan: arInfo.count,
+                        styles: { valign: 'middle', halign: 'right' }
+                    });
+                }
+                
+                return row;
+            });
 
             // 3. Generate Table (Handles 50+ pages without overlap)
             autoTable(pdf, {
@@ -187,26 +215,57 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
 
                 // Format cells for currency and calculate totals
                 didParseCell: (data) => {
-                    // Format Amount (Index 9) and Fare (Index 8) to Currency for display
-                    if (data.section === 'body' && (data.column.index === 8 || data.column.index === 9)) {
-                        const val = parseFloat(String(data.cell.raw)) || 0;
-                        data.cell.text = [`P${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
+                    // Format Fare (8), Amount (9) and Total (10)
+                    if (data.section === 'body' && (data.column.index === 8 || data.column.index === 9 || data.column.index === 10)) {
+                        let rawStr = "";
+                        if (typeof data.cell.raw === 'object' && data.cell.raw !== null && 'content' in data.cell.raw) {
+                            rawStr = String((data.cell.raw as any).content).replace(/,/g, '');
+                        } else {
+                            rawStr = String(data.cell.raw).replace(/,/g, '');
+                        }
+
+                        if (rawStr && rawStr !== "") {
+                            const val = parseFloat(rawStr) || 0;
+                            data.cell.text = [`P${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
+                        } else {
+                            data.cell.text = [""];
+                        }
                     }
                 },
 
                 willDrawCell: (data) => {
                     // Track the sum for the current page
-                    if (data.section === 'body' && data.column.index === 9) {
-                        const amount = parseFloat(String(data.cell.raw)) || 0;
-                        const currentPage = (pdf.internal as any).getNumberOfPages();
-                        pageSubtotals[currentPage] = (pageSubtotals[currentPage] || 0) + amount;
+                    if (data.section === 'body') {
+                        let rawStr = "";
+                        if (typeof data.cell.raw === 'object' && data.cell.raw !== null && 'content' in data.cell.raw) {
+                            rawStr = String((data.cell.raw as any).content).replace(/,/g, '');
+                        } else {
+                            rawStr = String(data.cell.raw).replace(/,/g, '');
+                        }
+
+                        if (rawStr && rawStr !== "") {
+                            const val = parseFloat(rawStr) || 0;
+                            const currentPage = (pdf.internal as any).getNumberOfPages();
+                            if (data.column.index === 9) {
+                                pageSubtotalsAmount[currentPage] = (pageSubtotalsAmount[currentPage] || 0) + val;
+                            }
+                            if (data.column.index === 10) {
+                                pageSubtotalsTotal[currentPage] = (pageSubtotalsTotal[currentPage] || 0) + val;
+                            }
+                        }
                     }
 
                     // Inject the calculated subset into the foot cell before drawing
-                    if (data.section === 'foot' && data.column.index === 9) {
+                    if (data.section === 'foot') {
                         const currentPage = (pdf.internal as any).getNumberOfPages();
-                        const subtotal = pageSubtotals[currentPage] || 0;
-                        data.cell.text = [`P${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
+                        if (data.column.index === 9) {
+                            const subtotal = pageSubtotalsAmount[currentPage] || 0;
+                            data.cell.text = [`P${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
+                        }
+                        if (data.column.index === 10) {
+                            const subtotal = pageSubtotalsTotal[currentPage] || 0;
+                            data.cell.text = [`P${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
+                        }
                     }
                 },
 
@@ -231,6 +290,10 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                     {
                         content: ``,
                         styles: { halign: 'right', fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0, 0, 0] }
+                    },
+                    {
+                        content: ``,
+                        styles: { halign: 'right', fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [0, 0, 0] }
                     }
                 ]],
             });
@@ -250,7 +313,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
 
             // Draw Grand Total Amount right-aligned
             pdf.setFontSize(10);
-            pdf.text(`GRAND TOTAL AMOUNT: P${grandTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, FOLIO_WIDTH - M - 5, finalY, { align: 'right' });
+            pdf.text(`GRAND TOTAL: P${grandTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, FOLIO_WIDTH - M - 5, finalY, { align: 'right' });
 
             finalY += 20; // gap before signatures
             const footerHeight = 35; // approximate height needed for signatures
