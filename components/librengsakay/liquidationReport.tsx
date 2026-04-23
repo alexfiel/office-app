@@ -161,21 +161,25 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             const hHeight = (hProps.height * safeWidth) / hProps.width;
             pdf.addImage(headerImg, 'PNG', M, M, safeWidth, hHeight);
 
-            // Pre-calculate Total and Count per AR
-            const arTotals: Record<string, { total: number, count: number }> = {};
+            // Pre-calculate Total and Count per AR, and group items to ensure contiguous ARs
+            const arTotals: Record<string, { total: number, count: number, items: any[] }> = {};
             reportData.forEach(item => {
                 const k = item.arnumber ? item.arnumber : `no-ar-${item.id}`;
                 if (!arTotals[k]) {
-                    arTotals[k] = { total: 0, count: 0 };
+                    arTotals[k] = { total: 0, count: 0, items: [] };
                 }
                 arTotals[k].total += item.amount;
                 arTotals[k].count += 1;
+                arTotals[k].items.push(item);
             });
+            
+            // Flatten the grouped items to ensure contiguous rows for the same AR
+            const sortedReportData = Object.values(arTotals).flatMap(group => group.items);
             const seenArs = new Set<string>();
 
             // 2. Prepare Table Data
             const headers = [["#", "AR #", "Operation Date", "Payment Date", "Route", "Driver", "Plate Number", "Pax", "Fare", "Amount", "Total"]];
-            const rows = reportData.map((item, index) => {
+            const rows = sortedReportData.map((item, index) => {
                 const k = item.arnumber ? item.arnumber : `no-ar-${item.id}`;
                 const row: any[] = [
                     index + 1,

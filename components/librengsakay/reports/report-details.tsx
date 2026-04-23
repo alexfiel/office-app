@@ -6,14 +6,15 @@ interface ReportDetailsProps {
 }
 
 export function ReportDetails({ routeName, data, totalPax, totalAmount }: ReportDetailsProps) {
-    const arTotals: Record<string, { total: number, count: number }> = {};
+    const arTotals: Record<string, { total: number, count: number, items: any[] }> = {};
     data.forEach(item => {
         const k = item.arnumber ? item.arnumber : `no-ar-${item.id}`;
         if (!arTotals[k]) {
-            arTotals[k] = { total: 0, count: 0 };
+            arTotals[k] = { total: 0, count: 0, items: [] };
         }
         arTotals[k].total += item.amount;
         arTotals[k].count += 1;
+        arTotals[k].items.push(item);
     });
 
     const seenArs = new Set<string>();
@@ -47,7 +48,7 @@ export function ReportDetails({ routeName, data, totalPax, totalAmount }: Report
                             </td>
                         </tr>
                     ) : (
-                        data.map((item, idx) => {
+                        Object.values(arTotals).flatMap(group => group.items).map((item, idx) => {
                             const k = item.arnumber ? item.arnumber : `no-ar-${item.id}`;
                             let isFirstAr = false;
                             if (!seenArs.has(k)) {
