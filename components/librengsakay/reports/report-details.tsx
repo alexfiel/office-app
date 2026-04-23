@@ -61,15 +61,12 @@ export function ReportDetails({ routeName, data, totalPax, totalAmount }: Report
                                     <td className="border border-black p-2 text-center font-mono">
                                         {item.arnumber || "-"}
                                     </td>
-                                    <td className="border border-black p-2 text-center">
-                                        {item.paymentDate ? new Date(item.paymentDate).toLocaleDateString() : "-"}
-                                    </td>
-                                    <td className="border border-black p-2 text-center">
-                                        {new Date(item.departureDate).toLocaleDateString()}
-                                    </td>
-                                    <td className="border border-black p-2 font-medium">{item.driverName}</td>
-                                    <td className="border border-black p-2 text-center font-mono">{item.vehiclePlateNumber}</td>
-                                    <td className="border border-black p-2 text-center">{item.numberofPax}</td>
+                                    <td className="border border-black p-2 text-center">{item.paymentDate ? new Date(item.paymentDate).toLocaleDateString() : "-"}</td>
+                                    <td className="border border-black p-2 text-center">{item.departureDate ? new Date(item.departureDate).toLocaleDateString() : "-"}</td>
+                                    <td className="border border-black p-2 text-center font-medium">{item.trip?.route?.routeName || "Unknown Route"}</td>
+                                    <td className="border border-black p-2 text-center uppercase">{item.driverName || "-"}</td>
+                                    <td className="border border-black p-2 text-center font-mono">{item.vehiclePlateNumber || "-"}</td>
+                                    <td className="border border-black p-2 text-center">{item.numberofPax || 0}</td>
                                     <td className="border border-black p-2 text-right">₱{item.fare.toFixed(2)}</td>
                                     <td className="border border-black p-2 text-right">
                                         ₱{item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}

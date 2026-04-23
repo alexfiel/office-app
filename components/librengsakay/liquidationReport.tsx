@@ -184,14 +184,14 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                 const row: any[] = [
                     index + 1,
                     item.arnumber || "-",
-                    new Date(item.departureDate).toLocaleDateString(),
-                    new Date(item.paymentDate).toLocaleDateString(),
-                    item.trip.route.routeName,
-                    item.driverName,
-                    item.vehiclePlateNumber,
-                    item.numberofPax,
-                    item.fare,
-                    item.amount
+                    item.departureDate ? new Date(item.departureDate).toLocaleDateString() : "-",
+                    item.paymentDate ? new Date(item.paymentDate).toLocaleDateString() : "-",
+                    item.trip?.route?.routeName || "Unknown Route",
+                    item.driverName || "-",
+                    item.vehiclePlateNumber || "-",
+                    item.numberofPax || 0,
+                    item.fare || 0,
+                    item.amount || 0
                 ];
 
                 if (!seenArs.has(k)) {
@@ -371,9 +371,9 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             const dateTag = new Date().toISOString().split('T')[0];
             pdf.save(`Liquidation_Report_${dateTag}.pdf`);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("PDF Export Error:", error);
-            alert("Error capturing footer. Try again.");
+            alert(`Error generating PDF: ${error?.message || 'Unknown error'}. Please check console.`);
         } finally {
             setIsGeneratingPdf(false);
         }
