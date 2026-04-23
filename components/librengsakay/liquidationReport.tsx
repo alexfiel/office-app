@@ -155,11 +155,47 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             let pageSubtotalsAmount: Record<number, number> = {}; // Object to store amount totals per page index
             let pageSubtotalsTotal: Record<number, number> = {}; // Object to store Total per page index
 
-            // 1. Capture and Add Header
-            const headerImg = await toPng(headerElement, { pixelRatio: 3, backgroundColor: '#ffffff' });
-            const hProps = pdf.getImageProperties(headerImg);
-            const hHeight = (hProps.height * safeWidth) / hProps.width;
-            pdf.addImage(headerImg, 'PNG', M, M, safeWidth, hHeight);
+            // 1. Draw Header Natively
+            const centerX = FOLIO_WIDTH / 2;
+            let currentY = M + 15;
+            
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(0);
+            pdf.setFontSize(14);
+            pdf.text("Republic of the Philippines", centerX, currentY, { align: "center" });
+            
+            currentY += 6;
+            pdf.setFontSize(14);
+            pdf.text("CITY GOVERNMENT OF TAGBILARAN", centerX, currentY, { align: "center" });
+            
+            currentY += 6;
+            pdf.setFontSize(10);
+            pdf.text("Tagbilaran City, Bohol, Philippines", centerX, currentY, { align: "center" });
+            
+            currentY += 12;
+            pdf.setFontSize(16);
+            pdf.setFont("helvetica", "bold");
+            pdf.text("LIBRENG SAKAY PROGRAM", centerX, currentY, { align: "center" });
+            
+            currentY += 8;
+            pdf.setFontSize(11);
+            let dateRangeText = "";
+            if (filters.startDate && filters.endDate) {
+                if (filters.startDate === filters.endDate) {
+                    dateRangeText = new Date(filters.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                } else {
+                    const startText = new Date(filters.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                    const endText = new Date(filters.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                    dateRangeText = `${startText} - ${endText}`;
+                }
+            } else {
+                 dateRangeText = "All Dates";
+            }
+            pdf.text(`PAYMENT DATE: ${dateRangeText.toUpperCase()}`, centerX, currentY, { align: "center" });
+            
+            currentY += 15; // Gap before table
+            
+            const hHeight = currentY;
 
             // Pre-calculate Total and Count per AR, and group items to ensure contiguous ARs
             const arTotals: Record<string, { total: number, count: number, items: any[] }> = {};
