@@ -29,9 +29,11 @@ export function ReportDetails({ routeName, data, totalPax, totalAmount }: Report
             <table className="w-full border-collapse border border-black text-xs">
                 <thead>
                     <tr className="bg-gray-100">
+                        <th className="border border-black p-2 text-center uppercase tracking-tighter">#</th>
                         <th className="border border-black p-2 text-center uppercase tracking-tighter">AR Number</th>
-                        <th className="border border-black p-2 text-center uppercase tracking-tighter">Paid Date</th>
                         <th className="border border-black p-2 text-center uppercase tracking-tighter">Operation Date</th>
+                        <th className="border border-black p-2 text-center uppercase tracking-tighter">Paid Date</th>
+                        <th className="border border-black p-2 text-left uppercase tracking-tighter">Route</th>
                         <th className="border border-black p-2 text-left uppercase tracking-tighter">Driver Name</th>
                         <th className="border border-black p-2 text-center uppercase tracking-tighter">Plate Number</th>
                         <th className="border border-black p-2 text-center uppercase tracking-tighter">Pax</th>
@@ -43,7 +45,7 @@ export function ReportDetails({ routeName, data, totalPax, totalAmount }: Report
                 <tbody>
                     {data.length === 0 ? (
                         <tr>
-                            <td colSpan={9} className="border border-black p-8 text-center text-gray-400 italic">
+                            <td colSpan={11} className="border border-black p-8 text-center text-gray-400 italic">
                                 No records found for the selected period.
                             </td>
                         </tr>
@@ -58,12 +60,13 @@ export function ReportDetails({ routeName, data, totalPax, totalAmount }: Report
 
                             return (
                                 <tr key={idx} className="hover:bg-gray-50">
+                                    <td className="border border-black p-2 text-center font-mono">{idx + 1}</td>
                                     <td className="border border-black p-2 text-center font-mono">
                                         {item.arnumber || "-"}
                                     </td>
-                                    <td className="border border-black p-2 text-center">{item.paymentDate ? new Date(item.paymentDate).toLocaleDateString() : "-"}</td>
                                     <td className="border border-black p-2 text-center">{item.departureDate ? new Date(item.departureDate).toLocaleDateString() : "-"}</td>
-                                    <td className="border border-black p-2 text-center font-medium">{item.trip?.route?.routeName || "Unknown Route"}</td>
+                                    <td className="border border-black p-2 text-center">{item.paymentDate ? new Date(item.paymentDate).toLocaleDateString() : "-"}</td>
+                                    <td className="border border-black p-2 font-medium">{item.trip?.route?.routeName || "Unknown Route"}</td>
                                     <td className="border border-black p-2 text-center uppercase">{item.driverName || "-"}</td>
                                     <td className="border border-black p-2 text-center font-mono">{item.vehiclePlateNumber || "-"}</td>
                                     <td className="border border-black p-2 text-center">{item.numberofPax || 0}</td>
