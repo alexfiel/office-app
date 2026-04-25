@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from 'react';
-import { getPendingTrips, saveLiquidations } from '@/lib/upload/librengsakay/liquidation';
+import { getPendingTrips, saveLiquidations, checkArNumberExists } from '@/lib/upload/librengsakay/liquidation';
 
 export default function LiquidationWorkspace({ routes, userId, userName }: any){
     const [filter, setFilter] = useState({ routeId: '', date: '' });
@@ -50,6 +50,13 @@ export default function LiquidationWorkspace({ routes, userId, userName }: any){
 
         setIsBulkLoading(true);
         try {
+            const exists = await checkArNumberExists(commonData.arnumber);
+            if (exists) {
+                alert(`AR Number ${commonData.arnumber} already exists. Please use a different AR Number.`);
+                setIsBulkLoading(false);
+                return;
+            }
+
             await saveLiquidations(payloads, userId);
             setEditingTrips(null);
             setSelectedIds([]);

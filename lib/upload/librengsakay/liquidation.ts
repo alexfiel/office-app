@@ -59,6 +59,15 @@ export async function saveLiquidations(items: any[], userId: string) {
 }
 
 
+// 2.5 Check if AR Number already exists
+export async function checkArNumberExists(arnumber: string) {
+    const existing = await prisma.librengSakayLiquidation.findFirst({
+        where: { arnumber }
+    });
+    return !!existing;
+}
+
+
 // 3. Get Liquidation Report
 export async function getLiquidationReport(startDate: string, endDate: string, routeId?: string) {
     try {
@@ -303,6 +312,89 @@ export async function deleteTripLogs(tripIds: string[]) {
         return result;
     } catch (error: any) {
         console.error("Bulk Delete Trip Logs Error:", error.message);
+        throw error;
+    }
+}
+
+// 11. Search Trips
+export async function searchTrips(filters: {
+    driverName?: string;
+    plateNumber?: string;
+    routeId?: string;
+    status?: 'ALL' | 'PENDING' | 'LIQUIDATED';
+    tripDate?: string;
+    paymentDate?: string;
+}) {
+    try {
+        const where: any = {};
+        
+        if (filters.driverName) {
+            where.driverName = { contains: filters.driverName, mode: 'insensitive' };
+        }
+        if (filters.plateNumber) {
+            where.vehiclePlateNumber = { contains: filters.plateNumber, mode: 'insensitive' };
+        }
+        if (filters.routeId) {
+            where.routeId = filters.routeId;
+        }
+        if (filters.tripDate) {
+            const startTrip = new Date(filters.tripDate);
+            startTrip.setHours(0, 0, 0, 0);
+            const endTrip = new Date(filters.tripDate);
+            endTrip.setHours(23, 59, 59, 999);
+            where.departureDate = {
+                gte: startTrip,
+                lte: endTrip
+            };
+        }
+        
+        let liquidationConditions: any = {};
+        if (filters.paymentDate) {
+            const startPay = new Date(filters.paymentDate);
+            startPay.setHours(0, 0, 0, 0);
+            const endPay = new Date(filters.paymentDate);
+            endPay.setHours(23, 59, 59, 999);
+            liquidationConditions.paymentDate = {
+                gte: startPay,
+                lte: endPay
+            };
+        }
+
+        if (filters.status === 'PENDING') {
+            where.liquidations = { none: {} };
+            if (filters.paymentDate) {
+                where.id = "impossible_pending_with_payment_date";
+            }
+        } else if (filters.status === 'LIQUIDATED') {
+            where.liquidations = { some: liquidationConditions };
+        } else {
+            if (Object.keys(liquidationConditions).length > 0) {
+                where.liquidations = { some: liquidationConditions };
+            }
+        }
+
+        return await prisma.librengSakayTrip.findMany({
+            where,
+            include: {
+                route: {
+                    select: { routeName: true }
+                },
+                liquidations: {
+                    include: {
+                        user: { select: { name: true } },
+                        trip: {
+                            include: {
+                                route: { select: { routeName: true } }
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { departureDate: "desc" },
+            take: 200 // Limit results for performance
+        });
+    } catch (error: any) {
+        console.error("Search Trips Error:", error.message);
         throw error;
     }
 }

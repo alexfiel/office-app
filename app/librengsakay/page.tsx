@@ -11,6 +11,7 @@ import TripUpload from "@/components/librengsakay/tripUpload"
 import LiquidationWorkspace from "@/components/librengsakay/liquidationWorkspace"
 import LiquidationReport from "@/components/librengsakay/liquidationReport"
 import TripViewList from "@/components/librengsakay/tripViewList"
+import TripSearch from "@/components/librengsakay/tripSearch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default async function LibrengSakay() {
@@ -62,10 +63,11 @@ export default async function LibrengSakay() {
                     </div>
 
                     <Tabs defaultValue="dashboard" className="w-full">
-                        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+                        <TabsList className="grid w-full grid-cols-6 max-w-3xl">
                             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                             <TabsTrigger value="upload">Upload Trips</TabsTrigger>
                             <TabsTrigger value="logs">Trip Logs</TabsTrigger>
+                            <TabsTrigger value="search">Search</TabsTrigger>
                             <TabsTrigger value="liquidate">Liquidation</TabsTrigger>
                             <TabsTrigger value="reports">Reports</TabsTrigger>
                         </TabsList>
@@ -92,7 +94,16 @@ export default async function LibrengSakay() {
                             </div>
                         </TabsContent>
 
-                        {/* TAB 3: LIQUIDATION */}
+                        {/* TAB 4: SEARCH */}
+                        <TabsContent value="search" className="mt-4">
+                            <div className="border rounded-xl p-6 bg-white shadow-sm">
+                                <h2 className="text-lg font-semibold mb-4">Search Trips</h2>
+                                <p className="text-sm text-gray-500 mb-6">Search for trips by driver, plate number, route, or liquidation status.</p>
+                                <TripSearch routes={routes} userName={user.name} />
+                            </div>
+                        </TabsContent>
+
+                        {/* TAB 5: LIQUIDATION */}
                         <TabsContent value="liquidate" className="mt-4">
                             <div className="border rounded-xl p-6 bg-white shadow-sm">
                                 <h2 className="text-lg font-semibold mb-4">Liquidation Workspace</h2>
@@ -105,7 +116,7 @@ export default async function LibrengSakay() {
                             </div>
                         </TabsContent>
 
-                        {/* TAB 4: REPORTS */}
+                        {/* TAB 6: REPORTS */}
                         <TabsContent value="reports" className="mt-4">
                             <div className="border rounded-xl p-6 bg-white shadow-sm">
                                 <h2 className="text-lg font-semibold mb-4">Liquidation Report</h2>
