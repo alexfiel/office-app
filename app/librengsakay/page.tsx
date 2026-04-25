@@ -13,20 +13,33 @@ import LiquidationReport from "@/components/librengsakay/liquidationReport"
 import TripViewList from "@/components/librengsakay/tripViewList"
 import TripSearch from "@/components/librengsakay/tripSearch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { 
+    LayoutDashboard, 
+    UploadCloud, 
+    FileText, 
+    Search, 
+    Banknote, 
+    FileBarChart 
+} from "lucide-react"
 
 export default async function LibrengSakay() {
     const session = await auth();
     if (!session?.user) redirect("/login");
 
     const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    // For the chart, we want last 6 months
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(now.getMonth() - 6);
+    sixMonthsAgo.setDate(1);
 
     // Fetch all necessary data
-    const [budget, paxData, totalSpent, routes, recent] = await Promise.all([
+    const [budget, paxData, totalSpent, routes, recent, allTrips, allLiquidations] = await Promise.all([
         prisma.librengSakayBudget.findFirst({ where: { year: now.getFullYear() } }),
         prisma.librengSakayTrip.aggregate({
-            where: { departureDate: { gte: start, lte: end } },
+            where: { departureDate: { gte: startOfMonth, lte: endOfMonth } },
             _sum: { numberofPax: true }
         }),
         prisma.librengSakayLiquidation.aggregate({ _sum: { amount: true } }),
@@ -35,6 +48,14 @@ export default async function LibrengSakay() {
             take: 5, 
             orderBy: { createdAt: 'desc' },
             include: { user: { select: { name: true } } }
+        }),
+        prisma.librengSakayTrip.findMany({
+            where: { departureDate: { gte: sixMonthsAgo } },
+            select: { id: true, departureDate: true, numberofPax: true, amount: true }
+        }),
+        prisma.librengSakayLiquidation.findMany({
+            where: { paymentDate: { gte: sixMonthsAgo } },
+            select: { id: true, paymentDate: true, amount: true }
         })
     ]);
 
@@ -44,6 +65,8 @@ export default async function LibrengSakay() {
         runningBalance: (budget?.totalBudget || 0) - (totalSpent._sum.amount || 0),
         budgetUtilization: budget ? ((totalSpent._sum.amount || 0) / budget.totalBudget) * 100 : 0,
         initialBudget: budget?.totalBudget || 0,
+        allTrips,
+        allLiquidations
     };
 
     const user = {
@@ -63,13 +86,31 @@ export default async function LibrengSakay() {
                     </div>
 
                     <Tabs defaultValue="dashboard" className="w-full">
-                        <TabsList className="grid w-full grid-cols-6 max-w-3xl">
-                            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-                            <TabsTrigger value="upload">Upload Trips</TabsTrigger>
-                            <TabsTrigger value="logs">Trip Logs</TabsTrigger>
-                            <TabsTrigger value="search">Search</TabsTrigger>
-                            <TabsTrigger value="liquidate">Liquidation</TabsTrigger>
-                            <TabsTrigger value="reports">Reports</TabsTrigger>
+                        <TabsList className="grid w-full grid-cols-6 max-w-4xl h-12">
+                            <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                                <LayoutDashboard className="w-4 h-4" />
+                                <span>Dashboard</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="upload" className="flex items-center gap-2">
+                                <UploadCloud className="w-4 h-4" />
+                                <span>Upload Trips</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="logs" className="flex items-center gap-2">
+                                <FileText className="w-4 h-4" />
+                                <span>Trip Logs</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="search" className="flex items-center gap-2">
+                                <Search className="w-4 h-4" />
+                                <span>Search</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="liquidate" className="flex items-center gap-2">
+                                <Banknote className="w-4 h-4" />
+                                <span>Liquidation</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="reports" className="flex items-center gap-2">
+                                <FileBarChart className="w-4 h-4" />
+                                <span>Reports</span>
+                            </TabsTrigger>
                         </TabsList>
 
                         {/* TAB 1: DASHBOARD */}

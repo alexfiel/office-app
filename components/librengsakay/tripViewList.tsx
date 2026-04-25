@@ -19,6 +19,8 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRoute, setFilterRoute] = useState('');
     const [filterDate, setFilterDate] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 20;
 
     // Edit state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -111,6 +113,11 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
         loadTrips();
     }, []);
 
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterRoute, filterDate]);
+
     const filteredTrips = trips.filter(trip => {
         const matchesSearch = trip.driverName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                               trip.vehiclePlateNumber.toLowerCase().includes(searchTerm.toLowerCase());
@@ -125,9 +132,13 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
 
     const uniqueRoutes = Array.from(new Set(trips.map(t => t.route?.routeName).filter(Boolean)));
 
+    // Pagination Logic
+    const totalPages = Math.ceil(filteredTrips.length / pageSize);
+    const paginatedTrips = filteredTrips.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
     const toggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.checked) {
-            setSelectedTripIds(filteredTrips.map(t => t.id));
+            setSelectedTripIds(paginatedTrips.map(t => t.id));
         } else {
             setSelectedTripIds([]);
         }
@@ -305,18 +316,18 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {isLoading && filteredTrips.length === 0 ? (
+                        {isLoading && paginatedTrips.length === 0 ? (
                             Array.from({ length: 5 }).map((_, i) => (
                                 <tr key={i} className="animate-pulse">
                                     <td colSpan={100} className="p-4 bg-slate-50/50 h-12"></td>
                                 </tr>
                             ))
-                        ) : filteredTrips.length === 0 ? (
+                        ) : paginatedTrips.length === 0 ? (
                             <tr>
                                 <td colSpan={100} className="p-12 text-center text-slate-400 italic">No trips found.</td>
                             </tr>
                         ) : (
-                            filteredTrips.map((trip) => {
+                            paginatedTrips.map((trip) => {
                                 const isLiquidated = trip.liquidations.length > 0;
                                 const arNumber = isLiquidated ? trip.liquidations[0].arnumber : null;
 
@@ -390,6 +401,63 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex justify-between items-center bg-white p-4 border rounded-2xl shadow-sm">
+                    <div className="text-xs text-slate-500 font-medium">
+                        Showing <span className="font-bold text-slate-900">{(currentPage - 1) * pageSize + 1}</span> to <span className="font-bold text-slate-900">{Math.min(currentPage * pageSize, filteredTrips.length)}</span> of <span className="font-bold text-slate-900">{filteredTrips.length}</span> results
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className={`p-2 rounded-lg border transition-colors ${currentPage === 1 ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'hover:bg-slate-50 text-slate-600'}`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                                pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                                pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                                pageNum = totalPages - 4 + i;
+                            } else {
+                                pageNum = currentPage - 2 + i;
+                            }
+                            
+                            return (
+                                <button
+                                    key={pageNum}
+                                    onClick={() => setCurrentPage(pageNum)}
+                                    className={`w-9 h-9 rounded-lg text-xs font-bold transition-all ${
+                                        currentPage === pageNum 
+                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-200 scale-110' 
+                                            : 'hover:bg-slate-50 text-slate-600 border'
+                                    }`}
+                                >
+                                    {pageNum}
+                                </button>
+                            );
+                        })}
+
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                            className={`p-2 rounded-lg border transition-colors ${currentPage === totalPages ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'hover:bg-slate-50 text-slate-600'}`}
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Edit Trip Modal */}
             <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>

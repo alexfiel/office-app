@@ -13,7 +13,8 @@ export default function TripSearch({ routes, userName }: { routes: any[], userNa
         routeId: '',
         status: 'ALL' as 'ALL' | 'PENDING' | 'LIQUIDATED',
         tripDate: '',
-        paymentDate: ''
+        paymentDate: '',
+        arNumber: ''
     });
     const [results, setResults] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -238,7 +239,7 @@ export default function TripSearch({ routes, userName }: { routes: any[], userNa
     return (
         <div className="space-y-6">
             {/* Search Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-5 bg-white border rounded-2xl shadow-sm items-end">
+            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4 p-5 bg-white border rounded-2xl shadow-sm items-end">
                 <div>
                     <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Driver Name</label>
                     <input
@@ -302,7 +303,17 @@ export default function TripSearch({ routes, userName }: { routes: any[], userNa
                         onChange={(e) => setFilters({ ...filters, paymentDate: e.target.value })}
                     />
                 </div>
-                <div className="md:col-span-6 flex justify-end gap-3">
+                <div>
+                    <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">AR Number</label>
+                    <input
+                        type="text"
+                        placeholder="Search AR..."
+                        className="w-full border p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={filters.arNumber}
+                        onChange={(e) => setFilters({ ...filters, arNumber: e.target.value })}
+                    />
+                </div>
+                <div className="md:col-span-4 lg:col-span-7 flex justify-end gap-3">
                     <button
                         onClick={handleSearch}
                         disabled={isLoading}

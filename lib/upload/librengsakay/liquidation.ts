@@ -324,6 +324,7 @@ export async function searchTrips(filters: {
     status?: 'ALL' | 'PENDING' | 'LIQUIDATED';
     tripDate?: string;
     paymentDate?: string;
+    arNumber?: string;
 }) {
     try {
         const where: any = {};
@@ -359,11 +360,15 @@ export async function searchTrips(filters: {
                 lte: endPay
             };
         }
+        
+        if (filters.arNumber) {
+            liquidationConditions.arnumber = { contains: filters.arNumber, mode: 'insensitive' };
+        }
 
         if (filters.status === 'PENDING') {
             where.liquidations = { none: {} };
-            if (filters.paymentDate) {
-                where.id = "impossible_pending_with_payment_date";
+            if (filters.paymentDate || filters.arNumber) {
+                where.id = "impossible_pending_with_liq_data";
             }
         } else if (filters.status === 'LIQUIDATED') {
             where.liquidations = { some: liquidationConditions };
