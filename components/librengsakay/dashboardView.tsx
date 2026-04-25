@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Users, Wallet, Landmark, History, TrendingUp, TrendingDown, Activity } from "lucide-react"
 import { IconTrendingUp, IconTrendingDown } from "@tabler/icons-react"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -70,6 +70,32 @@ export default function DashboardView({ stats, recent }: { stats: Stats, recent:
         return Object.values(dailyData).sort((a, b) => a.date.localeCompare(b.date));
     }, [stats.allTrips, stats.allLiquidations]);
 
+    // Process data for route chart
+    const routeData = React.useMemo(() => {
+        const routeStats: Record<string, { route: string; pax: number; fill: string }> = {};
+        const colors = [
+            "var(--chart-1)",
+            "var(--chart-2)",
+            "var(--chart-3)",
+            "var(--chart-4)",
+            "var(--chart-5)",
+        ];
+
+        stats.allTrips.forEach((record, index) => {
+            const name = record.route?.routeName || "Unknown Route";
+            if (!routeStats[name]) {
+                routeStats[name] = { 
+                    route: name, 
+                    pax: 0, 
+                    fill: colors[Object.keys(routeStats).length % colors.length] 
+                };
+            }
+            routeStats[name].pax += Number(record.numberofPax || 0);
+        });
+
+        return Object.values(routeStats).sort((a, b) => b.pax - a.pax);
+    }, [stats.allTrips]);
+
     const filteredData = React.useMemo(() => {
         return processedData.filter((item) => {
             const date = new Date(item.date)
@@ -92,6 +118,12 @@ export default function DashboardView({ stats, recent }: { stats: Stats, recent:
         pax: {
             label: "Passengers",
             color: "var(--chart-2)",
+        },
+    } satisfies ChartConfig
+
+    const routeChartConfig = {
+        pax: {
+            label: "Passengers",
         },
     } satisfies ChartConfig
 
@@ -254,52 +286,101 @@ export default function DashboardView({ stats, recent }: { stats: Stats, recent:
                 </CardContent>
             </Card>
 
-            {/* Audit Log Table */}
-            <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b bg-gray-50/50 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <History className="w-4 h-4 text-gray-500" />
-                        <h3 className="font-bold text-gray-800 uppercase text-xs tracking-wider">Recent Liquidations (Audit Log)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Route Performance Bar Chart */}
+                <Card className="flex flex-col">
+                    <CardHeader>
+                        <CardTitle>Route Performance</CardTitle>
+                        <CardDescription>Total passengers served per route (Last 6 Months)</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1 pb-0">
+                        <ChartContainer config={routeChartConfig} className="mx-auto aspect-square max-h-[250px]">
+                            <BarChart
+                                accessibilityLayer
+                                data={routeData}
+                                layout="vertical"
+                                margin={{
+                                    left: 0,
+                                }}
+                            >
+                                <YAxis
+                                    dataKey="route"
+                                    type="category"
+                                    tickLine={false}
+                                    tickMargin={10}
+                                    axisLine={false}
+                                    hide
+                                />
+                                <XAxis type="number" dataKey="pax" hide />
+                                <ChartTooltip
+                                    cursor={false}
+                                    content={<ChartTooltipContent hideLabel />}
+                                />
+                                <Bar dataKey="pax" layout="vertical" radius={5} />
+                            </BarChart>
+                        </ChartContainer>
+                        
+                        {/* Manual Legend */}
+                        <div className="mt-4 space-y-2 pb-4">
+                            {routeData.map((item) => (
+                                <div key={item.route} className="flex items-center gap-2 text-xs">
+                                    <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: item.fill }} />
+                                    <span className="truncate font-medium text-gray-600 max-w-[150px]">{item.route}</span>
+                                    <span className="ml-auto font-mono font-bold text-gray-900">{item.pax.toLocaleString()}</span>
+                                    <span className="text-[10px] text-gray-400">pax</span>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                    <CardFooter className="flex-col items-start gap-2 text-sm">
+                        <div className="flex gap-2 font-medium leading-none">
+                            Top performing routes <TrendingUp className="h-4 w-4" />
+                        </div>
+                        <div className="leading-none text-muted-foreground">
+                            Based on total passenger counts from trip records
+                        </div>
+                    </CardFooter>
+                </Card>
+
+                {/* Audit Log Table (Now in Grid) */}
+                <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col">
+                    <div className="px-6 py-4 border-b bg-gray-50/50 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <History className="w-4 h-4 text-gray-500" />
+                            <h3 className="font-bold text-gray-800 uppercase text-xs tracking-wider">Recent Liquidations</h3>
+                        </div>
+                        <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">LATEST 5</span>
                     </div>
-                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">LATEST 5</span>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-white text-gray-500 uppercase text-[11px] font-bold border-b">
-                            <tr>
-                                <th className="px-6 py-3">AR Number</th>
-                                <th className="px-6 py-3">Date Paid</th>
-                                <th className="px-6 py-3">Driver</th>
-                                <th className="px-6 py-3">Plate</th>
-                                <th className="px-6 py-3 text-right">Amount</th>
-                                <th className="px-6 py-3 text-right">Prepared By</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {recent.length === 0 ? (
+                    <div className="overflow-x-auto flex-1">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-white text-gray-500 uppercase text-[11px] font-bold border-b">
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-10 text-center text-gray-400 italic">No recent liquidations found.</td>
+                                    <th className="px-6 py-3">AR Number</th>
+                                    <th className="px-6 py-3">Date</th>
+                                    <th className="px-6 py-3">Plate</th>
+                                    <th className="px-6 py-3 text-right">Amount</th>
                                 </tr>
-                            ) : (
-                                recent.map((item) => (
-                                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-6 py-4 font-mono font-bold text-blue-700">{item.arnumber}</td>
-                                        <td className="px-6 py-4 text-gray-600">
-                                            {new Date(item.paymentDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </td>
-                                        <td className="px-6 py-4 font-medium text-gray-800">{item.driverName}</td>
-                                        <td className="px-6 py-4 text-gray-500 font-mono text-xs">{item.vehiclePlateNumber}</td>
-                                        <td className="px-6 py-4 text-right font-bold text-gray-900">₱{item.amount.toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded uppercase tracking-tighter">
-                                                {item.user?.name || "System"}
-                                            </span>
-                                        </td>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {recent.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-10 text-center text-gray-400 italic">No recent liquidations found.</td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                ) : (
+                                    recent.map((item) => (
+                                        <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-6 py-4 font-mono font-bold text-blue-700">{item.arnumber}</td>
+                                            <td className="px-6 py-4 text-gray-600 text-xs">
+                                                {new Date(item.paymentDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-500 font-mono text-xs">{item.vehiclePlateNumber}</td>
+                                            <td className="px-6 py-4 text-right font-bold text-gray-900">₱{item.amount.toLocaleString()}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

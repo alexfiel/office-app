@@ -51,7 +51,7 @@ export default async function LibrengSakay() {
         }),
         prisma.librengSakayTrip.findMany({
             where: { departureDate: { gte: sixMonthsAgo } },
-            select: { id: true, departureDate: true, numberofPax: true, amount: true }
+            select: { id: true, departureDate: true, numberofPax: true, amount: true, route: { select: { routeName: true } } }
         }),
         prisma.librengSakayLiquidation.findMany({
             where: { paymentDate: { gte: sixMonthsAgo } },
