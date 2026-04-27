@@ -9,13 +9,13 @@ datasource db {
 }
 
 model User {
-  id                 String                    @id @default(cuid())
+  id                 String                             @id @default(cuid())
   name               String
-  email              String                    @unique
+  email              String                             @unique
   password           String
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
-  role               Role                      @default(USER)
+  createdAt          DateTime                           @default(now())
+  updatedAt          DateTime                           @updatedAt
+  role               Role                               @default(USER)
   designation        String
   chainTransactions  ChainTransaction[]
   liquidations       LibrengSakayLiquidation[]
@@ -24,6 +24,12 @@ model User {
   realProperties     RealProperty[]
   transferTaxes      TransferTax[]
   transferTaxDetails TransferTaxDetails[]
+  foodVouchers       FoodVoucher[]
+  foodVoucherVendors FoodVoucherVendor[]
+  foodVoucherClaims       FoodVoucherRedemptionClaim[]
+  foodVoucherAcks         FoodVoucherIssuerAcknowledgement[]
+  foodVoucherVendorClaims FoodVoucherVendorClaim[]
+  apiKeys                 ApiKeyModel[]
 }
 
 model RealProperty {
@@ -189,7 +195,103 @@ model LibrengSakayBudget {
   updatedAt   DateTime @updatedAt
 }
 
+model FoodVoucher {
+  id                String                              @id @default(cuid())
+  voucherCode       String
+  date              DateTime
+  amount            Float
+  createdAt         DateTime                            @default(now())
+  updatedAt         DateTime                            @updatedAt
+  userId            String
+  user              User                                @relation(fields: [userId], references: [id])
+  vendorId          String?
+  vendor            FoodVoucherVendor?                  @relation(fields: [vendorId], references: [id])
+  redemptionDetails FoodVoucherRedemptionClaimDetails[]
+}
+
+model FoodVoucherVendor {
+  id               String                       @id @default(cuid())
+  vendorName       String
+  market           String
+  stallNo          String
+  userId           String
+  user             User                         @relation(fields: [userId], references: [id])
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+  foodVouchers     FoodVoucher[] // This seems redundant if vouchers aren't linked to vendors directly?
+  redemptionClaims FoodVoucherRedemptionClaim[]
+}
+
+model FoodVoucherRedemptionClaim {
+  id              String                              @id @default(cuid())
+  redemptionCode  String                              @unique
+  vendorId        String
+  vendor          FoodVoucherVendor                   @relation(fields: [vendorId], references: [id])
+  totalAmount     Float
+  date            DateTime
+  status          String                              @default("PENDING")
+  createdAt       DateTime                            @default(now())
+  updatedAt       DateTime                            @updatedAt
+  userId          String
+  user            User                                @relation(fields: [userId], references: [id])
+  details         FoodVoucherRedemptionClaimDetails[]
+  acknowledgement FoodVoucherIssuerAcknowledgement?
+}
+
+model FoodVoucherRedemptionClaimDetails {
+  id                String                     @id @default(cuid())
+  redemptionClaimId String
+  redemptionClaim   FoodVoucherRedemptionClaim @relation(fields: [redemptionClaimId], references: [id])
+  foodVoucherId     String
+  foodVoucher       FoodVoucher                @relation(fields: [foodVoucherId], references: [id])
+  amount            Float
+}
+
+model FoodVoucherIssuerAcknowledgement {
+  id                String                     @id @default(cuid())
+  date              DateTime                   @default(now())
+  userId            String
+  user              User                       @relation(fields: [userId], references: [id])
+  acknowledged      Boolean                    @default(false)
+  ackDate           DateTime?
+  ackBy             String?
+  redemptionClaimId String?                    @unique
+  redemptionClaim   FoodVoucherRedemptionClaim? @relation(fields: [redemptionClaimId], references: [id])
+  vendorClaimId     String?                    @unique
+  vendorClaim       FoodVoucherVendorClaim?     @relation(fields: [vendorClaimId], references: [id])
+  arNumber          String                     @unique
+  createdAt         DateTime                   @default(now())
+}
+
+model FoodVoucherVendorClaim{
+  id                String                     @id @default(cuid())
+  market            String
+  stallNo           String
+  vendorName        String
+  claimControlNo   String 
+  totalAmount       Float
+  userId            String
+  user              User                       @relation(fields: [userId], references: [id])
+  acknowledgement   FoodVoucherIssuerAcknowledgement?
+  status            String                     @default("PENDING")
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+}
+
+model ApiKeyModel {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String   // Name of the system or purpose
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum Role {
   USER
   ADMIN
+  ISSUER
+  LIQUIDATOR
+  VALIDATOR
 }

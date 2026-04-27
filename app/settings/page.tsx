@@ -4,12 +4,17 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { UserSettingsForm } from "@/components/user-settings-form";
+import ApiKeyManagement from "@/components/foodvoucher/apiKeyManagement";
+import { getApiKeys } from "@/lib/actions/foodvoucher";
+import { prisma } from "@/lib/prisma";
 
 export default async function SettingsPage() {
   const session = await auth();
-  if (!session?.user) {
+  if (!session?.user?.id) {
     redirect("/login");
   }
+
+  const apiKeys = await getApiKeys(session.user.id);
 
   const user = {
     name: session.user.name || "User",
@@ -35,7 +40,21 @@ export default async function SettingsPage() {
             <h1 className="text-3xl font-bold tracking-tight">User Settings</h1>
             <p className="text-muted-foreground mt-2">Manage your account and preferences.</p>
           </div>
-          <UserSettingsForm />
+          <div className="space-y-10">
+            <UserSettingsForm />
+            
+            <div className="pt-6 border-t">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold tracking-tight">Security & Integrations</h2>
+                <p className="text-muted-foreground mt-2">Manage API access for external systems.</p>
+              </div>
+              <ApiKeyManagement 
+                userId={session.user.id} 
+                initialKeys={apiKeys}
+                role={user.role}
+              />
+            </div>
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>

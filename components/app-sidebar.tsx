@@ -24,6 +24,7 @@ import {
   IconUsers,
   IconBuildingSkyscraper,
   IconBus,
+  IconReceipt,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -58,6 +59,16 @@ const data = {
       url: "/librengsakay",
       icon: IconBus,
     },
+    {
+      title: "Food Voucher",
+      url: "/foodvoucher",
+      icon: IconInvoice,
+    },
+    {
+      title: "Food Voucher Claims",
+      url: "/foodvoucher-claims",
+      icon: IconReceipt,
+    },
 
 
   ],
@@ -65,7 +76,7 @@ const data = {
   navSecondary: [
     {
       title: "Settings",
-      url: "#",
+      url: "/settings",
       icon: IconSettings,
     },
     {
