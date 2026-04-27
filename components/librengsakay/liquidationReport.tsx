@@ -77,7 +77,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             await deleteLiquidation(deletingId, (session?.user as any)?.role);
             toast.success("Liquidation record deleted successfully");
             setIsDeleteModalOpen(false);
-            handleSearch(); // Refresh report
+            loadReport(); // Refresh report
         } catch (error: any) {
             toast.error(error.message || "Failed to delete liquidation");
         } finally {
