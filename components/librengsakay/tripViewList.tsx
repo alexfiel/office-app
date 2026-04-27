@@ -53,7 +53,7 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
         if (!editingTrip) return;
         setIsUpdating(true);
         try {
-            await updateTripLog(editingTrip.id, editForm);
+            await updateTripLog(editingTrip.id, editForm, (session?.user as any)?.role);
             toast.success("Trip updated successfully");
             setIsEditModalOpen(false);
             loadTrips(); // Reload after update
@@ -85,7 +85,7 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
         if (selectedTripIds.length === 0) return;
         setIsBulkDeleting(true);
         try {
-            await deleteTripLogs(selectedTripIds);
+            await deleteTripLogs(selectedTripIds, (session?.user as any)?.role);
             toast.success(`${selectedTripIds.length} trips deleted successfully!`);
             setIsBulkDeleteModalOpen(false);
             setSelectedTripIds([]);
@@ -252,10 +252,10 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
                             </button>
                             <button
                                 onClick={() => setIsBulkDeleteModalOpen(true)}
-                                disabled={hasLiquidatedInSelection}
-                                title={hasLiquidatedInSelection ? "Cannot delete selected trips because one or more are liquidated (Done)." : `Delete ${selectedTripIds.length} trips`}
+                                disabled={!isAdmin && hasLiquidatedInSelection}
+                                title={!isAdmin && hasLiquidatedInSelection ? "Cannot delete selected trips because one or more are liquidated (Done)." : `Delete ${selectedTripIds.length} trips`}
                                 className={`text-xs px-4 py-2 rounded-xl transition-colors font-semibold ${
-                                    hasLiquidatedInSelection 
+                                    !isAdmin && hasLiquidatedInSelection 
                                         ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-70' 
                                         : 'bg-red-500 hover:bg-red-600 text-white shadow-sm'
                                 }`}
@@ -383,7 +383,7 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
                                         </td>
                                         {isAdmin && (
                                             <td className="p-4 text-center">
-                                                {!isLiquidated && (
+                                                {(!isLiquidated || isAdmin) && (
                                                     <button
                                                         onClick={() => handleEditClick(trip)}
                                                         className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 transition-colors"
@@ -391,7 +391,7 @@ export default function TripViewList({ routes = [] }: { routes?: any[] }) {
                                                         Edit
                                                     </button>
                                                 )}
-                                                <DeleteTrip trip={trip} isPending={!isLiquidated} onSuccess={loadTrips} />
+                                                <DeleteTrip trip={trip} isPending={!isLiquidated} isAdmin={isAdmin} onSuccess={loadTrips} />
                                             </td>
                                         )}
                                     </tr>

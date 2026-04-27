@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { deleteTripLog } from '@/lib/upload/librengsakay/liquidation';
 import { Trash2 } from 'lucide-react';
 
-export default function DeleteTrip({ trip, isPending = true, onSuccess }: { trip: any, isPending?: boolean, onSuccess: () => void }) {
+export default function DeleteTrip({ trip, isPending = true, isAdmin = false, onSuccess }: { trip: any, isPending?: boolean, isAdmin?: boolean, onSuccess: () => void }) {
     const [isOpen, setIsOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -15,7 +15,7 @@ export default function DeleteTrip({ trip, isPending = true, onSuccess }: { trip
         if (!trip?.id) return;
         setIsDeleting(true);
         try {
-            await deleteTripLog(trip.id);
+            await deleteTripLog(trip.id, isAdmin ? "ADMIN" : "USER");
             toast.success("Trip successfully deleted.");
             setIsOpen(false);
             onSuccess();
@@ -30,13 +30,13 @@ export default function DeleteTrip({ trip, isPending = true, onSuccess }: { trip
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 <button
-                    disabled={!isPending}
+                    disabled={!isPending && !isAdmin}
                     className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ml-2 inline-flex items-center ${
-                        isPending 
+                        isPending || isAdmin
                             ? 'text-red-600 hover:text-red-800 bg-red-50 border-red-100' 
                             : 'text-slate-400 bg-slate-100 border-slate-200 cursor-not-allowed opacity-50'
                     }`}
-                    title={isPending ? "Delete Trip" : "Cannot delete a liquidated (Done) trip"}
+                    title={isPending || isAdmin ? "Delete Trip" : "Cannot delete a liquidated (Done) trip"}
                 >
                     <Trash2 className="w-3.5 h-3.5 mr-1" />
                     Delete

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { getLiquidationReport, updateLiquidation } from '@/lib/upload/librengsakay/liquidation';
+import { getLiquidationReport, updateLiquidation, deleteLiquidation } from '@/lib/upload/librengsakay/liquidation';
 import { Report } from './reports/report';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -16,6 +16,7 @@ import { toast } from "sonner";
 
 export default function LiquidationReport({ routes, userName }: { routes: any[], userName: string }) {
     const { data: session } = useSession();
+    const isAdmin = (session?.user as any)?.role === "ADMIN";
     const today = new Date().toISOString().split('T')[0];
     const [filters, setFilters] = useState({
         startDate: today,
@@ -39,7 +40,8 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
         fare: 0,
         amount: 0,
         departureDate: '',
-        paymentDate: ''
+        paymentDate: '',
+        routeId: ''
     });
 
     const handleEditClick = (item: any) => {
@@ -52,9 +54,35 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             fare: item.fare,
             amount: item.amount,
             departureDate: new Date(item.departureDate).toISOString().split('T')[0],
-            paymentDate: new Date(item.paymentDate).toISOString().split('T')[0]
+            paymentDate: new Date(item.paymentDate).toISOString().split('T')[0],
+            routeId: item.trip?.routeId || ''
         });
         setIsEditModalOpen(true);
+    };
+
+    // Delete State
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDeleteClick = (id: string) => {
+        setDeletingId(id);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deletingId) return;
+        setIsDeleting(true);
+        try {
+            await deleteLiquidation(deletingId, (session?.user as any)?.role);
+            toast.success("Liquidation record deleted successfully");
+            setIsDeleteModalOpen(false);
+            handleSearch(); // Refresh report
+        } catch (error: any) {
+            toast.error(error.message || "Failed to delete liquidation");
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const handleUpdateSubmit = async () => {
@@ -158,25 +186,25 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             // 1. Draw Header Natively
             const centerX = FOLIO_WIDTH / 2;
             let currentY = M + 15;
-            
+
             pdf.setFont("helvetica", "bold");
             pdf.setTextColor(0);
             pdf.setFontSize(14);
             pdf.text("Republic of the Philippines", centerX, currentY, { align: "center" });
-            
+
             currentY += 6;
             pdf.setFontSize(14);
             pdf.text("CITY GOVERNMENT OF TAGBILARAN", centerX, currentY, { align: "center" });
-            
+
             currentY += 6;
             pdf.setFontSize(10);
             pdf.text("Tagbilaran City, Bohol, Philippines", centerX, currentY, { align: "center" });
-            
+
             currentY += 12;
             pdf.setFontSize(16);
             pdf.setFont("helvetica", "bold");
             pdf.text("LIBRENG SAKAY PROGRAM", centerX, currentY, { align: "center" });
-            
+
             currentY += 8;
             pdf.setFontSize(11);
             let dateRangeText = "";
@@ -189,12 +217,12 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                     dateRangeText = `${startText} - ${endText}`;
                 }
             } else {
-                 dateRangeText = "All Dates";
+                dateRangeText = "All Dates";
             }
             pdf.text(`PAYMENT DATE: ${dateRangeText.toUpperCase()}`, centerX, currentY, { align: "center" });
-            
+
             currentY += 15; // Gap before table
-            
+
             const hHeight = currentY;
 
             // Pre-calculate Total and Count per AR, and group items to ensure contiguous ARs
@@ -208,7 +236,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                 arTotals[k].count += 1;
                 arTotals[k].items.push(item);
             });
-            
+
             // Flatten the grouped items to ensure contiguous rows for the same AR
             const sortedReportData = Object.values(arTotals).flatMap(group => group.items);
             const seenArs = new Set<string>();
@@ -240,7 +268,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                         styles: { valign: 'middle', halign: 'right' }
                     });
                 }
-                
+
                 return row;
             });
 
@@ -346,7 +374,7 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
             pdf.setFontSize(9);
             pdf.setFont("helvetica", "bold");
             pdf.setTextColor(0);
-            
+
             // Draw Total Rows left-aligned
             pdf.text(`TOTAL TRANSACTIONS: ${reportData.length}`, M + 5, finalY);
             pdf.text(`TOTAL PAX: ${totalPaxValue}`, M + 5, finalY + 5);
@@ -538,14 +566,24 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                                             </span>
                                         </td>
                                         <td className="p-4 text-center">
-                                            {(item.userId === session?.user?.id || (session?.user as any)?.role === "ADMIN") && (
-                                                <button
-                                                    onClick={() => handleEditClick(item)}
-                                                    className="text-[10px] text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 font-bold px-3 py-1.5 rounded border border-blue-200 transition-colors"
-                                                >
-                                                    Edit
-                                                </button>
-                                            )}
+                                            <div className="flex items-center justify-center gap-2">
+                                                {(item.userId === session?.user?.id || isAdmin) && (
+                                                    <button
+                                                        onClick={() => handleEditClick(item)}
+                                                        className="text-[10px] text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 font-bold px-3 py-1.5 rounded border border-blue-200 transition-colors"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                )}
+                                                {isAdmin && (
+                                                    <button
+                                                        onClick={() => handleDeleteClick(item.id)}
+                                                        className="text-[10px] text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 font-bold px-3 py-1.5 rounded border border-red-200 transition-colors"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -641,6 +679,21 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                             />
                         </div>
 
+                        <div className="space-y-2">
+                            <Label>Trip Route</Label>
+                            <select
+                                className={`w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white shadow-sm ${!isAdmin ? 'bg-slate-50 cursor-not-allowed text-slate-400' : ''}`}
+                                value={editForm.routeId}
+                                disabled={!isAdmin}
+                                onChange={(e) => setEditForm(prev => ({ ...prev, routeId: e.target.value }))}
+                            >
+                                <option value="">-- Select Route --</option>
+                                {routes.map(route => (
+                                    <option key={route.id} value={route.id}>{route.routeName}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Departure Date</Label>
@@ -708,6 +761,24 @@ export default function LiquidationReport({ routes, userName }: { routes: any[],
                             disabled={isUpdating || !editForm.driverName || !editForm.arnumber}
                         >
                             {isUpdating ? "Saving..." : "Save Changes"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Modal */}
+            <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Liquidation Record</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete this liquidation record? This will effectively "unliquidate" the associated trip log. This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+                            {isDeleting ? "Deleting..." : "Delete Record"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

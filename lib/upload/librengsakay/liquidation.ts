@@ -6,18 +6,18 @@ import { revalidatePath } from "next/cache";
 
 //fetch trips for a specification route and date that ARE Not yet liquidated
 
-export async function getPendingTrips(routeId: string, date: string) {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+export async function getPendingTrips(routeId: string, startDate: string, endDate: string) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
 
     return await prisma.librengSakayTrip.findMany({
         where: {
             routeId: routeId,
             departureDate: {
-                gte: startOfDay,
-                lte: endOfDay
+                gte: start,
+                lte: end
             },
             liquidations: { none: {} }
         },
@@ -147,7 +147,7 @@ export async function getTripLogs() {
 }
 
 // 5. Update Trip Log (Only if not liquidated)
-export async function updateTripLog(tripId: string, data: { driverName: string, numberofPax: number, fare: number, amount: number }) {
+export async function updateTripLog(tripId: string, data: { driverName: string, numberofPax: number, fare: number, amount: number }, userRole?: string) {
     try {
         const trip = await prisma.librengSakayTrip.findUnique({
             where: { id: tripId },
@@ -155,7 +155,7 @@ export async function updateTripLog(tripId: string, data: { driverName: string, 
         });
 
         if (!trip) throw new Error("Trip not found");
-        if (trip.liquidations.length > 0) throw new Error("Cannot update a liquidated trip");
+        if (trip.liquidations.length > 0 && userRole !== "ADMIN") throw new Error("Cannot update a liquidated trip");
 
         const result = await prisma.librengSakayTrip.update({
             where: { id: tripId },
@@ -166,6 +166,19 @@ export async function updateTripLog(tripId: string, data: { driverName: string, 
                 amount: data.amount
             }
         });
+
+        // If admin is overriding a liquidated trip, also sync the liquidation records
+        if (userRole === "ADMIN" && trip.liquidations.length > 0) {
+            await prisma.librengSakayLiquidation.updateMany({
+                where: { tripId: tripId },
+                data: {
+                    driverName: data.driverName,
+                    numberofPax: data.numberofPax,
+                    fare: data.fare,
+                    amount: data.amount
+                }
+            });
+        }
 
         revalidatePath("/librengsakay");
         return result;
@@ -211,7 +224,8 @@ export async function updateLiquidation(liquidationId: string, data: any, userId
                     vehiclePlateNumber: data.vehiclePlateNumber,
                     numberofPax: data.numberofPax,
                     fare: data.fare,
-                    amount: data.amount
+                    amount: data.amount,
+                    routeId: data.routeId
                 }
             })
         }
@@ -267,7 +281,7 @@ export async function createTripLog(data: { driverName: string; vehiclePlateNumb
 }
 
 // 9. Delete Trip Log
-export async function deleteTripLog(tripId: string) {
+export async function deleteTripLog(tripId: string, userRole?: string) {
     try {
         const trip = await prisma.librengSakayTrip.findUnique({
             where: { id: tripId },
@@ -275,7 +289,14 @@ export async function deleteTripLog(tripId: string) {
         });
 
         if (!trip) throw new Error("Trip not found");
-        if (trip.liquidations.length > 0) throw new Error("Cannot delete a liquidated trip");
+        if (trip.liquidations.length > 0 && userRole !== "ADMIN") throw new Error("Cannot delete a liquidated trip");
+
+        // Manual cascade for admin override
+        if (userRole === "ADMIN" && trip.liquidations.length > 0) {
+            await prisma.librengSakayLiquidation.deleteMany({
+                where: { tripId: tripId }
+            });
+        }
 
         const result = await prisma.librengSakayTrip.delete({
             where: { id: tripId }
@@ -290,7 +311,7 @@ export async function deleteTripLog(tripId: string) {
 }
 
 // 10. Delete Multiple Trip Logs
-export async function deleteTripLogs(tripIds: string[]) {
+export async function deleteTripLogs(tripIds: string[], userRole?: string) {
     try {
         if (!tripIds || tripIds.length === 0) throw new Error("No trips selected for deletion");
 
@@ -299,9 +320,16 @@ export async function deleteTripLogs(tripIds: string[]) {
             include: { liquidations: true }
         });
 
-        const invalidTrips = trips.filter(t => t.liquidations.length > 0);
-        if (invalidTrips.length > 0) {
-            throw new Error(`Cannot delete ${invalidTrips.length} trip(s) because they are already liquidated`);
+        if (userRole !== "ADMIN") {
+            const hasLiquidated = trips.some(t => t.liquidations.length > 0);
+            if (hasLiquidated) throw new Error("Cannot delete liquidated trips");
+        }
+
+        // Manual cascade for admin override
+        if (userRole === "ADMIN") {
+            await prisma.librengSakayLiquidation.deleteMany({
+                where: { tripId: { in: tripIds } }
+            });
         }
 
         const result = await prisma.librengSakayTrip.deleteMany({
@@ -400,6 +428,23 @@ export async function searchTrips(filters: {
         });
     } catch (error: any) {
         console.error("Search Trips Error:", error.message);
+        throw error;
+    }
+}
+
+// 11. Delete Liquidation
+export async function deleteLiquidation(liquidationId: string, userRole: string) {
+    try {
+        if (userRole !== "ADMIN") throw new Error("You are not authorized to delete liquidation records");
+
+        const result = await prisma.librengSakayLiquidation.delete({
+            where: { id: liquidationId }
+        });
+
+        revalidatePath("/librengsakay");
+        return result;
+    } catch (error: any) {
+        console.error("Delete Liquidation Error:", error.message);
         throw error;
     }
 }

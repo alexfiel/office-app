@@ -4,15 +4,15 @@ import React, { useState } from 'react';
 import { getPendingTrips, saveLiquidations, checkArNumberExists } from '@/lib/upload/librengsakay/liquidation';
 
 export default function LiquidationWorkspace({ routes, userId, userName }: any){
-    const [filter, setFilter] = useState({ routeId: '', date: '' });
+    const [filter, setFilter] = useState({ routeId: '', startDate: '', endDate: '' });
     const [trips, setTrips] = useState<any[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isBulkLoading, setIsBulkLoading] = useState(false);
     const [editingTrips, setEditingTrips] = useState<any[] | null>(null);
 
     const loadTrips = async () => {
-        if (filter.routeId && filter.date) {
-            const data = await getPendingTrips(filter.routeId, filter.date);
+        if (filter.routeId && filter.startDate && filter.endDate) {
+            const data = await getPendingTrips(filter.routeId, filter.startDate, filter.endDate);
             setTrips(data);
             setSelectedIds([]); // Reset selection on new search
         }
@@ -108,18 +108,27 @@ export default function LiquidationWorkspace({ routes, userId, userName }: any){
                     </select>
                 </div>
                 <div className="flex-1 min-w-[200px]">
-                    <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Trip Date</label>
+                    <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Trip Date Begin</label>
                     <input
                         type="date"
                         className="w-full border p-2.5 rounded-lg text-sm bg-white shadow-sm focus:ring-2 focus:ring-blue-500"
-                        onChange={(e) => setFilter({ ...filter, date: e.target.value })}
-                        value={filter.date}
+                        onChange={(e) => setFilter({ ...filter, startDate: e.target.value })}
+                        value={filter.startDate}
+                    />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                    <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Trip Date End</label>
+                    <input
+                        type="date"
+                        className="w-full border p-2.5 rounded-lg text-sm bg-white shadow-sm focus:ring-2 focus:ring-blue-500"
+                        onChange={(e) => setFilter({ ...filter, endDate: e.target.value })}
+                        value={filter.endDate}
                     />
                 </div>
                 <button
                     onClick={loadTrips}
                     className="h-[42px] bg-slate-800 text-white px-8 rounded-lg text-sm font-bold hover:bg-slate-900 transition-all disabled:opacity-50"
-                    disabled={!filter.routeId || !filter.date}
+                    disabled={!filter.routeId || !filter.startDate || !filter.endDate}
                 >
                     Search Trips
                 </button>
@@ -154,6 +163,7 @@ export default function LiquidationWorkspace({ routes, userId, userName }: any){
                                 />
                             </th>
                             <th className="p-4 uppercase text-[11px] tracking-wider">Driver</th>
+                            <th className="p-4 uppercase text-[11px] tracking-wider">Trip Date</th>
                             <th className="p-4 uppercase text-[11px] tracking-wider">Plate Number</th>
                             <th className="p-4 uppercase text-[11px] tracking-wider text-right">Pax</th>
                             <th className="p-4 uppercase text-[11px] tracking-wider text-right">Estimated Amount</th>
@@ -162,7 +172,7 @@ export default function LiquidationWorkspace({ routes, userId, userName }: any){
                     <tbody className="divide-y divide-gray-200">
                         {trips.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="p-12 text-center text-gray-400">
+                                <td colSpan={6} className="p-12 text-center text-gray-400">
                                     <p className="font-medium">No pending trips found.</p>
                                     <p className="text-xs">Select a route and date above to see trips awaiting liquidation.</p>
                                 </td>
@@ -179,6 +189,7 @@ export default function LiquidationWorkspace({ routes, userId, userName }: any){
                                     />
                                 </td>
                                 <td className="p-4 font-medium text-gray-900">{trip.driverName}</td>
+                                <td className="p-4 text-gray-600 whitespace-nowrap">{new Date(trip.departureDate).toLocaleDateString()}</td>
                                 <td className="p-4 font-mono text-gray-500 text-xs">{trip.vehiclePlateNumber}</td>
                                 <td className="p-4 text-right text-gray-600">{trip.numberofPax}</td>
                                 <td className="p-4 font-bold text-right text-gray-800">₱{trip.amount.toLocaleString()}</td>
