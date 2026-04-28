@@ -73,7 +73,7 @@ export async function POST(req: Request) {
             vendorName,
             claimControlNo,
             totalAmount,
-            verifiedVoucherCodes,
+            // verifiedVoucherCodes,
         } = body;
 
         // Required field validation
@@ -91,30 +91,29 @@ export async function POST(req: Request) {
         }
 
         // Validate verifiedVoucherCodes
-        if (!Array.isArray(verifiedVoucherCodes)) {
-            return NextResponse.json(
-                {
-                    error:
-                        "verifiedVoucherCodes is required and must be an array",
-                },
-                { status: 400 }
-            );
-        }
+        //if (!Array.isArray(verifiedVoucherCodes)) {
+        //  return NextResponse.json(
+        //    {
+        //      error:
+        //        "verifiedVoucherCodes is required and must be an array",
+        // },
+        //{ status: 400 }
+        //);
+        //}
 
-        for (const code of verifiedVoucherCodes) {
-            if (
-                typeof code !== "string" ||
-                code.trim() === ""
-            ) {
-                return NextResponse.json(
-                    {
-                        error:
-                            "All verified voucher codes must be non-empty strings",
-                    },
-                    { status: 400 }
-                );
-            }
-        }
+        //for (const code of verifiedVoucherCodes) {
+        //  if (
+        //    typeof code !== "string" ||
+        //  code.trim() === ""
+        //) {
+        //  return NextResponse.json(
+        //    {
+        //      error:
+        //        "All verified voucher codes must be non-empty strings",
+        // },
+        //{ status: 400 }
+        //);
+        //}
 
         const claim = await prisma.foodVoucherVendorClaim.create({
             data: {
@@ -124,7 +123,7 @@ export async function POST(req: Request) {
                 claimControlNo,
                 totalAmount: parseFloat(totalAmount.toString()),
                 userId: keyRecord.userId,
-                verifiedVoucherCodes,
+                //verifiedVoucherCodes,
             },
         });
         return NextResponse.json(
