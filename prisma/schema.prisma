@@ -274,7 +274,7 @@ model FoodVoucherVendorClaim {
   createdAt       DateTime                          @default(now())
   updatedAt       DateTime                          @updatedAt
   status          String                            @default("PENDING")
-  voucherCodes  String[]  @default([])
+  verifiedVoucherCodes  String[]  @default([])
   acknowledgement FoodVoucherIssuerAcknowledgement?
   user            User                              @relation(fields: [userId], references: [id])
 }
