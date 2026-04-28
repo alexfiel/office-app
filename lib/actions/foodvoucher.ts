@@ -259,7 +259,7 @@ export async function getFoodVoucherStats() {
 
         return {
             totalIssued: totalIssued._sum.amount || 0,
-            totalRedeemed: totalRedeemed._sum.amount || 0, // Wait, this should be totalAmount from claims
+            totalRedeemed: totalRedeemed._sum.totalAmount || 0,
             vendorCount
         };
     } catch (error) {

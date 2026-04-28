@@ -35,7 +35,7 @@ export default async function FoodVoucherPage() {
     };
 
     // Fetch initial data
-    const [vendors, vouchers, claims, stats, vendorClaims, apiKeys] = await Promise.all([
+    const [vendors, vouchers, claims, stats] = await Promise.all([
         prisma.foodVoucherVendor.findMany({ orderBy: { vendorName: 'asc' } }),
         prisma.foodVoucher.findMany({ 
             include: { user: { select: { name: true } } },
@@ -78,7 +78,7 @@ export default async function FoodVoucherPage() {
                     </div>
 
                     <Tabs defaultValue="dashboard" className="w-full">
-                        <TabsList className="grid w-full grid-cols-8 max-w-6xl h-12 no-print">
+                        <TabsList className="grid w-full grid-cols-6 max-w-6xl h-12 no-print">
                             <TabsTrigger value="dashboard" className="flex items-center gap-2">
                                 <LayoutDashboard className="w-4 h-4" />
                                 <span>Dashboard</span>
