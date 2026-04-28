@@ -147,6 +147,27 @@ export default function ExternalClaimReceipt({ userId, userName }: { userId: str
                                 </div>
                             </div>
 
+                            <div className="space-y-3">
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    Voucher Codes for Verification 
+                                    <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[9px] font-black">
+                                        {foundClaim.voucherCodes?.length || 0} ITEMS
+                                    </span>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {foundClaim.voucherCodes && foundClaim.voucherCodes.length > 0 ? (
+                                        foundClaim.voucherCodes.map((code: string, idx: number) => (
+                                            <div key={idx} className="bg-white border border-slate-200 px-3 py-1.5 rounded-md text-xs font-mono font-bold text-slate-700 shadow-sm flex items-center gap-1.5 print:border-slate-300">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                                {code}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-sm text-slate-400 italic">No voucher codes attached to this claim.</div>
+                                    )}
+                                </div>
+                            </div>
+
                             <div className="space-y-4">
                                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Certificate of Acknowledgement</div>
                                 <p className="text-sm text-slate-600 leading-relaxed italic">

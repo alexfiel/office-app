@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 
 // Simple in-memory rate limiter
 const rateLimitMap = new Map<string, { count: number, resetTime: number }>();
-const LIMIT = 20; 
-const WINDOW = 60 * 1000; 
+const LIMIT = 20;
+const WINDOW = 60 * 1000;
 
 function isRateLimited(ip: string) {
     const now = Date.now();
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-        const { market, stallNo, vendorName, claimControlNo, totalAmount } = body;
+        const { market, stallNo, vendorName, claimControlNo, totalAmount, voucherCodes } = body;
 
         if (!market || !stallNo || !vendorName || !claimControlNo || totalAmount === undefined) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -51,22 +51,24 @@ export async function POST(req: Request) {
                 stallNo,
                 vendorName,
                 claimControlNo,
+                voucherCodes,
                 totalAmount: parseFloat(totalAmount.toString()),
                 userId: keyRecord.userId
             }
         });
 
-        return NextResponse.json({ 
-            message: "Claim recorded", 
+        return NextResponse.json({
+            message: "Claim recorded",
             claimId: claim.id,
-            controlNo: claim.claimControlNo 
+            controlNo: claim.claimControlNo
         }, { status: 201 });
 
     } catch (error: any) {
+        console.error("Error creating vendor claim:", error);
         if (error.code === 'P2002') {
             return NextResponse.json({ error: "Duplicate control number" }, { status: 409 });
         }
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        return NextResponse.json({ error: "Internal Server Error", details: error.message }, { status: 500 });
     }
 }
 

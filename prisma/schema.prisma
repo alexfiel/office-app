@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../lib/generated/prisma"
 }
 
@@ -9,27 +9,27 @@ datasource db {
 }
 
 model User {
-  id                 String                             @id @default(cuid())
-  name               String
-  email              String                             @unique
-  password           String
-  createdAt          DateTime                           @default(now())
-  updatedAt          DateTime                           @updatedAt
-  role               Role                               @default(USER)
-  designation        String
-  chainTransactions  ChainTransaction[]
-  liquidations       LibrengSakayLiquidation[]
-  trips              LibrengSakayTrip[]
-  notarialDocuments  NotarialDocument[]
-  realProperties     RealProperty[]
-  transferTaxes      TransferTax[]
-  transferTaxDetails TransferTaxDetails[]
-  foodVouchers       FoodVoucher[]
-  foodVoucherVendors FoodVoucherVendor[]
-  foodVoucherClaims       FoodVoucherRedemptionClaim[]
-  foodVoucherAcks         FoodVoucherIssuerAcknowledgement[]
-  foodVoucherVendorClaims FoodVoucherVendorClaim[]
+  id                      String                             @id @default(cuid())
+  name                    String
+  email                   String                             @unique
+  password                String
+  createdAt               DateTime                           @default(now())
+  updatedAt               DateTime                           @updatedAt
+  role                    Role                               @default(USER)
+  designation             String
   apiKeys                 ApiKeyModel[]
+  chainTransactions       ChainTransaction[]
+  foodVouchers            FoodVoucher[]
+  foodVoucherAcks         FoodVoucherIssuerAcknowledgement[]
+  foodVoucherClaims       FoodVoucherRedemptionClaim[]
+  foodVoucherVendors      FoodVoucherVendor[]
+  foodVoucherVendorClaims FoodVoucherVendorClaim[]
+  liquidations            LibrengSakayLiquidation[]
+  trips                   LibrengSakayTrip[]
+  notarialDocuments       NotarialDocument[]
+  realProperties          RealProperty[]
+  transferTaxes           TransferTax[]
+  transferTaxDetails      TransferTaxDetails[]
 }
 
 model RealProperty {
@@ -203,8 +203,8 @@ model FoodVoucher {
   createdAt         DateTime                            @default(now())
   updatedAt         DateTime                            @updatedAt
   userId            String
-  user              User                                @relation(fields: [userId], references: [id])
   vendorId          String?
+  user              User                                @relation(fields: [userId], references: [id])
   vendor            FoodVoucherVendor?                  @relation(fields: [vendorId], references: [id])
   redemptionDetails FoodVoucherRedemptionClaimDetails[]
 }
@@ -215,77 +215,78 @@ model FoodVoucherVendor {
   market           String
   stallNo          String
   userId           String
-  user             User                         @relation(fields: [userId], references: [id])
   createdAt        DateTime                     @default(now())
   updatedAt        DateTime                     @updatedAt
-  foodVouchers     FoodVoucher[] // This seems redundant if vouchers aren't linked to vendors directly?
+  foodVouchers     FoodVoucher[]
   redemptionClaims FoodVoucherRedemptionClaim[]
+  user             User                         @relation(fields: [userId], references: [id])
 }
 
 model FoodVoucherRedemptionClaim {
   id              String                              @id @default(cuid())
   redemptionCode  String                              @unique
   vendorId        String
-  vendor          FoodVoucherVendor                   @relation(fields: [vendorId], references: [id])
   totalAmount     Float
   date            DateTime
   status          String                              @default("PENDING")
   createdAt       DateTime                            @default(now())
   updatedAt       DateTime                            @updatedAt
   userId          String
-  user            User                                @relation(fields: [userId], references: [id])
-  details         FoodVoucherRedemptionClaimDetails[]
   acknowledgement FoodVoucherIssuerAcknowledgement?
+  user            User                                @relation(fields: [userId], references: [id])
+  vendor          FoodVoucherVendor                   @relation(fields: [vendorId], references: [id])
+  details         FoodVoucherRedemptionClaimDetails[]
 }
 
 model FoodVoucherRedemptionClaimDetails {
   id                String                     @id @default(cuid())
   redemptionClaimId String
-  redemptionClaim   FoodVoucherRedemptionClaim @relation(fields: [redemptionClaimId], references: [id])
   foodVoucherId     String
-  foodVoucher       FoodVoucher                @relation(fields: [foodVoucherId], references: [id])
   amount            Float
+  foodVoucher       FoodVoucher                @relation(fields: [foodVoucherId], references: [id])
+  redemptionClaim   FoodVoucherRedemptionClaim @relation(fields: [redemptionClaimId], references: [id])
 }
 
 model FoodVoucherIssuerAcknowledgement {
-  id                String                     @id @default(cuid())
-  date              DateTime                   @default(now())
+  id                String                      @id @default(cuid())
+  date              DateTime                    @default(now())
   userId            String
-  user              User                       @relation(fields: [userId], references: [id])
-  acknowledged      Boolean                    @default(false)
+  acknowledged      Boolean                     @default(false)
   ackDate           DateTime?
   ackBy             String?
-  redemptionClaimId String?                    @unique
+  createdAt         DateTime                    @default(now())
+  arNumber          String                      @unique
+  redemptionClaimId String?                     @unique
+  vendorClaimId     String?                     @unique
   redemptionClaim   FoodVoucherRedemptionClaim? @relation(fields: [redemptionClaimId], references: [id])
-  vendorClaimId     String?                    @unique
+  user              User                        @relation(fields: [userId], references: [id])
   vendorClaim       FoodVoucherVendorClaim?     @relation(fields: [vendorClaimId], references: [id])
-  arNumber          String                     @unique
-  createdAt         DateTime                   @default(now())
 }
 
-model FoodVoucherVendorClaim{
-  id                String                     @id @default(cuid())
-  market            String
-  stallNo           String
-  vendorName        String
-  claimControlNo   String 
-  totalAmount       Float
-  userId            String
-  user              User                       @relation(fields: [userId], references: [id])
-  acknowledgement   FoodVoucherIssuerAcknowledgement?
-  status            String                     @default("PENDING")
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
+model FoodVoucherVendorClaim {
+  id              String                            @id @default(cuid())
+  market          String
+  stallNo         String
+  vendorName      String
+  claimControlNo  String
+  totalAmount     Float
+  userId          String
+  createdAt       DateTime                          @default(now())
+  updatedAt       DateTime                          @updatedAt
+  status          String                            @default("PENDING")
+  voucherCodes    String[]
+  acknowledgement FoodVoucherIssuerAcknowledgement?
+  user            User                              @relation(fields: [userId], references: [id])
 }
 
 model ApiKeyModel {
   id        String   @id @default(cuid())
   key       String   @unique
-  name      String   // Name of the system or purpose
+  name      String
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 enum Role {
