@@ -45,6 +45,22 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
+        // Validate that voucherCodes exists and is an array
+        if (!Array.isArray(voucherCodes)) {
+            return NextResponse.json({
+                error: "voucherCodes is required and must be an array"
+            }, { status: 400 });
+        }
+
+        // Optional: Validate voucher codes (e.g., check format or uniqueness if needed)
+        for (const code of voucherCodes) {
+            if (typeof code !== 'string' || code.trim() === '') {
+                return NextResponse.json({
+                    error: "All voucher codes must be non-empty strings"
+                }, { status: 400 });
+            }
+        }
+
         const claim = await prisma.foodVoucherVendorClaim.create({
             data: {
                 market,

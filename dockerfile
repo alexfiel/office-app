@@ -43,8 +43,8 @@ USER nextjs
 
 # You've set this to 3001, just make sure your docker-compose 
 # matches this port (e.g., 3001:3001)
-EXPOSE 3001
-ENV PORT 3001
+EXPOSE 3000
+ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
 # MODIFIED: It's best practice to run 'migrate deploy' before starting the app
