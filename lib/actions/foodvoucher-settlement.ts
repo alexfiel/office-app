@@ -41,7 +41,8 @@ export async function getSettlements() {
                     include: {
                         redemptionClaim: {
                             include: { vendor: true }
-                        }
+                        },
+                        vendorClaim: true
                     }
                 }
             },

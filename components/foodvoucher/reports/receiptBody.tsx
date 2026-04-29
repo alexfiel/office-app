@@ -55,7 +55,7 @@ const numberToWords = (num: number): string => {
 
 export function ReceiptBody({ arNumber, date, amount, vendorName, controlNo, userName }: ReceiptBodyProps) {
     return (
-        <div className="text-slate-800 leading-tight space-y-4 py-4 px-4">
+        <div className="text-slate-800 leading-tight space-y-2 py-2 px-4">
             {/* Header Info */}
             <div className="flex justify-between font-bold text-base">
                 <div>A.R No: <span className="font-mono">{arNumber}</span></div>
@@ -65,18 +65,18 @@ export function ReceiptBody({ arNumber, date, amount, vendorName, controlNo, use
             {/* Main Statement */}
             <div className="text-justify text-sm space-y-3">
                 <p>
-                    Received from the <span className="font-bold">CITY GOVERNMENT OF TAGBILARAN</span> the total amount of 
+                    Received from the <span className="font-bold">CITY GOVERNMENT OF TAGBILARAN</span> the total amount of
                     <span className="font-bold border-b border-slate-900 px-2 mx-1 uppercase italic">
                         {numberToWords(amount)}
-                    </span> 
-                    (<span className="font-bold">₱{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>), 
-                    representing payment/reimbursement for food vouchers accepted by the undersigned as an accredited vendor under the 
-                    <span className="font-bold"> CITY’S FOOD VOUCHER PROGRAM</span>, covered by <span className="font-bold">CLAIM FORM</span> with 
+                    </span>
+                    (<span className="font-bold">₱{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>),
+                    representing payment/reimbursement for food vouchers accepted by the undersigned as an accredited vendor under the
+                    <span className="font-bold"> CITY’S FOOD VOUCHER PROGRAM</span>, covered by <span className="font-bold">CLAIM FORM</span> with
                     CONTROL NUMBER <span className="font-mono font-bold">{controlNo}</span>.
                 </p>
 
                 <p>
-                    The undersigned hereby acknowledge that the said amount corresponds to the value of food vouchers duly submitted, 
+                    The undersigned hereby acknowledge that the said amount corresponds to the value of food vouchers duly submitted,
                     examined, and approved for reimbursement in accordance with the existing guidelines.
                 </p>
             </div>
@@ -91,24 +91,7 @@ export function ReceiptBody({ arNumber, date, amount, vendorName, controlNo, use
                 </ol>
             </div>
 
-            {/* Signatures */}
-            <div className="grid grid-cols-2 gap-10 pt-6">
-                <div className="text-center space-y-2">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">Received by:</div>
-                    <div className="mt-6">
-                        <div className="font-black text-base border-b border-slate-900 pb-1 uppercase">{vendorName}</div>
-                        <div className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-tight">VENDOR NAME / REPRESENTATIVE</div>
-                    </div>
-                </div>
 
-                <div className="text-center space-y-2">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left">Issued by:</div>
-                    <div className="mt-6">
-                        <div className="font-black text-base border-b border-slate-900 pb-1 uppercase">{userName}</div>
-                        <div className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-tight">CITY TREASURER'S OFFICE</div>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 }
