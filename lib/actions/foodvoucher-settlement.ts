@@ -16,7 +16,8 @@ export async function getUnsettledAcknowledgements() {
                     include: {
                         vendor: true,
                     }
-                }
+                },
+                vendorClaim: true
             },
             orderBy: {
                 date: 'asc'

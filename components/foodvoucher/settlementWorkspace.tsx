@@ -31,7 +31,10 @@ export default function SettlementWorkspace({ unsettledAcks, userId }: { unsettl
         if (acksToSettle.length === 0) return toast.error("Please select at least one AR");
 
         setIsSubmitting(true);
-        const totalAmount = acksToSettle.reduce((sum: number, a: any) => sum + a.redemptionClaim.totalAmount, 0);
+        const totalAmount = acksToSettle.reduce((sum: number, a: any) => {
+            const amount = a.redemptionClaim?.totalAmount || a.vendorClaim?.totalAmount || 0;
+            return sum + amount;
+        }, 0);
         try {
             await createSettlement({
                 amount: totalAmount,
@@ -78,7 +81,10 @@ export default function SettlementWorkspace({ unsettledAcks, userId }: { unsettl
     }
 
     const selectedForGroup = filteredAcks.filter((a: any) => selectedAcks.includes(a.id));
-    const totalSelectedAmount = selectedForGroup.reduce((sum: number, a: any) => sum + a.redemptionClaim.totalAmount, 0);
+    const totalSelectedAmount = selectedForGroup.reduce((sum: number, a: any) => {
+        const amount = a.redemptionClaim?.totalAmount || a.vendorClaim?.totalAmount || 0;
+        return sum + amount;
+    }, 0);
 
     const handleSearch = () => {
         setAppliedDateFrom(dateFrom);
@@ -147,6 +153,10 @@ export default function SettlementWorkspace({ unsettledAcks, userId }: { unsettl
                     <TableBody>
                         {filteredAcks.length > 0 ? filteredAcks.map((ack: any) => {
                             const isSelected = selectedAcks.includes(ack.id);
+                            const vendorName = ack.redemptionClaim?.vendor?.vendorName || ack.vendorClaim?.vendorName || "Unknown";
+                            const market = ack.redemptionClaim?.vendor?.market || ack.vendorClaim?.market || "Unknown";
+                            const amount = ack.redemptionClaim?.totalAmount || ack.vendorClaim?.totalAmount || 0;
+
                             return (
                                 <TableRow 
                                     key={ack.id} 
@@ -164,10 +174,10 @@ export default function SettlementWorkspace({ unsettledAcks, userId }: { unsettl
                                         {ack.arNumber}
                                     </TableCell>
                                     <TableCell className="font-medium text-slate-900">
-                                        {ack.redemptionClaim.vendor.vendorName}
+                                        {vendorName}
                                     </TableCell>
                                     <TableCell className="text-xs text-slate-500 uppercase tracking-widest">
-                                        {ack.redemptionClaim.vendor.market}
+                                        {market}
                                     </TableCell>
                                     <TableCell className="text-slate-500">
                                         <div className="flex items-center gap-1.5">
@@ -176,7 +186,7 @@ export default function SettlementWorkspace({ unsettledAcks, userId }: { unsettl
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <div className="font-bold text-slate-900">₱{ack.redemptionClaim.totalAmount.toLocaleString()}</div>
+                                        <div className="font-bold text-slate-900">₱{amount.toLocaleString()}</div>
                                         <Badge variant="outline" className="text-[10px] mt-1 bg-amber-50 text-amber-600 border-amber-200">UNPAID</Badge>
                                     </TableCell>
                                 </TableRow>
