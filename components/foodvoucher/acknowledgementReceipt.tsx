@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { acknowledgeClaim, getRedemptionClaims } from "@/lib/actions/foodvoucher";
-import { FileCheck, Search, Printer, CheckCircle2 } from "lucide-react";
+import { FileCheck, Search, Printer, CheckCircle2, Ticket } from "lucide-react";
 
 import { downloadReceiptAsPDF } from '@/lib/foodvoucher/pdf-generator';
 import IssueAR from './reports/IssueAR';
@@ -166,6 +167,29 @@ export default function AcknowledgementReceipt({ userId, userName }: { userId: s
                                             <div className="text-sm font-bold text-slate-700">Claim Code: <span className="font-mono">{foundClaim.redemptionCode}</span></div>
                                             <div className="text-sm font-bold text-slate-700">Submission Date: {new Date(foundClaim.date).toLocaleDateString()}</div>
                                         </div>
+
+                                        {foundClaim.details && foundClaim.details.length > 0 && (
+                                            <div className="pt-2 border-t">
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1 mt-2">
+                                                    <Ticket className="w-3 h-3" />
+                                                    Vouchers Included ({foundClaim.details.length})
+                                                </div>
+                                                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-2 no-print custom-scrollbar">
+                                                    {foundClaim.details.map((d: any, idx: number) => (
+                                                        <Badge key={idx} variant="secondary" className="font-mono text-[10px] bg-slate-100 text-slate-600 border border-slate-200">
+                                                            {d.foodVoucher?.voucherCode || 'N/A'} (₱{d.amount})
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                                <div className="hidden print:flex flex-wrap gap-1.5">
+                                                    {foundClaim.details.map((d: any, idx: number) => (
+                                                        <span key={idx} className="font-mono text-[8px] text-slate-800 border border-slate-300 px-1 rounded-sm">
+                                                            {d.foodVoucher?.voucherCode || 'N/A'}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex flex-col justify-center items-end">

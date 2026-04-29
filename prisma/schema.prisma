@@ -30,6 +30,8 @@ model User {
   realProperties          RealProperty[]
   transferTaxes           TransferTax[]
   transferTaxDetails      TransferTaxDetails[]
+  foodVoucherSettlements       FoodVoucherSettlement[]
+  foodVoucherSettlementDetails FoodVoucherSettlementDetails[]
 }
 
 model RealProperty {
@@ -210,16 +212,16 @@ model FoodVoucher {
 }
 
 model FoodVoucherVendor {
-  id               String                       @id @default(cuid())
-  vendorName       String
-  market           String
-  stallNo          String
-  userId           String
-  createdAt        DateTime                     @default(now())
-  updatedAt        DateTime                     @updatedAt
-  foodVouchers     FoodVoucher[]
-  redemptionClaims FoodVoucherRedemptionClaim[]
-  user             User                         @relation(fields: [userId], references: [id])
+  id                     String                       @id @default(cuid())
+  vendorName             String
+  market                 String
+  stallNo                String
+  userId                 String
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
+  foodVouchers           FoodVoucher[]
+  redemptionClaims       FoodVoucherRedemptionClaim[]
+  user                   User                         @relation(fields: [userId], references: [id])
 }
 
 model FoodVoucherRedemptionClaim {
@@ -258,25 +260,53 @@ model FoodVoucherIssuerAcknowledgement {
   arNumber          String                      @unique
   redemptionClaimId String?                     @unique
   vendorClaimId     String?                     @unique
+  settlementId      String?
   redemptionClaim   FoodVoucherRedemptionClaim? @relation(fields: [redemptionClaimId], references: [id])
   user              User                        @relation(fields: [userId], references: [id])
   vendorClaim       FoodVoucherVendorClaim?     @relation(fields: [vendorClaimId], references: [id])
+  settlement        FoodVoucherSettlement?      @relation(fields: [settlementId], references: [id])
 }
 
 model FoodVoucherVendorClaim {
-  id              String                            @id @default(cuid())
-  market          String
-  stallNo         String
-  vendorName      String
-  claimControlNo  String
-  totalAmount     Float
-  userId          String
-  createdAt       DateTime                          @default(now())
-  updatedAt       DateTime                          @updatedAt
-  status          String                            @default("PENDING")
-  verifiedVoucherCodes  String[]  @default([])
-  acknowledgement FoodVoucherIssuerAcknowledgement?
-  user            User                              @relation(fields: [userId], references: [id])
+  id                   String                            @id @default(cuid())
+  market               String
+  stallNo              String
+  vendorName           String
+  claimControlNo       String
+  totalAmount          Float
+  userId               String
+  createdAt            DateTime                          @default(now())
+  updatedAt            DateTime                          @updatedAt
+  status               String                            @default("PENDING")
+  verifiedVoucherCodes String[]                          @default([])
+  acknowledgement      FoodVoucherIssuerAcknowledgement?
+  user                 User                              @relation(fields: [userId], references: [id])
+}
+
+model FoodVoucherSettlement {
+  id         String            @id @default(cuid())
+  amount     Float
+  arNumber   String            @unique
+  datePaid   DateTime          @default(now())
+  userId     String
+  user       User              @relation(fields: [userId], references: [id])
+
+  acknowledgements FoodVoucherIssuerAcknowledgement[]
+  details          FoodVoucherSettlementDetails[]
+}
+
+model FoodVoucherSettlementDetails {
+  id           String                @id @default(cuid())
+  settlementId String
+  vendorName   String
+  arNumber     String
+  amount       Float
+  market       String
+  stallNo      String
+  datePaid     DateTime              @default(now())
+  userId       String
+  user         User                  @relation(fields: [userId], references: [id])
+  settlement   FoodVoucherSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 }
 
 model ApiKeyModel {

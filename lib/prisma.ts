@@ -1,7 +1,10 @@
 import { PrismaClient } from "./generated/prisma/client";
 
 
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const globalForPrisma = global as unknown as { prisma: PrismaClient | undefined };
+
+// Force reload of Prisma Client to pick up the latest schema changes
+globalForPrisma.prisma = undefined;
 
 export const prisma =
     globalForPrisma.prisma ||

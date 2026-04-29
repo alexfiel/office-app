@@ -14,10 +14,13 @@ export default function RedemptionWorkspace({ vendors, userId }: { vendors: any[
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingVouchers, setIsLoadingVouchers] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [vendorSearchTerm, setVendorSearchTerm] = useState('');
+    const [isVendorDropdownOpen, setIsVendorDropdownOpen] = useState(false);
+    const vendorDropdownRef = React.useRef<HTMLDivElement>(null);
     
     const [form, setForm] = useState({
         vendorId: '',
-        redemptionCode: `RC-${Date.now().toString().slice(-6)}`,
+        redemptionCode: '',
         date: new Date().toISOString().split('T')[0]
     });
 
@@ -37,6 +40,16 @@ export default function RedemptionWorkspace({ vendors, userId }: { vendors: any[
         fetchAvailable();
     }, []);
 
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (vendorDropdownRef.current && !vendorDropdownRef.current.contains(event.target as Node)) {
+                setIsVendorDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     const toggleVoucher = (voucher: any) => {
         if (selectedVouchers.find(v => v.id === voucher.id)) {
             setSelectedVouchers(selectedVouchers.filter(v => v.id !== voucher.id));
@@ -51,6 +64,9 @@ export default function RedemptionWorkspace({ vendors, userId }: { vendors: any[
         e.preventDefault();
         if (!form.vendorId || selectedVouchers.length === 0) {
             return toast.error("Please select a vendor and at least one voucher");
+        }
+        if (!form.redemptionCode.trim()) {
+            return toast.error("Please enter a redemption code");
         }
 
         setIsSubmitting(true);
@@ -68,15 +84,17 @@ export default function RedemptionWorkspace({ vendors, userId }: { vendors: any[
             setSelectedVouchers([]);
             setForm({
                 ...form,
-                redemptionCode: `RC-${Date.now().toString().slice(-6)}`,
+                vendorId: '',
+                redemptionCode: '',
                 date: new Date().toISOString().split('T')[0]
             });
+            setVendorSearchTerm('');
             
             // Refresh available
             const all = await getVouchers();
             setAvailableVouchers(all.filter((v: any) => !v.vendorId));
-        } catch (error) {
-            toast.error("Failed to process redemption");
+        } catch (error: any) {
+            toast.error(error.message || "Failed to process redemption");
         } finally {
             setIsSubmitting(false);
         }
@@ -86,6 +104,17 @@ export default function RedemptionWorkspace({ vendors, userId }: { vendors: any[
         v.voucherCode.toLowerCase().includes(searchTerm.toLowerCase()) &&
         !selectedVouchers.find(sv => sv.id === v.id)
     );
+
+    const filteredVendors = vendors.filter(v => 
+        v.vendorName.toLowerCase().includes(vendorSearchTerm.toLowerCase()) || 
+        v.market.toLowerCase().includes(vendorSearchTerm.toLowerCase())
+    );
+
+    const handleSelectVendor = (vendorId: string, vendorName: string) => {
+        setForm({ ...form, vendorId });
+        setVendorSearchTerm(vendorName);
+        setIsVendorDropdownOpen(false);
+    };
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -154,7 +183,12 @@ export default function RedemptionWorkspace({ vendors, userId }: { vendors: any[
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label>Redemption Code</Label>
-                            <Input value={form.redemptionCode} readOnly className="bg-slate-50 font-mono text-emerald-700 font-bold" />
+                            <Input 
+                                value={form.redemptionCode} 
+                                onChange={(e) => setForm({...form, redemptionCode: e.target.value})}
+                                placeholder="Enter Redemption Code"
+                                className="bg-white font-mono text-emerald-700 font-bold border-emerald-200 focus-visible:ring-emerald-500" 
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label>Processing Date</Label>
@@ -166,18 +200,39 @@ export default function RedemptionWorkspace({ vendors, userId }: { vendors: any[
                         </div>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 relative" ref={vendorDropdownRef}>
                         <Label>Select Vendor</Label>
-                        <select
-                            className="w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white shadow-sm"
-                            value={form.vendorId}
-                            onChange={(e) => setForm({...form, vendorId: e.target.value})}
-                        >
-                            <option value="">-- Choose Vendor --</option>
-                            {vendors.map(vendor => (
-                                <option key={vendor.id} value={vendor.id}>{vendor.vendorName} ({vendor.market})</option>
-                            ))}
-                        </select>
+                        <div className="relative">
+                            <Input
+                                placeholder="Type to search vendor..."
+                                value={vendorSearchTerm}
+                                onChange={(e) => {
+                                    setVendorSearchTerm(e.target.value);
+                                    setIsVendorDropdownOpen(true);
+                                    if (form.vendorId) setForm({ ...form, vendorId: '' });
+                                }}
+                                onFocus={() => setIsVendorDropdownOpen(true)}
+                                className="w-full bg-white shadow-sm border-slate-200"
+                            />
+                            {isVendorDropdownOpen && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                    {filteredVendors.length > 0 ? (
+                                        filteredVendors.map((vendor: any) => (
+                                            <div
+                                                key={vendor.id}
+                                                className={`px-4 py-2 cursor-pointer hover:bg-emerald-50 border-b last:border-0 transition-colors ${form.vendorId === vendor.id ? 'bg-emerald-50' : ''}`}
+                                                onClick={() => handleSelectVendor(vendor.id, vendor.vendorName)}
+                                            >
+                                                <div className="font-bold text-sm text-slate-900">{vendor.vendorName}</div>
+                                                <div className="text-[10px] text-slate-500 uppercase font-medium tracking-wider">{vendor.market}</div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="px-4 py-4 text-sm text-slate-400 text-center italic">No vendors found matching "{vendorSearchTerm}"</div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="space-y-3">

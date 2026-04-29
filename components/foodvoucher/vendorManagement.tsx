@@ -5,12 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { addVendor } from "@/lib/actions/foodvoucher";
-import { Store, Plus } from "lucide-react";
+import { addVendor, bulkAddVendors } from "@/lib/actions/foodvoucher";
+import { Store, Plus, Upload } from "lucide-react";
+import Papa from "papaparse";
+import { useRouter } from "next/navigation";
 
 export default function VendorManagement({ vendors: initialVendors, userId }: { vendors: any[], userId: string }) {
     const [vendors, setVendors] = useState(initialVendors);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const router = useRouter();
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [form, setForm] = useState({
         vendorName: '',
         market: '',
@@ -32,6 +36,47 @@ export default function VendorManagement({ vendors: initialVendors, userId }: { 
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsSubmitting(true);
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+                try {
+                    const validData = results.data
+                        .filter((row: any) => row.vendorName && row.market)
+                        .map((row: any) => ({
+                            vendorName: row.vendorName,
+                            market: row.market,
+                            stallNo: row.stallNo || '',
+                            userId
+                        }));
+                    
+                    if (validData.length === 0) {
+                        toast.error("No valid vendor data found in CSV. Ensure 'vendorName' and 'market' columns exist.");
+                        return;
+                    }
+
+                    const count = await bulkAddVendors(validData);
+                    toast.success(`Successfully added ${count} vendors`);
+                    router.refresh();
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                } catch (error) {
+                    toast.error("Failed to upload vendors");
+                } finally {
+                    setIsSubmitting(false);
+                }
+            },
+            error: (error) => {
+                toast.error("Error parsing CSV file");
+                setIsSubmitting(false);
+            }
+        });
     };
 
     return (
@@ -71,6 +116,29 @@ export default function VendorManagement({ vendors: initialVendors, userId }: { 
                             {isSubmitting ? "Adding..." : "Add Vendor"}
                         </Button>
                     </form>
+
+                    <div className="mt-6 border-t pt-6">
+                        <div className="flex items-center gap-2 mb-4 text-emerald-600">
+                            <Upload className="w-5 h-5" />
+                            <h2 className="text-sm font-bold uppercase tracking-wider">Bulk Upload CSV</h2>
+                        </div>
+                        <input 
+                            type="file" 
+                            accept=".csv" 
+                            className="hidden" 
+                            ref={fileInputRef} 
+                            onChange={handleFileUpload} 
+                        />
+                        <Button 
+                            variant="outline" 
+                            className="w-full" 
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? "Uploading..." : "Upload CSV File"}
+                        </Button>
+                        <p className="text-[10px] text-slate-400 mt-2 text-center">Required columns: vendorName, market. Optional: stallNo.</p>
+                    </div>
                 </div>
             </div>
 

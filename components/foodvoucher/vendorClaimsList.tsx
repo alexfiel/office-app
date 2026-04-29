@@ -3,7 +3,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Database, Calendar, User as UserIcon } from "lucide-react";
+import { ExternalLink, Database, Calendar, User as UserIcon, Ticket } from "lucide-react";
 
 export default function VendorClaimsList({ vendorClaims }: { vendorClaims: any[] }) {
     if (vendorClaims.length === 0) {
@@ -88,6 +88,22 @@ export default function VendorClaimsList({ vendorClaims }: { vendorClaims: any[]
                                     <div className="text-lg font-black text-slate-900">₱{claim.totalAmount.toLocaleString()}</div>
                                 </div>
                             </div>
+
+                            {claim.verifiedVoucherCodes && claim.verifiedVoucherCodes.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-slate-100">
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <Ticket className="w-3 h-3" />
+                                        Vouchers Claimed ({claim.verifiedVoucherCodes.length})
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {claim.verifiedVoucherCodes.map((code: string, idx: number) => (
+                                            <Badge key={idx} variant="secondary" className="font-mono text-[10px] bg-slate-100 text-slate-600 hover:bg-slate-200">
+                                                {code}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 ))}

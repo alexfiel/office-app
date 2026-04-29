@@ -65,12 +65,10 @@ const data = {
       icon: IconInvoice,
     },
     {
-      title: "Food Voucher Claims",
-      url: "/foodvoucher-claims",
-      icon: IconReceipt,
+      title: "Food Voucher Settlement",
+      url: "/foodvoucher-settlement",
+      icon: IconReport,
     },
-
-
   ],
 
   navSecondary: [

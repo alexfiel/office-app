@@ -3,6 +3,22 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
+async function ensureSystemUploadUser() {
+    let user = await prisma.user.findUnique({ where: { id: "systemUpload" } });
+    if (!user) {
+        user = await prisma.user.create({
+            data: {
+                id: "systemUpload",
+                name: "System Upload",
+                email: "system.upload@office.local",
+                password: "system-upload-no-login",
+                designation: "System Integration"
+            }
+        });
+    }
+    return user.id;
+}
+
 // --- VENDOR ACTIONS ---
 
 export async function getVendors() {
@@ -26,6 +42,22 @@ export async function addVendor(data: { vendorName: string, market: string, stal
     } catch (error) {
         console.error("Failed to add vendor:", error);
         throw new Error("Failed to add vendor");
+    }
+}
+
+export async function bulkAddVendors(data: { vendorName: string, market: string, stallNo: string, userId: string }[]) {
+    try {
+        const systemUserId = await ensureSystemUploadUser();
+        const mappedData = data.map(item => ({ ...item, userId: systemUserId }));
+
+        const result = await prisma.foodVoucherVendor.createMany({
+            data: mappedData,
+        });
+        revalidatePath("/foodvoucher");
+        return result.count;
+    } catch (error: any) {
+        console.error("Failed to add vendors in bulk:", error);
+        throw new Error(error.message || "Failed to add vendors in bulk");
     }
 }
 
@@ -56,6 +88,22 @@ export async function addVoucher(data: { voucherCode: string, amount: number, da
     }
 }
 
+export async function bulkAddVouchers(data: { voucherCode: string, amount: number, date: Date, userId: string }[]) {
+    try {
+        const systemUserId = await ensureSystemUploadUser();
+        const mappedData = data.map(item => ({ ...item, userId: systemUserId }));
+
+        const result = await prisma.foodVoucher.createMany({
+            data: mappedData,
+        });
+        revalidatePath("/foodvoucher");
+        return result.count;
+    } catch (error: any) {
+        console.error("Failed to add vouchers in bulk:", error);
+        throw new Error(error.message || "Failed to add vouchers in bulk");
+    }
+}
+
 // --- REDEMPTION ACTIONS ---
 
 export async function createRedemptionClaim(data: { 
@@ -68,6 +116,14 @@ export async function createRedemptionClaim(data: {
 }) {
     try {
         const { voucherIds, ...claimData } = data;
+        
+        // Check for duplicate redemption code
+        const existingClaim = await prisma.foodVoucherRedemptionClaim.findUnique({
+            where: { redemptionCode: claimData.redemptionCode }
+        });
+        if (existingClaim) {
+            throw new Error(`Duplicate redemption code: ${claimData.redemptionCode} already exists.`);
+        }
         
         const claim = await prisma.$transaction(async (tx) => {
             const newClaim = await tx.foodVoucherRedemptionClaim.create({
@@ -98,9 +154,9 @@ export async function createRedemptionClaim(data: {
 
         revalidatePath("/foodvoucher");
         return claim;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to create redemption claim:", error);
-        throw new Error("Failed to create redemption claim");
+        throw new Error(error.message || "Failed to create redemption claim");
     }
 }
 
