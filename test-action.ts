@@ -1,5 +1,5 @@
 import { bulkAddVendors } from './lib/actions/foodvoucher';
-import { PrismaClient } from './lib/generated/prisma';
+import { PrismaClient } from "@prisma/client";
 
 async function test() {
     const prisma = new PrismaClient();

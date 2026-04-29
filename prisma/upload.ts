@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { parse } from 'csv-parse';
 import { fileURLToPath } from 'url';
-import { PrismaClient } from '../lib/generated/prisma/client';
+import { PrismaClient } from "@prisma/client";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -9,7 +9,7 @@ export async function getUnsettledAcknowledgements() {
         return await prisma.foodVoucherIssuerAcknowledgement.findMany({
             where: {
                 settlementId: null,
-            },
+            } as any,
             include: {
                 user: { select: { name: true } },
                 redemptionClaim: {
@@ -171,8 +171,8 @@ export async function deleteSettlement(id: string) {
 
             // Unlink ARs by setting settlementId to null
             await tx.foodVoucherIssuerAcknowledgement.updateMany({
-                where: { settlementId: id },
-                data: { settlementId: null }
+                where: { settlementId: id } as any,
+                data: { settlementId: null } as any
             });
 
             // Delete the settlement itself
