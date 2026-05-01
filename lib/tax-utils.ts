@@ -8,7 +8,7 @@ export interface PenaltyResult {
     totalAmountDue: number;
 }
 
-export function calculateTaxPenalties(taxDue: number, notarialDate: string): PenaltyResult {
+export function calculateTaxPenalties(taxDue: number, notarialDate: string, referenceDate?: Date): PenaltyResult {
     let daysElapsed = 0;
     let surcharge = 0;
     let interest = 0;
@@ -19,7 +19,7 @@ export function calculateTaxPenalties(taxDue: number, notarialDate: string): Pen
     }
 
     const start = new Date(notarialDate);
-    const today = new Date();
+    const today = referenceDate || new Date();
 
     // Normalize dates to midnight to avoid hour-based discrepancies
     start.setHours(0, 0, 0, 0);
@@ -46,7 +46,7 @@ export function calculateTaxPenalties(taxDue: number, notarialDate: string): Pen
         } else {
             const daysIntoCycle = (daysElapsed - 90) % 30;
             const daysToNext = 30 - daysIntoCycle;
-            const vDate = new Date();
+            const vDate = new Date(today);
             vDate.setDate(vDate.getDate() + (daysToNext - 1));
             validityDate = vDate.toLocaleDateString('EN-US').toUpperCase();
         }

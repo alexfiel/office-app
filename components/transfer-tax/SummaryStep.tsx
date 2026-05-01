@@ -6,6 +6,7 @@ import { PropertyTable } from "./PropertyTable"
 import { DocumentInfo, RealPropertyInfo } from "@/lib/types/property"
 import QRCode from "react-qr-code"
 import { Printer, Save, FileCheck, RefreshCcw } from "lucide-react"
+import { useHasMounted } from "@/hooks/use-has-mounted"
 
 
 interface SummaryStepProps {
@@ -50,7 +51,7 @@ export function SummaryStep({
     ejsChain,
     onTriggerEjsTransfer
 }: SummaryStepProps) {
-
+    const hasMounted = useHasMounted()
     const handlePrint = () => window.print();
 
 
@@ -82,11 +83,11 @@ export function SummaryStep({
                         <div className="text-left">
                             <h1 className="text-2xl font-bold uppercase tracking-widest">OFFICE OF THE CITY TREASURER</h1>
                             <h2 className="text-xl font-semibold mt-1 font-small-caps">Transfer Tax Computation Summary</h2>
-                            <p className="text-xs mt-2 font-mono">DATE COMPUTED: {new Date().toLocaleDateString()}</p>
+                            <p className="text-xs mt-2 font-mono" suppressHydrationWarning>DATE COMPUTED: {hasMounted ? new Date().toLocaleDateString() : ""}</p>
                         </div>
                         {savedTxId && (
                             <div className="flex flex-col items-center">
-                                <QRCode value={savedTxId} size={80} level="M" />
+                                {hasMounted && <QRCode value={savedTxId} size={80} level="M" />}
                                 <span className="text-[9px] mt-1 font-mono uppercase">REF: {savedTxId.slice(-8)}</span>
                             </div>
                         )}

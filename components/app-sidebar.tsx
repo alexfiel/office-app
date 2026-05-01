@@ -66,8 +66,8 @@ const data = {
     },
     {
       title: "Food Voucher Settlement",
-      url: "/foodvoucher-settlement",
-      icon: IconReport,
+      url: "/foodvoucherExternalSettlement",
+      icon: IconReceipt,
     },
   ],
 

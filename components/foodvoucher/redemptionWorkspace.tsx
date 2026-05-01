@@ -159,7 +159,7 @@ export default function RedemptionWorkspace({ vendors, userId }: { vendors: any[
                                     </div>
                                     <div>
                                         <div className="font-bold text-slate-900 font-mono text-sm">{v.voucherCode}</div>
-                                        <div className="text-[10px] text-slate-400 uppercase">{new Date(v.date).toLocaleDateString()}</div>
+                                        <div className="text-[10px] text-slate-400 uppercase" suppressHydrationWarning>{new Date(v.date).toLocaleDateString()}</div>
                                     </div>
                                 </div>
                                 <div className="font-black text-slate-700">₱{v.amount.toLocaleString()}</div>

@@ -12,8 +12,10 @@ import { FileCheck, Search, Printer, CheckCircle2, Ticket } from "lucide-react";
 
 import { downloadReceiptAsPDF } from '@/lib/foodvoucher/pdf-generator';
 import IssueAR from './reports/IssueAR';
+import { useHasMounted } from "@/hooks/use-has-mounted";
 
 export default function AcknowledgementReceipt({ userId, userName }: { userId: string, userName: string }) {
+    const hasMounted = useHasMounted();
     const [claimCode, setClaimCode] = useState('');
     const [foundClaim, setFoundClaim] = useState<any>(null);
     const [arNumber, setArNumber] = useState('');
@@ -165,7 +167,7 @@ export default function AcknowledgementReceipt({ userId, userName }: { userId: s
                                         <div>
                                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Redemption Details</div>
                                             <div className="text-sm font-bold text-slate-700">Claim Code: <span className="font-mono">{foundClaim.redemptionCode}</span></div>
-                                            <div className="text-sm font-bold text-slate-700">Submission Date: {new Date(foundClaim.date).toLocaleDateString()}</div>
+                                            <div className="text-sm font-bold text-slate-700" suppressHydrationWarning>Submission Date: {foundClaim.date ? new Date(foundClaim.date).toLocaleDateString() : ""}</div>
                                         </div>
 
                                         {foundClaim.details && foundClaim.details.length > 0 && (
@@ -261,7 +263,7 @@ export default function AcknowledgementReceipt({ userId, userName }: { userId: s
                 <div className="hidden print:block print:m-0 print:p-0">
                     <IssueAR 
                         arNumber={arNumber}
-                        date={foundClaim.acknowledgement ? new Date(foundClaim.acknowledgement.ackDate) : new Date()}
+                        date={foundClaim.acknowledgement ? new Date(foundClaim.acknowledgement.ackDate) : (hasMounted ? new Date() : new Date(0))}
                         amount={foundClaim.totalAmount}
                         vendorName={foundClaim.vendor.vendorName}
                         controlNo={foundClaim.redemptionCode}

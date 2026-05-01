@@ -11,8 +11,10 @@ import { FileCheck, Search, Printer, CheckCircle2, Globe } from "lucide-react";
 
 import { downloadReceiptAsPDF } from '@/lib/foodvoucher/pdf-generator';
 import IssueAR from './reports/IssueAR';
+import { useHasMounted } from "@/hooks/use-has-mounted";
 
 export default function ExternalClaimReceipt({ userId, userName }: { userId: string, userName: string }) {
+    const hasMounted = useHasMounted();
     const [controlNo, setControlNo] = useState('');
     const [foundClaim, setFoundClaim] = useState<any>(null);
     const [arNumber, setArNumber] = useState('');
@@ -158,7 +160,7 @@ export default function ExternalClaimReceipt({ userId, userName }: { userId: str
                                         <div>
                                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Submission Details</div>
                                             <div className="text-sm font-bold text-slate-700">Control No: <span className="font-mono">{foundClaim.claimControlNo}</span></div>
-                                            <div className="text-sm font-bold text-slate-700">API Record Date: {new Date(foundClaim.createdAt).toLocaleDateString()}</div>
+                                            <div className="text-sm font-bold text-slate-700" suppressHydrationWarning>API Record Date: {foundClaim.createdAt ? new Date(foundClaim.createdAt).toLocaleDateString() : ""}</div>
                                             <div className="text-xs text-slate-400 mt-1 italic">Source: External System Integration</div>
                                         </div>
                                     </div>
@@ -240,7 +242,7 @@ export default function ExternalClaimReceipt({ userId, userName }: { userId: str
                 <div className="hidden print:block print:m-0 print:p-0">
                     <IssueAR 
                         arNumber={arNumber}
-                        date={foundClaim.acknowledgement ? new Date(foundClaim.acknowledgement.ackDate) : new Date()}
+                        date={foundClaim.acknowledgement ? new Date(foundClaim.acknowledgement.ackDate) : (hasMounted ? new Date() : new Date(0))}
                         amount={foundClaim.totalAmount}
                         vendorName={foundClaim.vendorName}
                         controlNo={foundClaim.claimControlNo}

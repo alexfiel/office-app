@@ -191,7 +191,7 @@ export default function VoucherInventory({ vouchers: initialVouchers, userId }: 
                                     <tr key={v.id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="p-4 font-bold text-slate-900 font-mono">{v.voucherCode}</td>
                                         <td className="p-4 text-right font-black text-slate-800">₱{v.amount.toLocaleString()}</td>
-                                        <td className="p-4 text-center text-slate-600">{new Date(v.date).toLocaleDateString()}</td>
+                                        <td className="p-4 text-center text-slate-600" suppressHydrationWarning>{new Date(v.date).toLocaleDateString()}</td>
                                         <td className="p-4 text-right">
                                             {v.vendorId ? (
                                                 <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 uppercase">Redeemed</span>

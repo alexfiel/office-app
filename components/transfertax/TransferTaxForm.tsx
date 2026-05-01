@@ -12,6 +12,7 @@ import { toast } from "sonner"
 import dynamic from "next/dynamic"
 import QRCode from "react-qr-code"
 import { useSession } from "next-auth/react"
+import { useHasMounted } from "@/hooks/use-has-mounted"
 
 const UploadForm = dynamic(() => import("../uploadForm.tsx/page"), { ssr: false })
 
@@ -34,6 +35,7 @@ type RealPropertyInfo = {
 
 export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any) => void }) {
     const { data: session } = useSession()
+    const hasMounted = useHasMounted()
     const [activeTab, setActiveTab] = useState("documents")
 
     const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
@@ -1234,11 +1236,13 @@ export default function TransferTaxForm({ onPreview }: { onPreview?: (data: any)
                                     <div className="text-left">
                                         <h1 className="text-2xl font-bold uppercase tracking-widest">Office of the City Treasurer</h1>
                                         <h2 className="text-xl font-semibold mt-1">TRANSFER TAX COMPUTATION SUMMARY</h2>
-                                        <p className="text-sm mt-2">Date Computed: {new Date().toLocaleDateString()}</p>
+                                        <p className="text-sm mt-2" suppressHydrationWarning>Date Computed: {hasMounted ? new Date().toLocaleDateString() : ""}</p>
                                     </div>
                                     {savedTxId && (
                                         <div className="flex flex-col items-center">
-                                            <QRCode value={`ID: ${savedTxId}\nNew Owner: ${parties.newOwner}\nAmount Due: P ${totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nValidity Date: ${validityDate || new Date().toLocaleDateString()}`} size={80} level="M" />
+                                            {hasMounted && (
+                                                <QRCode value={`ID: ${savedTxId}\nNew Owner: ${parties.newOwner}\nAmount Due: P ${totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nValidity Date: ${validityDate || new Date().toLocaleDateString()}`} size={80} level="M" />
+                                            )}
                                             <span className="text-[10px] mt-1 text-muted-foreground break-all max-w-[80px] text-center">{savedTxId.slice(-8)}</span>
                                         </div>
                                     )}
