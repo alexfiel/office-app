@@ -31,6 +31,8 @@ model User {
   transferTaxDetails      TransferTaxDetails[]
   foodVoucherSettlements       FoodVoucherSettlement[]
   foodVoucherSettlementDetails FoodVoucherSettlementDetails[]
+  externalFVSettlements        ExternalFVSettlement[]
+  externalFVLiquidations       ExternalFVLiquidation[]
 }
 
 model RealProperty {
@@ -307,6 +309,64 @@ model FoodVoucherSettlementDetails {
   user         User                  @relation(fields: [userId], references: [id])
   settlement   FoodVoucherSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 }
+
+
+model ExternalFVSettlement {
+  id           String   @id @default(cuid())
+  arNo         String   @unique @map("ar_no")
+  batchNo      String   @map("batch_no")
+  vendorName   String   @map("vendor_name")
+  
+  // Summary Data (For your standard printout)
+  totalTransactions Int    @map("total_transactions")
+  totalAmount  Decimal  @db.Decimal(10, 2) @map("total_amount")
+  status       String   @default("forLiquidation")
+  datePaid     DateTime @default(now()) @map("date_paid")
+  
+  // Metadata from CSV
+  market       String?
+  stallNo      String?  @map("stall_no")
+
+  // The link to the audit trail
+  transactions ExternalFVTransaction[]
+
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@map("external_fv_settlements")
+
+  liquidationId String?  @map("liquidation_id")
+  liquidation   ExternalFVLiquidation? @relation(fields: [liquidationId], references: [id])
+}
+
+model ExternalFVTransaction {
+  id           String                @id @default(cuid())
+  voucherCode  String                @map("voucher_code")
+  beneficiary  String                // <--- Stored here for the Auditor
+  amount       Decimal               @db.Decimal(10, 2)
+  createdAt    DateTime              @map("created_at")
+
+  // Link to the parent summary
+  settlementId String                @map("settlement_id")
+  settlement   ExternalFVSettlement  @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  @@map("external_fv_transactions")
+}
+
+model ExternalFVLiquidation {
+  id            String   @id @default(cuid())
+  liquidationNo String   @unique @map("liquidation_no")
+  totalAmount   Decimal  @db.Decimal(10, 2) @map("total_amount")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  settlements   ExternalFVSettlement[]
+
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@map("external_fv_liquidations")
+}
+
 
 model ApiKeyModel {
   id        String   @id @default(cuid())
