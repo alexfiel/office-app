@@ -212,13 +212,7 @@ export default function ExternalLiquidationHistory({ userName = "Unknown User" }
                     <DialogHeader className="no-print border-b pb-4 mb-4">
                         <DialogTitle className="flex items-center justify-between">
                             <span className="text-xl font-bold">Consolidated Liquidation Summary</span>
-                            <div className="flex gap-2">
-                                <Button variant="destructive" size="sm" onClick={() => setViewListReport(false)}>Close</Button>
-                                <Button size="sm" onClick={handlePrint} className="bg-emerald-600 hover:bg-emerald-700">
-                                    <Printer className="w-4 h-4 mr-2" />
-                                    Print
-                                </Button>
-                            </div>
+
                         </DialogTitle>
                     </DialogHeader>
 
