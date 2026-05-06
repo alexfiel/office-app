@@ -316,11 +316,11 @@ model ExternalFVSettlement {
   arNo         String   @unique @map("ar_no")
   batchNo      String   @map("batch_no")
   vendorName   String   @map("vendor_name")
+  status       String   @default("forLiquidation")
   
   // Summary Data (For your standard printout)
   totalTransactions Int    @map("total_transactions")
   totalAmount  Decimal  @db.Decimal(10, 2) @map("total_amount")
-  status       String   @default("forLiquidation")
   datePaid     DateTime @default(now()) @map("date_paid")
   
   // Metadata from CSV

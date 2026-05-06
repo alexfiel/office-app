@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Banknote, FileBarChart, Globe, History } from "lucide-react"
 
 import ExternalSettlementWorkspace from "@/components/foodvoucher/externalSettlementWorkspace"
-import ExternalSettlementReport from "@/components/foodvoucher/externalSettlementReport"
+import ExternalSettlementForLiquidation from "@/components/foodvoucher/externalSettlementForLiquidation"
 import ExternalLiquidationHistory from "@/components/foodvoucher/externalLiquidationHistory"
 import { getExternalSettlements } from "@/lib/actions/external-fv-settlement"
 
@@ -100,7 +100,7 @@ export default async function FoodVoucherExternalSettlementPage() {
                             </TabsContent>
 
                             <TabsContent value="report" className="m-0 p-6">
-                                <ExternalSettlementReport
+                                <ExternalSettlementForLiquidation
                                     settlements={settlements as any}
                                     userId={user.id}
                                     userName={user.name}

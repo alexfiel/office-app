@@ -197,3 +197,31 @@ export async function getExternalLiquidations(startDate?: Date, endDate?: Date) 
         }))
     }));
 }
+
+export async function voidExternalFVSettlement(id: string) {
+    try {
+        await prisma.externalFVSettlement.update({
+            where: { id },
+            data: { status: "VOIDED" }
+        });
+        revalidatePath("/foodvoucherExternalSettlement");
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to void external FV settlement:", error);
+        throw new Error(error.message || "Failed to void settlement");
+    }
+}
+
+export async function updateExternalFVSettlementBatch(id: string, batchNo: string) {
+    try {
+        await prisma.externalFVSettlement.update({
+            where: { id },
+            data: { batchNo }
+        });
+        revalidatePath("/foodvoucherExternalSettlement");
+        return { success: true };
+    } catch (error: any) {
+        console.error("Failed to update external FV settlement batch:", error);
+        throw new Error(error.message || "Failed to update batch number");
+    }
+}
