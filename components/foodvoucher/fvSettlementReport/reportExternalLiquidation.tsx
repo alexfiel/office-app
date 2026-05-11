@@ -55,14 +55,17 @@ export function ReportExternalLiquidation({ liquidation, userName }: ReportExter
 
         currentY += 10;
 
+        let pageTotal = 0;
+
         // Table
-        const tableHeaders = [["#", "AR Number", "Batch No.", "Vendor Name", "Amount"]];
+        const tableHeaders = [["#", "AR Number", "Batch No.", "Vendor Name", "No. of Vouchers", "Amount"]];
         const tableRows = liquidation.settlements.map((s: any, idx: number) => [
             idx + 1,
             s.arNo,
             s.batchNo,
             s.vendorName,
-            `P${s.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+            s.totalTransactions || 0,
+            s.totalAmount // Keep as raw number for subtotal calculation
         ]);
 
         autoTable(pdf, {
@@ -76,12 +79,52 @@ export function ReportExternalLiquidation({ liquidation, userName }: ReportExter
                 0: { halign: 'center', cellWidth: 10 },
                 1: { halign: 'center' },
                 2: { halign: 'center' },
-                4: { halign: 'right' }
+                4: { halign: 'center' },
+                5: { halign: 'right' }
             },
             foot: [[
-                { content: 'GRAND TOTAL:', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
-                { content: `P${liquidation.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, styles: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } }
-            ]]
+                { content: 'PAGE SUBTOTAL:', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
+                { content: '', styles: { halign: 'right', fontStyle: 'bold' } }
+            ]],
+            showFoot: 'everyPage',
+            willDrawPage: (data) => {
+                pageTotal = 0;
+            },
+            didDrawCell: (data) => {
+                if (data.section === 'body' && data.column.index === 5) {
+                    pageTotal += Number(data.cell.raw);
+                }
+            },
+            willDrawCell: (data) => {
+                if (data.section === 'body' && data.column.index === 5) {
+                    const val = Number(data.cell.raw);
+                    data.cell.text = [`P${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
+                }
+                if (data.section === 'foot' && data.column.index === 5) {
+                    data.cell.text = [`P${pageTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
+                }
+            }
+        });
+
+        const lastTable = (pdf as any).lastAutoTable;
+        const columns = lastTable.columns;
+        const colWidth1 = columns[0].width + columns[1].width + columns[2].width + columns[3].width + columns[4].width;
+        const colWidth2 = columns[5].width;
+
+        autoTable(pdf, {
+            body: [
+                [
+                    { content: 'GRAND TOTAL:', styles: { halign: 'right', fontStyle: 'bold' } },
+                    { content: `P${liquidation.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, styles: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } }
+                ]
+            ],
+            startY: lastTable.finalY,
+            theme: 'grid',
+            styles: { fontSize: 8 },
+            columnStyles: {
+                0: { cellWidth: colWidth1 },
+                1: { cellWidth: colWidth2, halign: 'right' }
+            }
         });
 
         const finalY = (pdf as any).lastAutoTable.finalY + 20;
@@ -136,6 +179,7 @@ export function ReportExternalLiquidation({ liquidation, userName }: ReportExter
                         <th className="border border-black p-2 text-center">AR Number</th>
                         <th className="border border-black p-2 text-center">Batch No.</th>
                         <th className="border border-black p-2 text-left">Vendor Name</th>
+                        <th className="border border-black p-2 text-center">No. of Vouchers</th>
                         <th className="border border-black p-2 text-right">Amount</th>
                     </tr>
                 </thead>
@@ -146,13 +190,14 @@ export function ReportExternalLiquidation({ liquidation, userName }: ReportExter
                             <td className="border border-black p-2 text-center font-mono font-bold">{s.arNo}</td>
                             <td className="border border-black p-2 text-center font-mono">{s.batchNo}</td>
                             <td className="border border-black p-2 font-medium">{s.vendorName}</td>
+                            <td className="border border-black p-2 text-center font-mono">{s.totalTransactions || 0}</td>
                             <td className="border border-black p-2 text-right font-bold">₱{s.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
                     ))}
                 </tbody>
                 <tfoot>
                     <tr className="bg-slate-50 font-black text-sm">
-                        <td colSpan={4} className="border border-black p-3 text-right uppercase">Grand Total:</td>
+                        <td colSpan={5} className="border border-black p-3 text-right uppercase">Grand Total:</td>
                         <td className="border border-black p-3 text-right text-red-700">
                             ₱{liquidation.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>

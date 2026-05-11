@@ -50,15 +50,21 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
 
         currentY += 15;
 
+        let pageTotal = 0;
+
         // Table
-        const tableHeaders = [["#", "Liquidation No.", "Date Processed", "No. of ARs", "Total Amount"]];
-        const tableRows = liquidations.map((l, idx) => [
-            idx + 1,
-            l.liquidationNo,
-            new Date(l.createdAt).toLocaleDateString(),
-            l.settlements?.length || 0,
-            `P${l.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-        ]);
+        const tableHeaders = [["#", "Liquidation No.", "Date Processed", "No. of ARs", "No. of Vouchers", "Total Amount"]];
+        const tableRows = liquidations.map((l, idx) => {
+            const totalVouchers = l.settlements?.reduce((sum: number, s: any) => sum + (s.totalTransactions || 0), 0) || 0;
+            return [
+                idx + 1,
+                l.liquidationNo,
+                new Date(l.createdAt).toLocaleDateString(),
+                l.settlements?.length || 0,
+                totalVouchers,
+                Number(l.totalAmount) // Keep as raw number for calculation
+            ];
+        });
 
         autoTable(pdf, {
             head: tableHeaders,
@@ -72,12 +78,52 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
                 1: { halign: 'center' },
                 2: { halign: 'center' },
                 3: { halign: 'center' },
-                4: { halign: 'right' }
+                4: { halign: 'center' },
+                5: { halign: 'right' }
             },
             foot: [[
-                { content: 'TOTAL LIQUIDATED AMOUNT:', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
-                { content: `P${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, styles: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } }
-            ]]
+                { content: 'PAGE SUBTOTAL:', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
+                { content: '', styles: { halign: 'right', fontStyle: 'bold' } }
+            ]],
+            showFoot: 'everyPage',
+            willDrawPage: (data) => {
+                pageTotal = 0;
+            },
+            didDrawCell: (data) => {
+                if (data.section === 'body' && data.column.index === 5) {
+                    pageTotal += Number(data.cell.raw);
+                }
+            },
+            willDrawCell: (data) => {
+                if (data.section === 'body' && data.column.index === 5) {
+                    const val = Number(data.cell.raw);
+                    data.cell.text = [`P${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
+                }
+                if (data.section === 'foot' && data.column.index === 5) {
+                    data.cell.text = [`P${pageTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
+                }
+            }
+        });
+
+        const lastTable = (pdf as any).lastAutoTable;
+        const columns = lastTable.columns;
+        const colWidth1 = columns[0].width + columns[1].width + columns[2].width + columns[3].width + columns[4].width;
+        const colWidth2 = columns[5].width;
+
+        autoTable(pdf, {
+            body: [
+                [
+                    { content: 'TOTAL LIQUIDATED AMOUNT:', styles: { halign: 'right', fontStyle: 'bold' } },
+                    { content: `P${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, styles: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } }
+                ]
+            ],
+            startY: lastTable.finalY,
+            theme: 'grid',
+            styles: { fontSize: 8 },
+            columnStyles: {
+                0: { cellWidth: colWidth1 },
+                1: { cellWidth: colWidth2, halign: 'right' }
+            }
         });
 
         const finalY = (pdf as any).lastAutoTable.finalY + 20;
@@ -132,28 +178,35 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
                         <th className="border border-black p-2 text-center">Liquidation No.</th>
                         <th className="border border-black p-2 text-center">Date Liquidated</th>
                         <th className="border border-black p-2 text-center">No. of ARs</th>
+                        <th className="border border-black p-2 text-center">No. of Vouchers</th>
                         <th className="border border-black p-2 text-right">Total Amount</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {liquidations.map((l, idx) => (
-                        <tr key={l.id} className="hover:bg-gray-50">
-                            <td className="border border-black p-2 text-center font-mono">{idx + 1}</td>
-                            <td className="border border-black p-2 text-center font-mono font-black">{l.liquidationNo}</td>
-                            <td className="border border-black p-2 text-center">
-                                {new Date(l.createdAt).toLocaleDateString()}
-                            </td>
-                            <td className="border border-black p-2 text-center">
-                                {l.settlements?.length || 0}
-                            </td>
-                            <td className="border border-black p-2 text-right font-bold">
-                                ₱{l.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                        </tr>
-                    ))}
+                    {liquidations.map((l, idx) => {
+                        const totalVouchers = l.settlements?.reduce((sum: number, s: any) => sum + (s.totalTransactions || 0), 0) || 0;
+                        return (
+                            <tr key={l.id} className="hover:bg-gray-50">
+                                <td className="border border-black p-2 text-center font-mono">{idx + 1}</td>
+                                <td className="border border-black p-2 text-center font-mono font-black">{l.liquidationNo}</td>
+                                <td className="border border-black p-2 text-center">
+                                    {new Date(l.createdAt).toLocaleDateString()}
+                                </td>
+                                <td className="border border-black p-2 text-center">
+                                    {l.settlements?.length || 0}
+                                </td>
+                                <td className="border border-black p-2 text-center">
+                                    {totalVouchers}
+                                </td>
+                                <td className="border border-black p-2 text-right font-bold">
+                                    ₱{l.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                            </tr>
+                        );
+                    })}
                     {liquidations.length === 0 && (
                         <tr>
-                            <td colSpan={5} className="border border-black p-8 text-center text-slate-400 italic">
+                            <td colSpan={6} className="border border-black p-8 text-center text-slate-400 italic">
                                 No liquidation records found for the selected period.
                             </td>
                         </tr>
@@ -161,7 +214,7 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
                 </tbody>
                 <tfoot>
                     <tr className="bg-slate-50 font-black text-sm">
-                        <td colSpan={4} className="border border-black p-3 text-right uppercase">Total Liquidated Amount:</td>
+                        <td colSpan={5} className="border border-black p-3 text-right uppercase">Total Liquidated Amount:</td>
                         <td className="border border-black p-3 text-right text-red-700">
                             ₱{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
