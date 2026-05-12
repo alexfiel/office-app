@@ -39,17 +39,17 @@ export async function uploadExternalSettlements(
                         arNo: sData.arNo,
                         batchNo: sData.batchNo,
                         vendorName: sData.vendorName,
-                        totalTransactions: sData.totalTransactions,
-                        totalAmount: sData.totalAmount,
+                        totalTransactions: sData.totalTransactions || 0,
+                        totalAmount: sData.totalAmount || 0,
                         datePaid: new Date(sData.datePaid),
                         market: sData.market,
                         stallNo: sData.stallNo,
-                        userId: userId,
+                        user: { connect: { id: userId } },
                         transactions: {
                             create: transactions.map(t => ({
                                 voucherCode: t.voucherCode,
                                 beneficiary: t.beneficiary,
-                                amount: t.amount,
+                                amount: t.amount || 0,
                                 createdAt: new Date(t.createdAt)
                             }))
                         }
@@ -121,7 +121,7 @@ export async function createExternalFVLiquidation(
                 data: {
                     liquidationNo: liquidationNo,
                     totalAmount: totalAmount._sum.totalAmount || 0,
-                    userId: userId,
+                    user: { connect: { id: userId } },
                 }
             });
 

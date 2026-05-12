@@ -59,7 +59,8 @@ export default function ExternalSettlementWorkspace({ userId }: { userId: string
                         };
                     }
 
-                    const transAmount = parseFloat(cleanRow.amount || "0");
+                    const cleanAmountStr = String(cleanRow.amount || "0").replace(/[^\d.-]/g, '');
+                    const transAmount = parseFloat(cleanAmountStr) || 0;
                     const transaction: ExternalTransactionData = {
                         voucherCode: cleanRow.vouchercode || cleanRow.voucher || "",
                         beneficiary: cleanRow.beneficiaryname || cleanRow.beneficiary || cleanRow.name || "Unknown",

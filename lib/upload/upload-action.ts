@@ -10,25 +10,16 @@ export async function uploadFile(formData: FormData) {
         return { error: "No file provided" }
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    // create a unique filename to prevent collision and security issues
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const filename = `${path.parse(file.name).name}-${uniqueSuffix}${path.parse(file.name).ext}`;
-
-
-    // upload-action.ts
     try {
-        const uploadDir = path.join(process.cwd(), "public/uploads");
-        await fs.mkdir(uploadDir, { recursive: true });
-
-        await fs.writeFile(path.join(uploadDir, filename), buffer);
-        revalidatePath("/upload");
-
-        // Change fileUrl to url
-        return { status: "success", url: `/uploads/${filename}` };
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const base64Str = buffer.toString("base64");
+        const mimeType = file.type || "application/pdf";
+        const dataUri = `data:${mimeType};base64,${base64Str}`;
+        
+        return { status: "success", url: dataUri };
 
     } catch (error) {
-        console.error("Error uploading file:", error);
+        console.error("Error encoding file:", error);
         return { error: "Failed to upload file" };
     }
 }

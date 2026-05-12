@@ -1,18 +1,53 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ReportSettlementHeader } from './reportSettlementHeader';
 import { ReportSettlementFooter } from './reportSettlementFooter';
 
-interface ReportExternalLiquidationSummaryProps {
+interface ReportExternalLiquidationByVendorProps {
     liquidations: any[];
     userName: string;
     startDate?: string;
     endDate?: string;
 }
 
-export function ReportExternalLiquidationSummary({ liquidations, userName, startDate, endDate }: ReportExternalLiquidationSummaryProps) {
-    const totalAmount = liquidations.reduce((sum, l) => sum + l.totalAmount, 0);
+export function ReportExternalLiquidationByVendor({ liquidations, userName, startDate, endDate }: ReportExternalLiquidationByVendorProps) {
+    const aggregatedData = useMemo(() => {
+        const vendorAgg: Record<string, { vendorName: string, market: string, totalVouchers: number, totalAmount: number }> = {};
+
+        liquidations.forEach(l => {
+            if (l.settlements) {
+                l.settlements.forEach((s: any) => {
+                    const key = `${s.vendorName || 'Unknown'}-${s.market || ''}`;
+                    if (!vendorAgg[key]) {
+                        vendorAgg[key] = {
+                            vendorName: s.vendorName || 'Unknown',
+                            market: s.market || '',
+                            totalVouchers: 0,
+                            totalAmount: 0
+                        };
+                    }
+                    vendorAgg[key].totalAmount += Number(s.totalAmount) || 0;
+                    vendorAgg[key].totalVouchers += Number(s.totalTransactions) || 0;
+                });
+            }
+        });
+
+        // Convert to array and sort by Market, then by Vendor Name
+        return Object.values(vendorAgg).sort((a, b) => {
+            const marketA = a.market || "";
+            const marketB = b.market || "";
+            const marketCompare = marketA.localeCompare(marketB);
+            
+            if (marketCompare !== 0) {
+                return marketCompare;
+            }
+            
+            return a.vendorName.localeCompare(b.vendorName);
+        });
+    }, [liquidations]);
+
+    const grandTotalAmount = aggregatedData.reduce((sum, item) => sum + item.totalAmount, 0);
 
     const downloadAsPDF = () => {
         const pdf = new jsPDF({
@@ -38,7 +73,7 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
         currentY += 12;
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(14);
-        pdf.text("SUMMARY OF FOOD VOUCHER LIQUIDATIONS", centerX, currentY, { align: "center" });
+        pdf.text("LIQUIDATION SUMMARY BY VENDOR", centerX, currentY, { align: "center" });
 
         if (startDate || endDate) {
             currentY += 6;
@@ -53,16 +88,14 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
         let pageTotal = 0;
 
         // Table
-        const tableHeaders = [["#", "Liquidation No.", "Date Processed", "No. of ARs", "No. of Vouchers", "Total Amount"]];
-        const tableRows = liquidations.map((l, idx) => {
-            const totalVouchers = l.settlements?.reduce((sum: number, s: any) => sum + (s.totalTransactions || 0), 0) || 0;
+        const tableHeaders = [["#", "Vendor Name", "Market", "No. of Vouchers", "Total Amount"]];
+        const tableRows = aggregatedData.map((item, idx) => {
             return [
                 idx + 1,
-                l.liquidationNo,
-                new Date(l.createdAt).toLocaleDateString(),
-                l.settlements?.length || 0,
-                totalVouchers,
-                Number(l.totalAmount) // Keep as raw number for calculation
+                item.vendorName,
+                item.market || '-',
+                item.totalVouchers,
+                item.totalAmount // Keep as raw number for calculation
             ];
         });
 
@@ -75,14 +108,13 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
             styles: { fontSize: 8 },
             columnStyles: {
                 0: { halign: 'center', cellWidth: 10 },
-                1: { halign: 'center' },
-                2: { halign: 'center' },
+                1: { halign: 'left' },
+                2: { halign: 'left' },
                 3: { halign: 'center' },
-                4: { halign: 'center' },
-                5: { halign: 'right' }
+                4: { halign: 'right' }
             },
             foot: [[
-                { content: 'PAGE SUBTOTAL:', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
+                { content: 'PAGE SUBTOTAL:', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
                 { content: '', styles: { halign: 'right', fontStyle: 'bold' } }
             ]],
             showFoot: 'everyPage',
@@ -90,16 +122,16 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
                 pageTotal = 0;
             },
             didDrawCell: (data) => {
-                if (data.section === 'body' && data.column.index === 5) {
+                if (data.section === 'body' && data.column.index === 4) {
                     pageTotal += Number(data.cell.raw);
                 }
             },
             willDrawCell: (data) => {
-                if (data.section === 'body' && data.column.index === 5) {
+                if (data.section === 'body' && data.column.index === 4) {
                     const val = Number(data.cell.raw);
                     data.cell.text = [`P${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
                 }
-                if (data.section === 'foot' && data.column.index === 5) {
+                if (data.section === 'foot' && data.column.index === 4) {
                     data.cell.text = [`P${pageTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`];
                 }
             }
@@ -107,14 +139,14 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
 
         const lastTable = (pdf as any).lastAutoTable;
         const columns = lastTable.columns;
-        const colWidth1 = columns[0].width + columns[1].width + columns[2].width + columns[3].width + columns[4].width;
-        const colWidth2 = columns[5].width;
+        const colWidth1 = columns[0].width + columns[1].width + columns[2].width + columns[3].width;
+        const colWidth2 = columns[4].width;
 
         autoTable(pdf, {
             body: [
                 [
-                    { content: 'TOTAL LIQUIDATED AMOUNT:', styles: { halign: 'right', fontStyle: 'bold' } },
-                    { content: `P${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, styles: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } }
+                    { content: 'GRAND TOTAL AMOUNT:', styles: { halign: 'right', fontStyle: 'bold' } },
+                    { content: `P${grandTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, styles: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } }
                 ]
             ],
             startY: lastTable.finalY,
@@ -147,7 +179,7 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
         pdf.text("Authorized Personnel / Staff", 50, finalY + 17, { align: "center" });
         pdf.text("City Treasurer", 160, finalY + 17, { align: "center" });
 
-        pdf.save(`Liquidation_Summary_${new Date().toISOString().split('T')[0]}.pdf`);
+        pdf.save(`Vendor_Liquidation_Summary_${new Date().toISOString().split('T')[0]}.pdf`);
     };
 
     return (
@@ -158,12 +190,12 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2 text-sm font-bold transition-colors"
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    Download Summary to PDF
+                    Download Vendor Summary to PDF
                 </button>
             </div>
             <ReportSettlementHeader />
             <div className="text-center mb-8">
-                <h2 className="text-xl font-black underline uppercase tracking-tight">Summary of Food Voucher Liquidations</h2>
+                <h2 className="text-xl font-black underline uppercase tracking-tight">Liquidation Summary by Vendor</h2>
                 {(startDate || endDate) && (
                     <p className="text-xs font-bold text-slate-500 mt-1 italic">
                         Period: {startDate ? new Date(startDate).toLocaleDateString() : 'Start'} to {endDate ? new Date(endDate).toLocaleDateString() : 'End'}
@@ -175,48 +207,37 @@ export function ReportExternalLiquidationSummary({ liquidations, userName, start
                 <thead>
                     <tr className="bg-gray-100 uppercase font-bold">
                         <th className="border border-black p-2 text-center w-12">#</th>
-                        <th className="border border-black p-2 text-center">Liquidation No.</th>
-                        <th className="border border-black p-2 text-center">Date Liquidated</th>
-                        <th className="border border-black p-2 text-center">No. of ARs</th>
+                        <th className="border border-black p-2 text-left">Vendor Name</th>
+                        <th className="border border-black p-2 text-left">Market</th>
                         <th className="border border-black p-2 text-center">No. of Vouchers</th>
                         <th className="border border-black p-2 text-right">Total Amount</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {liquidations.map((l, idx) => {
-                        const totalVouchers = l.settlements?.reduce((sum: number, s: any) => sum + (s.totalTransactions || 0), 0) || 0;
-                        return (
-                            <tr key={l.id} className="hover:bg-gray-50">
-                                <td className="border border-black p-2 text-center font-mono">{idx + 1}</td>
-                                <td className="border border-black p-2 text-center font-mono font-black">{l.liquidationNo}</td>
-                                <td className="border border-black p-2 text-center">
-                                    {new Date(l.createdAt).toLocaleDateString()}
-                                </td>
-                                <td className="border border-black p-2 text-center">
-                                    {l.settlements?.length || 0}
-                                </td>
-                                <td className="border border-black p-2 text-center">
-                                    {totalVouchers}
-                                </td>
-                                <td className="border border-black p-2 text-right font-bold">
-                                    ₱{l.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </td>
-                            </tr>
-                        );
-                    })}
-                    {liquidations.length === 0 && (
+                    {aggregatedData.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                            <td className="border border-black p-2 text-center font-mono">{idx + 1}</td>
+                            <td className="border border-black p-2 text-left font-bold">{item.vendorName}</td>
+                            <td className="border border-black p-2 text-left">{item.market || '-'}</td>
+                            <td className="border border-black p-2 text-center">{item.totalVouchers}</td>
+                            <td className="border border-black p-2 text-right font-bold">
+                                ₱{item.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                        </tr>
+                    ))}
+                    {aggregatedData.length === 0 && (
                         <tr>
-                            <td colSpan={6} className="border border-black p-8 text-center text-slate-400 italic">
-                                No liquidation records found for the selected period.
+                            <td colSpan={5} className="border border-black p-8 text-center text-slate-400 italic">
+                                No vendor records found for the selected period.
                             </td>
                         </tr>
                     )}
                 </tbody>
                 <tfoot>
                     <tr className="bg-slate-50 font-black text-sm">
-                        <td colSpan={5} className="border border-black p-3 text-right uppercase">Total Liquidated Amount:</td>
+                        <td colSpan={4} className="border border-black p-3 text-right uppercase">Grand Total Amount:</td>
                         <td className="border border-black p-3 text-right text-red-700">
-                            ₱{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ₱{grandTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                     </tr>
                 </tfoot>

@@ -12,6 +12,10 @@ interface ReportExternalLiquidationProps {
 export function ReportExternalLiquidation({ liquidation, userName }: ReportExternalLiquidationProps) {
     if (!liquidation) return null;
 
+    const sortedSettlements = [...(liquidation.settlements || [])].sort((a: any, b: any) =>
+        String(a.arNo).localeCompare(String(b.arNo), undefined, { numeric: true })
+    );
+
     const downloadAsPDF = () => {
         const pdf = new jsPDF({
             orientation: 'p',
@@ -59,7 +63,7 @@ export function ReportExternalLiquidation({ liquidation, userName }: ReportExter
 
         // Table
         const tableHeaders = [["#", "AR Number", "Batch No.", "Vendor Name", "No. of Vouchers", "Amount"]];
-        const tableRows = liquidation.settlements.map((s: any, idx: number) => [
+        const tableRows = sortedSettlements.map((s: any, idx: number) => [
             idx + 1,
             s.arNo,
             s.batchNo,
@@ -156,10 +160,10 @@ export function ReportExternalLiquidation({ liquidation, userName }: ReportExter
             <div className="flex justify-end mb-4 no-print">
                 <button
                     onClick={downloadAsPDF}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 text-sm font-bold transition-colors"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2 text-sm font-bold transition-colors"
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    Export to PDF
+                    Download as PDF
                 </button>
             </div>
             <ReportSettlementHeader />
@@ -184,7 +188,7 @@ export function ReportExternalLiquidation({ liquidation, userName }: ReportExter
                     </tr>
                 </thead>
                 <tbody>
-                    {liquidation.settlements?.map((s: any, idx: number) => (
+                    {sortedSettlements.map((s: any, idx: number) => (
                         <tr key={s.id} className="hover:bg-gray-50">
                             <td className="border border-black p-2 text-center font-mono">{idx + 1}</td>
                             <td className="border border-black p-2 text-center font-mono font-bold">{s.arNo}</td>

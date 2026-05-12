@@ -326,7 +326,7 @@ export default function ExternalSettlementForLiquidation({
 
             {/* View Report Sheet - Fluid */}
             <Sheet open={!!viewReport} onOpenChange={(o) => !o && setViewReport(null)}>
-                <SheetContent side="right" className="sm:max-w-[90%] md:max-w-[900px] p-0 bg-slate-100/50">
+                <SheetContent side="right" className="w-[90vw] sm:max-w-[90vw] md:max-w-[1200px] p-0 bg-slate-100/50 resize-x overflow-auto min-w-[50vw] xl:max-w-[1400px]">
                     <div className="flex flex-col h-full bg-white">
                         <div className="sticky top-0 bg-white/95 backdrop-blur-md p-6 border-b flex justify-between items-center no-print z-10 shadow-sm">
                             <div>

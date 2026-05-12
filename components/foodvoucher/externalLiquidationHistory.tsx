@@ -1,15 +1,16 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Printer, Calendar, Search, Database, Eye, FileText, ChevronDown, ChevronRight } from "lucide-react";
+import { Printer, Calendar, Search, Database, Eye, FileText, ChevronDown, ChevronRight, XIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getExternalLiquidations } from "@/lib/actions/external-fv-settlement";
 import { ReportExternalLiquidation } from "./fvSettlementReport/reportExternalLiquidation";
 import { ReportExternalLiquidationSummary } from "./fvSettlementReport/reportExternalLiquidationSummary";
+import { ReportExternalLiquidationByVendor } from "./fvSettlementReport/reportExternalLiquidationByVendor";
 import { toast } from "sonner";
 
 export default function ExternalLiquidationHistory({ userName = "Unknown User" }: { userName?: string }) {
@@ -20,6 +21,8 @@ export default function ExternalLiquidationHistory({ userName = "Unknown User" }
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [viewLiquidation, setViewLiquidation] = useState<any>(null);
     const [viewListReport, setViewListReport] = useState(false);
+    const [viewVendorReport, setViewVendorReport] = useState(false);
+    const [vendorSearch, setVendorSearch] = useState('');
 
     const fetchLiquidations = async () => {
         setIsLoading(true);
@@ -48,6 +51,31 @@ export default function ExternalLiquidationHistory({ userName = "Unknown User" }
         setExpandedId(expandedId === id ? null : id);
     };
 
+    const filteredLiquidations = useMemo(() => {
+        if (!vendorSearch.trim()) return liquidations;
+        
+        const searchLower = vendorSearch.toLowerCase();
+        
+        return liquidations.map(l => {
+            // Filter settlements inside this liquidation
+            const matchingSettlements = l.settlements.filter((s: any) => 
+                s.vendorName?.toLowerCase().includes(searchLower)
+            );
+            
+            // If no matching settlements, return null
+            if (matchingSettlements.length === 0) return null;
+            
+            // Recalculate totalAmount for this filtered liquidation
+            const newTotalAmount = matchingSettlements.reduce((sum: number, s: any) => sum + Number(s.totalAmount), 0);
+            
+            return {
+                ...l,
+                settlements: matchingSettlements,
+                totalAmount: newTotalAmount
+            };
+        }).filter(Boolean); // Remove nulls
+    }, [liquidations, vendorSearch]);
+
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap justify-between items-end gap-4 no-print">
@@ -72,10 +100,28 @@ export default function ExternalLiquidationHistory({ userName = "Unknown User" }
                     </div>
                     <Button onClick={fetchLiquidations} variant="secondary">Filter</Button>
                 </div>
-                <Button onClick={() => setViewListReport(true)} variant="outline" className="flex items-center gap-2 border-slate-200">
-                    <Printer className="w-4 h-4" />
-                    Print List Summary
-                </Button>
+                <div className="flex gap-2 w-full md:w-auto">
+                    <div className="relative flex-grow md:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Input
+                            type="text"
+                            placeholder="Filter by Vendor Name..."
+                            value={vendorSearch}
+                            onChange={e => setVendorSearch(e.target.value)}
+                            className="pl-9"
+                        />
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    <Button onClick={() => setViewVendorReport(true)} variant="outline" className="flex items-center gap-2 border-slate-200">
+                        <Printer className="w-4 h-4" />
+                        Print Vendor Summary
+                    </Button>
+                    <Button onClick={() => setViewListReport(true)} variant="outline" className="flex items-center gap-2 border-slate-200 bg-blue-50 text-blue-700 hover:bg-blue-100">
+                        <Printer className="w-4 h-4" />
+                        Print List Summary
+                    </Button>
+                </div>
             </div>
 
             <Card className="shadow-sm border-slate-200">
@@ -91,7 +137,7 @@ export default function ExternalLiquidationHistory({ userName = "Unknown User" }
                         <div className="text-right">
                             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Liquidated</div>
                             <div className="text-2xl font-black text-slate-900">
-                                ₱{liquidations.reduce((sum, l) => sum + l.totalAmount, 0).toLocaleString()}
+                                ₱{filteredLiquidations.reduce((sum, l) => sum + l.totalAmount, 0).toLocaleString()}
                             </div>
                         </div>
                     </div>
@@ -115,12 +161,12 @@ export default function ExternalLiquidationHistory({ userName = "Unknown User" }
                                     <tr>
                                         <td colSpan={7} className="px-6 py-12 text-center text-slate-500">Loading...</td>
                                     </tr>
-                                ) : liquidations.length === 0 ? (
+                                ) : filteredLiquidations.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">No liquidation records found for the selected range.</td>
+                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">No liquidation records found for the selected range/filter.</td>
                                     </tr>
                                 ) : (
-                                    liquidations.map((l) => (
+                                    filteredLiquidations.map((l: any) => (
                                         <React.Fragment key={l.id}>
                                             <tr className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-6 py-4">
@@ -154,6 +200,9 @@ export default function ExternalLiquidationHistory({ userName = "Unknown User" }
                                                                         <th className="px-4 py-2">AR No.</th>
                                                                         <th className="px-4 py-2">Batch</th>
                                                                         <th className="px-4 py-2">Vendor</th>
+                                                                        <th className="px-4 py-2">Date Paid</th>
+                                                                        <th className="px-4 py-2">Market</th>
+                                                                        <th className="px-4 py-2">Stall No.</th>
                                                                         <th className="px-4 py-2 text-right">Amount</th>
                                                                     </tr>
                                                                 </thead>
@@ -163,7 +212,10 @@ export default function ExternalLiquidationHistory({ userName = "Unknown User" }
                                                                             <td className="px-4 py-2 font-mono">{s.arNo}</td>
                                                                             <td className="px-4 py-2">{s.batchNo}</td>
                                                                             <td className="px-4 py-2">{s.vendorName}</td>
-                                                                            <td className="px-4 py-2 text-right font-bold">₱{s.totalAmount.toLocaleString()}</td>
+                                                                            <td className="px-4 py-2">{s.datePaid ? new Date(s.datePaid).toLocaleDateString() : '-'}</td>
+                                                                            <td className="px-4 py-2">{s.market || '-'}</td>
+                                                                            <td className="px-4 py-2">{s.stallNo || '-'}</td>
+                                                                            <td className="px-4 py-2 text-right font-bold">₱{s.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                                                         </tr>
                                                                     ))}
                                                                 </tbody>
@@ -183,10 +235,13 @@ export default function ExternalLiquidationHistory({ userName = "Unknown User" }
 
             {/* View/Print Liquidation Dialog */}
             <Dialog open={!!viewLiquidation} onOpenChange={(o) => !o && setViewLiquidation(null)}>
-                <DialogContent className="max-w-[80vw] max-h-[90vh] overflow-y-auto [&>button]:hidden">
+                <DialogContent className="w-[90vw] sm:max-w-[90vw] md:max-w-[1200px] xl:max-w-[1400px] min-w-[50vw] max-h-[90vh] resize-x overflow-auto [&>button]:hidden">
                     <DialogHeader className="no-print border-b pb-4 mb-4">
                         <DialogTitle className="flex items-center justify-between">
                             <span className="text-xl font-bold">Liquidation No: {viewLiquidation?.liquidationNo}</span>
+                            <div className="flex justify-end p-4 border-t no-print">
+                                <Button variant="destructive" size="icon" onClick={() => setViewLiquidation(null)}><XIcon className="w-4 h-4" /></Button>
+                            </div>
 
                         </DialogTitle>
                     </DialogHeader>
@@ -200,33 +255,55 @@ export default function ExternalLiquidationHistory({ userName = "Unknown User" }
                         )}
                     </div>
 
-                    <div className="flex justify-end p-4 border-t no-print">
-                        <Button variant="destructive" onClick={() => setViewLiquidation(null)}>Close Preview</Button>
-                    </div>
+
                 </DialogContent>
             </Dialog>
 
             {/* View/Print List Summary Dialog */}
             <Dialog open={viewListReport} onOpenChange={setViewListReport}>
-                <DialogContent className="max-w-[50vw] max-h-[90vh] overflow-y-auto [&>button]:hidden">
+                <DialogContent className="w-[90vw] sm:max-w-[90vw] md:max-w-[1200px] xl:max-w-[1400px] min-w-[50vw] max-h-[90vh] resize-x overflow-auto [&>button]:hidden">
                     <DialogHeader className="no-print border-b pb-4 mb-4">
                         <DialogTitle className="flex items-center justify-between">
                             <span className="text-xl font-bold">Consolidated Liquidation Summary</span>
-
                         </DialogTitle>
+                        <div className="flex justify-end p-4 border-t no-print">
+                            <Button variant="destructive" size="icon" onClick={() => setViewListReport(false)}><XIcon className="w-4 h-4" /></Button>
+                        </div>
+
                     </DialogHeader>
 
                     <div className="p-0">
                         <ReportExternalLiquidationSummary
-                            liquidations={liquidations}
+                            liquidations={filteredLiquidations}
                             userName={userName}
                             startDate={startDate}
                             endDate={endDate}
                         />
                     </div>
 
-                    <div className="flex justify-end p-4 border-t no-print">
-                        <Button variant="destructive" onClick={() => setViewListReport(false)}>Close Preview</Button>
+
+                </DialogContent>
+            </Dialog>
+
+            {/* View/Print Vendor Summary Dialog */}
+            <Dialog open={viewVendorReport} onOpenChange={setViewVendorReport}>
+                <DialogContent className="w-[90vw] sm:max-w-[90vw] md:max-w-[1200px] xl:max-w-[1400px] min-w-[50vw] max-h-[90vh] resize-x overflow-auto [&>button]:hidden">
+                    <DialogHeader className="no-print border-b pb-4 mb-4">
+                        <DialogTitle className="flex items-center justify-between">
+                            <span className="text-xl font-bold">Liquidation Summary by Vendor</span>
+                        </DialogTitle>
+                        <div className="flex justify-end p-4 border-t no-print">
+                            <Button variant="destructive" size="icon" onClick={() => setViewVendorReport(false)}><XIcon className="w-4 h-4" /></Button>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="p-0">
+                        <ReportExternalLiquidationByVendor
+                            liquidations={filteredLiquidations}
+                            userName={userName}
+                            startDate={startDate}
+                            endDate={endDate}
+                        />
                     </div>
                 </DialogContent>
             </Dialog>
