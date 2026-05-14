@@ -8,31 +8,33 @@ datasource db {
 }
 
 model User {
-  id                      String                             @id @default(cuid())
-  name                    String
-  email                   String                             @unique
-  password                String
-  createdAt               DateTime                           @default(now())
-  updatedAt               DateTime                           @updatedAt
-  role                    Role                               @default(USER)
-  designation             String
-  apiKeys                 ApiKeyModel[]
-  chainTransactions       ChainTransaction[]
-  foodVouchers            FoodVoucher[]
-  foodVoucherAcks         FoodVoucherIssuerAcknowledgement[]
-  foodVoucherClaims       FoodVoucherRedemptionClaim[]
-  foodVoucherVendors      FoodVoucherVendor[]
-  foodVoucherVendorClaims FoodVoucherVendorClaim[]
-  liquidations            LibrengSakayLiquidation[]
-  trips                   LibrengSakayTrip[]
-  notarialDocuments       NotarialDocument[]
-  realProperties          RealProperty[]
-  transferTaxes           TransferTax[]
-  transferTaxDetails      TransferTaxDetails[]
-  foodVoucherSettlements       FoodVoucherSettlement[]
-  foodVoucherSettlementDetails FoodVoucherSettlementDetails[]
-  externalFVSettlements        ExternalFVSettlement[]
-  externalFVLiquidations       ExternalFVLiquidation[]
+  id                            String                             @id @default(cuid())
+  name                          String
+  email                         String                             @unique
+  password                      String
+  createdAt                     DateTime                           @default(now())
+  updatedAt                     DateTime                           @updatedAt
+  role                          Role                               @default(USER)
+  designation                   String
+  apiKeys                       ApiKeyModel[]
+  chainTransactions             ChainTransaction[]
+  foodVouchers                  FoodVoucher[]
+  foodVoucherAcks               FoodVoucherIssuerAcknowledgement[]
+  foodVoucherClaims             FoodVoucherRedemptionClaim[]
+  foodVoucherVendors            FoodVoucherVendor[]
+  foodVoucherVendorClaims       FoodVoucherVendorClaim[]
+  liquidations                  LibrengSakayLiquidation[]
+  trips                         LibrengSakayTrip[]
+  notarialDocuments             NotarialDocument[]
+  realProperties                RealProperty[]
+  transferTaxes                 TransferTax[]
+  transferTaxDetails            TransferTaxDetails[]
+  foodVoucherSettlements        FoodVoucherSettlement[]
+  foodVoucherSettlementDetails  FoodVoucherSettlementDetails[]
+  externalFVSettlements         ExternalFVSettlement[]
+  externalFVLiquidations        ExternalFVLiquidation[]
+  cashAdvanceVouchers           CashAdvanceVoucher[]
+  externalReportofDisbursements ExternalReportofDisbursement[]
 }
 
 model RealProperty {
@@ -213,16 +215,16 @@ model FoodVoucher {
 }
 
 model FoodVoucherVendor {
-  id                     String                       @id @default(cuid())
-  vendorName             String
-  market                 String
-  stallNo                String
-  userId                 String
-  createdAt              DateTime                     @default(now())
-  updatedAt              DateTime                     @updatedAt
-  foodVouchers           FoodVoucher[]
-  redemptionClaims       FoodVoucherRedemptionClaim[]
-  user                   User                         @relation(fields: [userId], references: [id])
+  id               String                       @id @default(cuid())
+  vendorName       String
+  market           String
+  stallNo          String
+  userId           String
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+  foodVouchers     FoodVoucher[]
+  redemptionClaims FoodVoucherRedemptionClaim[]
+  user             User                         @relation(fields: [userId], references: [id])
 }
 
 model FoodVoucherRedemptionClaim {
@@ -285,12 +287,12 @@ model FoodVoucherVendorClaim {
 }
 
 model FoodVoucherSettlement {
-  id         String            @id @default(cuid())
-  amount     Float
-  arNumber   String            @unique
-  datePaid   DateTime          @default(now())
-  userId     String
-  user       User              @relation(fields: [userId], references: [id])
+  id       String   @id @default(cuid())
+  amount   Float
+  arNumber String   @unique
+  datePaid DateTime @default(now())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
 
   acknowledgements FoodVoucherIssuerAcknowledgement[]
   details          FoodVoucherSettlementDetails[]
@@ -310,45 +312,44 @@ model FoodVoucherSettlementDetails {
   settlement   FoodVoucherSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 }
 
-
 model ExternalFVSettlement {
-  id           String   @id @default(cuid())
-  arNo         String   @unique @map("ar_no")
-  batchNo      String   @map("batch_no")
-  vendorName   String   @map("vendor_name")
-  status       String   @default("forLiquidation")
-  
+  id         String @id @default(cuid())
+  arNo       String @unique @map("ar_no")
+  batchNo    String @map("batch_no")
+  vendorName String @map("vendor_name")
+  status     String @default("forLiquidation")
+
   // Summary Data (For your standard printout)
-  totalTransactions Int    @map("total_transactions")
-  totalAmount  Decimal  @db.Decimal(10, 2) @map("total_amount")
-  datePaid     DateTime @default(now()) @map("date_paid")
-  
+  totalTransactions Int      @map("total_transactions")
+  totalAmount       Decimal  @map("total_amount") @db.Decimal(10, 2)
+  datePaid          DateTime @default(now()) @map("date_paid")
+
   // Metadata from CSV
-  market       String?
-  stallNo      String?  @map("stall_no")
+  market  String?
+  stallNo String? @map("stall_no")
 
   // The link to the audit trail
   transactions ExternalFVTransaction[]
 
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  liquidationId String?                @map("liquidation_id")
+  liquidation   ExternalFVLiquidation? @relation(fields: [liquidationId], references: [id])
 
   @@map("external_fv_settlements")
-
-  liquidationId String?  @map("liquidation_id")
-  liquidation   ExternalFVLiquidation? @relation(fields: [liquidationId], references: [id])
 }
 
 model ExternalFVTransaction {
-  id           String                @id @default(cuid())
-  voucherCode  String                @map("voucher_code")
-  beneficiary  String                // <--- Stored here for the Auditor
-  amount       Decimal               @db.Decimal(10, 2)
-  createdAt    DateTime              @map("created_at")
+  id          String   @id @default(cuid())
+  voucherCode String   @map("voucher_code")
+  beneficiary String // <--- Stored here for the Auditor
+  amount      Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @map("created_at")
 
   // Link to the parent summary
-  settlementId String                @map("settlement_id")
-  settlement   ExternalFVSettlement  @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  settlementId String               @map("settlement_id")
+  settlement   ExternalFVSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 
   @@map("external_fv_transactions")
 }
@@ -356,17 +357,77 @@ model ExternalFVTransaction {
 model ExternalFVLiquidation {
   id            String   @id @default(cuid())
   liquidationNo String   @unique @map("liquidation_no")
-  totalAmount   Decimal  @db.Decimal(10, 2) @map("total_amount")
+  totalAmount   Decimal  @map("total_amount") @db.Decimal(10, 2)
   createdAt     DateTime @default(now()) @map("created_at")
 
-  settlements   ExternalFVSettlement[]
+  settlements ExternalFVSettlement[]
 
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  cashAdvanceVoucherId String?             @map("cash_advance_voucher_id")
+  cashAdvanceVoucher   CashAdvanceVoucher? @relation(fields: [cashAdvanceVoucherId], references: [id])
+
+  reportOfDisbursementId String?                       @map("report_of_disbursement_id")
+  reportOfDisbursement   ExternalReportofDisbursement? @relation(fields: [reportOfDisbursementId], references: [id])
 
   @@map("external_fv_liquidations")
 }
 
+model CashAdvanceVoucher {
+  id              String   @id @default(cuid())
+  referenceNumber String   @unique @map("reference_number")
+  amount          Decimal  @db.Decimal(10, 2)
+  balance         Decimal  @db.Decimal(10, 2)
+  date            DateTime @default(now())
+  payee           String
+  particulars     String? 
+  status          String   @default("PENDING")
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  disbursementReports ExternalReportofDisbursement[]
+  liquidations        ExternalFVLiquidation[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("cash_advance_vouchers")
+}
+
+model ExternalReportofDisbursement {
+  id           String   @id @default(cuid())
+  reportNumber String   @unique @map("report_number")
+  date         DateTime @default(now())
+ totalAmount  Decimal  @map("total_amount") @db.Decimal(10, 2)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  cashAdvanceVoucherId String?             @map("cash_advance_voucher_id")
+  cashAdvanceVoucher   CashAdvanceVoucher? @relation(fields: [cashAdvanceVoucherId], references: [id])
+
+  liquidations ExternalFVLiquidation[]
+  details      ExternalReportofDisbursementDetails[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("external_report_of_disbursement")
+}
+
+model ExternalReportofDisbursementDetails {
+  id String @id @default(cuid())
+  externalReportofDisbursementId String @map("external_report_of_disbursement_id")
+  externalReportofDisbursement ExternalReportofDisbursement @relation(fields: [externalReportofDisbursementId], references: [id])
+  barangay         String    @map("barangay")
+  liquidationNo    String?   @map("liquidation_no")
+  liquidationDate  DateTime? @map("liquidation_date")
+  numberOfVouchers Int       @map("number_of_vouchers")
+  totalVoucherAmount Decimal @map("total_voucher_amount") @db.Decimal(10,2)
+  
+}
 
 model ApiKeyModel {
   id        String   @id @default(cuid())

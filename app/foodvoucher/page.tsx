@@ -14,7 +14,8 @@ import {
     FileText,
     FileCheck,
     Database,
-    Key
+    Key,
+    Banknote
 } from "lucide-react"
 
 // Import components (to be created)
@@ -24,6 +25,7 @@ import VoucherInventory from "@/components/foodvoucher/voucherInventory"
 import RedemptionWorkspace from "@/components/foodvoucher/redemptionWorkspace"
 import RedemptionHistory from "@/components/foodvoucher/redemptionHistory"
 import AcknowledgementReceipt from "@/components/foodvoucher/acknowledgementReceipt"
+import CashAdvanceWorkspace from "@/components/foodvoucher/cashAdvanceWorkspace"
 
 export default async function FoodVoucherPage() {
     const session = await auth();
@@ -35,7 +37,7 @@ export default async function FoodVoucherPage() {
     };
 
     // Fetch initial data
-    const [vendors, vouchers, claims, stats] = await Promise.all([
+    const [vendors, vouchers, claims, stats, cashAdvances] = await Promise.all([
         prisma.foodVoucherVendor.findMany({ orderBy: { vendorName: 'asc' } }),
         prisma.foodVoucher.findMany({ 
             include: { user: { select: { name: true } } },
@@ -55,8 +57,17 @@ export default async function FoodVoucherPage() {
             prisma.foodVoucher.aggregate({ _sum: { amount: true } }),
             prisma.foodVoucherRedemptionClaim.aggregate({ _sum: { totalAmount: true } }),
             prisma.foodVoucherVendor.count()
-        ])
+        ]),
+        prisma.cashAdvanceVoucher.findMany({
+            orderBy: { createdAt: 'desc' }
+        })
     ]);
+
+    const plainCashAdvances = cashAdvances.map(ca => ({
+        ...ca,
+        amount: Number(ca.amount),
+        balance: Number(ca.balance)
+    }));
 
     const dashboardStats = {
         totalIssued: stats[0]._sum.amount || 0,
@@ -78,7 +89,7 @@ export default async function FoodVoucherPage() {
                     </div>
 
                     <Tabs defaultValue="dashboard" className="w-full">
-                        <TabsList className="grid w-full grid-cols-6 max-w-6xl h-12 no-print">
+                        <TabsList className="grid w-full grid-cols-7 max-w-[84rem] h-12 no-print">
                             <TabsTrigger value="dashboard" className="flex items-center gap-2">
                                 <LayoutDashboard className="w-4 h-4" />
                                 <span>Dashboard</span>
@@ -98,6 +109,10 @@ export default async function FoodVoucherPage() {
                             <TabsTrigger value="receipts" className="flex items-center gap-2">
                                 <FileText className="w-4 h-4" />
                                 <span>Receipts</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="cashadvance" className="flex items-center gap-2">
+                                <Banknote className="w-4 h-4" />
+                                <span>Cash Advance</span>
                             </TabsTrigger>
                             <TabsTrigger value="history" className="flex items-center gap-2">
                                 <History className="w-4 h-4" />
@@ -135,6 +150,10 @@ export default async function FoodVoucherPage() {
                                 userId={user.id}
                                 userName={user.name}
                             />
+                        </TabsContent>
+
+                        <TabsContent value="cashadvance" className="mt-4 no-print">
+                            <CashAdvanceWorkspace cashAdvances={plainCashAdvances} userId={user.id} isAdmin={(session.user as any).role === 'ADMIN'} />
                         </TabsContent>
 
                         <TabsContent value="history" className="mt-4 no-print">

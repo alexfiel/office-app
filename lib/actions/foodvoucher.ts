@@ -323,3 +323,82 @@ export async function getFoodVoucherStats() {
         throw new Error("Failed to fetch dashboard stats");
     }
 }
+
+// --- CASH ADVANCE VOUCHER ACTIONS ---
+
+export async function createCashAdvanceVoucher(data: { referenceNumber: string; amount: number; payee: string; particulars?: string; userId: string }) {
+    try {
+        const cashAdvance = await prisma.cashAdvanceVoucher.create({
+            data: {
+                ...data,
+                balance: data.amount,
+                status: "ACTIVE"
+            }
+        });
+        revalidatePath("/foodvoucher");
+        return {
+            ...cashAdvance,
+            amount: Number(cashAdvance.amount),
+            balance: Number(cashAdvance.balance)
+        };
+    } catch (error: any) {
+        console.error("Failed to create Cash Advance Voucher:", error);
+        throw new Error(error.message || "Failed to create Cash Advance Voucher");
+    }
+}
+
+export async function updateCashAdvanceStatus(id: string, status: string) {
+    try {
+        const cashAdvance = await prisma.cashAdvanceVoucher.update({
+            where: { id },
+            data: { status }
+        });
+        revalidatePath("/foodvoucher");
+        return {
+            ...cashAdvance,
+            amount: Number(cashAdvance.amount),
+            balance: Number(cashAdvance.balance)
+        };
+    } catch (error: any) {
+        console.error("Failed to update Cash Advance Status:", error);
+        throw new Error(error.message || "Failed to update Cash Advance Status");
+    }
+}
+
+export async function updateCashAdvanceVoucher(id: string, data: { referenceNumber: string; amount: number; payee: string; particulars?: string; }) {
+    try {
+        const currentCA = await prisma.cashAdvanceVoucher.findUnique({ where: { id } });
+        if (!currentCA) throw new Error("Cash advance not found");
+
+        const amountDiff = data.amount - Number(currentCA.amount);
+        const newBalance = Number(currentCA.balance) + amountDiff;
+
+        const updatedCA = await prisma.cashAdvanceVoucher.update({
+            where: { id },
+            data: {
+                ...data,
+                balance: newBalance
+            }
+        });
+        revalidatePath("/foodvoucher");
+        return {
+            ...updatedCA,
+            amount: Number(updatedCA.amount),
+            balance: Number(updatedCA.balance)
+        };
+    } catch (error: any) {
+        console.error("Failed to update Cash Advance Voucher:", error);
+        throw new Error(error.message || "Failed to update Cash Advance Voucher");
+    }
+}
+
+export async function deleteCashAdvanceVoucher(id: string) {
+    try {
+        await prisma.cashAdvanceVoucher.delete({ where: { id } });
+        revalidatePath("/foodvoucher");
+    } catch (error: any) {
+        console.error("Failed to delete Cash Advance Voucher:", error);
+        throw new Error("Failed to delete Cash Advance Voucher");
+    }
+}
+

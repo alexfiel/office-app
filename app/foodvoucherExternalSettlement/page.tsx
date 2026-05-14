@@ -4,12 +4,15 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Banknote, FileBarChart, Globe, History } from "lucide-react"
+import { Banknote, FileBarChart, Globe, History, FileText } from "lucide-react"
 
 import ExternalSettlementWorkspace from "@/components/foodvoucher/externalSettlementWorkspace"
 import ExternalSettlementForLiquidation from "@/components/foodvoucher/externalSettlementForLiquidation"
 import ExternalLiquidationHistory from "@/components/foodvoucher/externalLiquidationHistory"
+import ReportOfDisbursementWorkspace from "@/components/foodvoucher/reportOfDisbursementWorkspace"
+import ReportOfDisbursementHistory from "@/components/foodvoucher/reportOfDisbursementHistory"
 import { getExternalSettlements } from "@/lib/actions/external-fv-settlement"
+import { getUnreportedLiquidations, getActiveCashAdvances } from "@/lib/actions/external-fv-report"
 
 export default async function FoodVoucherExternalSettlementPage() {
     const session = await auth();
@@ -26,7 +29,12 @@ export default async function FoodVoucherExternalSettlementPage() {
     };
 
     // Fetch data
-    const externalSettlements = await getExternalSettlements();
+    const [externalSettlements, unreportedLiquidations, activeCashAdvances] = await Promise.all([
+        getExternalSettlements(),
+        getUnreportedLiquidations(),
+        getActiveCashAdvances()
+    ]);
+    
     const settlements = externalSettlements.map(s => ({
         id: s.id,
         arNo: s.arNo,
@@ -90,6 +98,14 @@ export default async function FoodVoucherExternalSettlementPage() {
                                 <History className="w-4 h-4" />
                                 Liquidated
                             </TabsTrigger>
+                            <TabsTrigger value="report-disbursement" className="flex items-center gap-2 px-6">
+                                <FileText className="w-4 h-4" />
+                                Disbursement Report
+                            </TabsTrigger>
+                            <TabsTrigger value="rod-history" className="flex items-center gap-2 px-6">
+                                <History className="w-4 h-4" />
+                                ROD History
+                            </TabsTrigger>
                         </TabsList>
 
                         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
@@ -111,6 +127,18 @@ export default async function FoodVoucherExternalSettlementPage() {
                                 <ExternalLiquidationHistory
                                     userName={user.name}
                                 />
+                            </TabsContent>
+
+                            <TabsContent value="report-disbursement" className="m-0 p-6">
+                                <ReportOfDisbursementWorkspace 
+                                    liquidations={unreportedLiquidations}
+                                    cashAdvances={activeCashAdvances}
+                                    userId={user.id}
+                                />
+                            </TabsContent>
+
+                            <TabsContent value="rod-history" className="m-0 p-6">
+                                <ReportOfDisbursementHistory />
                             </TabsContent>
                         </div>
                     </Tabs>
