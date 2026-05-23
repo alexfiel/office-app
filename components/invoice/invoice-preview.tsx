@@ -20,7 +20,7 @@ import { InvoiceHeader } from "./invoice-header";
 import { TransactionSummary } from "./invoice-transaction-summary";
 import { PartiesSection } from "./invoice-parties";
 
-export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: () => void }) {
+export default function InvoicePreview({ data, onBack, actionElement }: { data?: any, onBack?: () => void, actionElement?: React.ReactNode }) {
     const invoiceRef = useRef<HTMLDivElement>(null)
 
     // 1. RE-ESTABLISH THE DATA LOGIC
@@ -146,9 +146,10 @@ export default function InvoicePreview({ data, onBack }: { data?: any, onBack?: 
     return (
         <div className="p-4 bg-gray-50 min-h-screen">
             {/* Header/Buttons (not part of the printed PDF) */}
-            <div className="max-w-4xl mx-auto flex justify-between mb-4 gap-2">
+            <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between mb-4 gap-4">
                 <Button onClick={onBack} variant="outline">Back</Button>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                    {actionElement}
                     <Button onClick={handlePrint}>Print Invoice</Button> {/* New Print Button */}
                     <Button onClick={handleDownloadPdf}>Download PDF</Button>
                 </div>

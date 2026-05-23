@@ -24,7 +24,20 @@ async function main() {
     // 3. Correct path to the CSV file (one level up from /prisma/)
     const filePath = path.resolve(__dirname, '../faaslist2026Current.csv');
 
-    const SYSTEM_USER_ID = 'cmno3g5tv0000vhapvrz82d9j';
+    // 4. Ensure a system user exists for these automated uploads
+    const systemUser = await prisma.user.upsert({
+        where: { email: 'system@upload.local' },
+        update: {},
+        create: {
+            name: 'System Upload',
+            email: 'system@upload.local',
+            password: 'system_upload_no_login', // Dummy password for system user
+            designation: 'System Automator',
+            role: 'ADMIN',
+        }
+    });
+
+    const SYSTEM_USER_ID = systemUser.id;
 
     if (!fs.existsSync(filePath)) {
         console.error(`File not found at: ${filePath}`);

@@ -35,6 +35,7 @@ model User {
   externalFVLiquidations        ExternalFVLiquidation[]
   cashAdvanceVouchers           CashAdvanceVoucher[]
   externalReportofDisbursements ExternalReportofDisbursement[]
+  collections                   Collections[]
 }
 
 model RealProperty {
@@ -381,7 +382,7 @@ model CashAdvanceVoucher {
   balance         Decimal  @db.Decimal(10, 2)
   date            DateTime @default(now())
   payee           String
-  particulars     String? 
+  particulars     String?
   status          String   @default("PENDING")
 
   userId String
@@ -400,7 +401,7 @@ model ExternalReportofDisbursement {
   id           String   @id @default(cuid())
   reportNumber String   @unique @map("report_number")
   date         DateTime @default(now())
- totalAmount  Decimal  @map("total_amount") @db.Decimal(10, 2)
+  totalAmount  Decimal  @map("total_amount") @db.Decimal(10, 2)
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
@@ -418,15 +419,54 @@ model ExternalReportofDisbursement {
 }
 
 model ExternalReportofDisbursementDetails {
-  id String @id @default(cuid())
-  externalReportofDisbursementId String @map("external_report_of_disbursement_id")
-  externalReportofDisbursement ExternalReportofDisbursement @relation(fields: [externalReportofDisbursementId], references: [id])
-  barangay         String    @map("barangay")
-  liquidationNo    String?   @map("liquidation_no")
-  liquidationDate  DateTime? @map("liquidation_date")
-  numberOfVouchers Int       @map("number_of_vouchers")
-  totalVoucherAmount Decimal @map("total_voucher_amount") @db.Decimal(10,2)
-  
+  id                             String                       @id @default(cuid())
+  externalReportofDisbursementId String                       @map("external_report_of_disbursement_id")
+  externalReportofDisbursement   ExternalReportofDisbursement @relation(fields: [externalReportofDisbursementId], references: [id])
+  barangay                       String                       @map("barangay")
+  liquidationNo                  String?                      @map("liquidation_no")
+  liquidationDate                DateTime?                    @map("liquidation_date")
+  numberOfVouchers               Int                          @map("number_of_vouchers")
+  totalVoucherAmount             Decimal                      @map("total_voucher_amount") @db.Decimal(10, 2)
+}
+
+model FundType {
+  id                   String               @id @default(cuid())
+  name                 String
+  code                 String
+  collectionCategories CollectionCategory[]
+}
+
+model CollectionCategory {
+  id              String           @id @default(cuid())
+  code            String
+  name            String
+  fundTypeId      String
+  fundType        FundType         @relation(fields: [fundTypeId], references: [id])
+  collectionItems CollectionItem[]
+}
+
+model Collections {
+  id              String           @id @default(cuid())
+  controlNo       String           @unique @map("control_no")
+  date            DateTime         @default(now())
+  amount          Decimal          @db.Decimal(15, 2)
+  totalAmount     Decimal          @db.Decimal(15, 2)
+  collectionItems CollectionItem[]
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+}
+
+model CollectionItem {
+  id                   String             @id @default(cuid())
+  collectionId         String
+  collection           Collections        @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  collectionCategoryId String
+  collectionCategory   CollectionCategory @relation(fields: [collectionCategoryId], references: [id])
+  amount               Decimal            @db.Decimal(15, 2)
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
 }
 
 model ApiKeyModel {

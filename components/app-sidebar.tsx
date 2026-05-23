@@ -111,6 +111,19 @@ const data = {
     },
   ],
 
+  cashier: [
+    {
+      title: "Record Collection",
+      url: "/cashier/collections",
+      icon: IconInvoice,
+    },
+    {
+      title: "Settings",
+      url: "/cashier/settings",
+      icon: IconSettings,
+    },
+  ],
+
 }
 
 export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sidebar> & { user: any }) {
@@ -132,7 +145,8 @@ export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sideb
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={data.navMain} label="General" />
+        <NavMain items={data.cashier} label="Cashier Division" />
         <NavDocuments items={data.transfertax} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>

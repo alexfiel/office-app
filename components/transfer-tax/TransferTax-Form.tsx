@@ -17,6 +17,8 @@ import { SummaryStep } from "./SummaryStep"
 import { toast } from "sonner"
 import InvoicePreview from "@/components/invoice/invoice-preview"
 import { EJSTransferModal } from "./EJSTransferModal"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 export default function TransferTxFrm() {
     const { data: session } = useSession()
@@ -81,6 +83,7 @@ export default function TransferTxFrm() {
     const [isSuccess, setIsSuccess] = useState(false);
     const [savedTxId, setSavedTxId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [showMultiTxModal, setShowMultiTxModal] = useState(false);
 
 
     const handleSubmit = async () => {
@@ -142,6 +145,11 @@ export default function TransferTxFrm() {
             setIsSuccess(true);
             setSavedTxId(data.result?.id || null);
             toast.success("TRANSACTION SAVED SUCCESSFULLY");
+            
+            const isMulti = documentInfo.type?.toUpperCase().includes("WITH") || transactionType?.toUpperCase().includes("WITH");
+            if (isMulti) {
+                setShowMultiTxModal(true);
+            }
 
         } catch (error: any) {
             toast.error(error.message);
@@ -159,40 +167,106 @@ export default function TransferTxFrm() {
     };
 
     if (isSuccess) {
+        const isMultiTransaction = documentInfo.type?.toUpperCase().includes("WITH") || transactionType?.toUpperCase().includes("WITH");
+
+        const handleProceedToNext = (nextType: string) => {
+            setIsSuccess(false);
+            setSavedTxId(null);
+            setShowMultiTxModal(false);
+            
+            // Keep the document info and the cart
+            // Automatically set the new transaction type
+            setTransactionType(nextType);
+            setConsideration("");
+            
+            // Auto-fill the prevOwner of the next transaction with the newOwner/heirs of this completed transaction
+            setParties({
+                prevOwner: isEJS ? (ejsChain[0]?.heirs || "") : parties.newOwner,
+                newOwner: ""
+            });
+            
+            // Clear the EJS chain since the next transaction won't be EJS
+            setEjsChain([]);
+            
+            // Navigate to parties tab to continue the flow
+            setActiveTab("parties");
+        };
+
+        const proceedButton = isMultiTransaction ? (
+            <Button onClick={() => setShowMultiTxModal(true)} className="bg-primary hover:bg-primary/90 text-white font-bold" variant="default">
+                NEXT TRANSACTION (SALE, PARTITION, ETC.)
+            </Button>
+        ) : null;
+
         return (
-            <InvoicePreview
-                onBack={handleReset}
-                data={{
-                    transactionId: savedTxId || "SUCCESS",
-                    transferee: isEJS ? (ejsChain[0]?.heirs || "N/A") : parties.newOwner,
-                    transferor: isEJS ? (ejsChain[0]?.deceasedOwner || "N/A") : parties.prevOwner,
-                    computationDate: new Date().toLocaleDateString(),
-                    validityDate: effectivityComputation.validityDate,
-                    properties: cart.map((item) => ({
-                        ...item,
-                        marketValue: Number(item.marketValue),
-                        area: Number(item.area),
-                    })),
-                    totalMarketValue: isEJS ? "N/A" : effectivityComputation.totalMarketValue,
-                    documentInfo: documentInfo,
-                    transactionInfo: {
-                        type: transactionType,
-                        consideration: isEJS ? "N/A" : effectivityComputation.consideration,
-                        dayselapsed: effectivityComputation.daysElapsed
-                    },
-                    ejsChain: ejsChain,
-                    computation: {
-                        taxBase: effectivityComputation.taxBase,
-                        taxRate: effectivityComputation.taxRate,
-                        basicTaxDue: effectivityComputation.basicTaxDue,
-                        surcharge: effectivityComputation.surcharge,
-                        interest: effectivityComputation.interest,
-                        totalAmountDue: effectivityComputation.totalAmountDue
-                    },
-                    preparedBy: session?.user?.name || "OFFICE STAFF",
-                    preparedByDesignation: "REVENUE EXAMINER"
-                }}
-            />
+            <div className="space-y-6">
+                <InvoicePreview
+                    onBack={handleReset}
+                    actionElement={proceedButton}
+                    data={{
+                        transactionId: savedTxId || "SUCCESS",
+                        transferee: isEJS ? (ejsChain[0]?.heirs || "N/A") : parties.newOwner,
+                        transferor: isEJS ? (ejsChain[0]?.deceasedOwner || "N/A") : parties.prevOwner,
+                        computationDate: new Date().toLocaleDateString(),
+                        validityDate: effectivityComputation.validityDate,
+                        properties: cart.map((item) => ({
+                            ...item,
+                            marketValue: Number(item.marketValue),
+                            area: Number(item.area),
+                        })),
+                        totalMarketValue: isEJS ? "N/A" : effectivityComputation.totalMarketValue,
+                        documentInfo: documentInfo,
+                        transactionInfo: {
+                            type: transactionType,
+                            consideration: isEJS ? "N/A" : effectivityComputation.consideration,
+                            dayselapsed: effectivityComputation.daysElapsed
+                        },
+                        ejsChain: ejsChain,
+                        computation: {
+                            taxBase: effectivityComputation.taxBase,
+                            taxRate: effectivityComputation.taxRate,
+                            basicTaxDue: effectivityComputation.basicTaxDue,
+                            surcharge: effectivityComputation.surcharge,
+                            interest: effectivityComputation.interest,
+                            totalAmountDue: effectivityComputation.totalAmountDue
+                        },
+                        preparedBy: session?.user?.name || "OFFICE STAFF",
+                        preparedByDesignation: "REVENUE EXAMINER"
+                    }}
+                />
+
+                <Dialog open={showMultiTxModal} onOpenChange={setShowMultiTxModal}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="text-xl text-primary font-small-caps font-bold">Multi-Transaction Detected</DialogTitle>
+                            <DialogDescription>
+                                The document type is <span className="font-bold text-foreground">{documentInfo.type}</span>.
+                                <br/><br/>
+                                You have successfully computed the first transaction. Please select the next transaction type to proceed.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid grid-cols-2 gap-3 py-4">
+                            <Button variant="outline" onClick={() => handleProceedToNext("DEED OF SALE")} className="font-bold border-primary/20 hover:bg-primary/10">
+                                SALE
+                            </Button>
+                            <Button variant="outline" onClick={() => handleProceedToNext("DEED OF PARTITION")} className="font-bold border-primary/20 hover:bg-primary/10">
+                                PARTITION
+                            </Button>
+                            <Button variant="outline" onClick={() => handleProceedToNext("DEED OF DONATION")} className="font-bold border-primary/20 hover:bg-primary/10">
+                                DONATION
+                            </Button>
+                            <Button variant="outline" onClick={() => handleProceedToNext("DEED OF WAIVER")} className="font-bold border-primary/20 hover:bg-primary/10">
+                                WAIVER OF RIGHTS
+                            </Button>
+                        </div>
+                        <DialogFooter className="sm:justify-start">
+                            <Button type="button" variant="ghost" onClick={() => setShowMultiTxModal(false)}>
+                                Dismiss
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
         );
     }
     //END OF NEW CODE BLOCK

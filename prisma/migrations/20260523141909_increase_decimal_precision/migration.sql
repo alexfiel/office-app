@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "CollectionItem" ALTER COLUMN "amount" SET DATA TYPE DECIMAL(15,2);
+
+-- AlterTable
+ALTER TABLE "Collections" ALTER COLUMN "amount" SET DATA TYPE DECIMAL(15,2),
+ALTER COLUMN "totalAmount" SET DATA TYPE DECIMAL(15,2);

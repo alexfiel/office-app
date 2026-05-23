@@ -7,7 +7,7 @@ import { Input } from "../ui/input"
 import { Label } from "../ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
 import { cn } from "@/lib/utils"
-
+import { TransferTaxCalculator } from "@/lib/tax-calculator"
 
 interface EJSTransferModalProps {
     isOpen: boolean;
@@ -22,16 +22,36 @@ export function EJSTransferModal({ isOpen, onClose, property, onAddTransfer }: E
     const [heirs, setHeirs] = useState("")
     const [share, setShare] = useState("1") // Default to 100% or 1/1
 
-    // Split the property owners into an array (assuming comma-separated in DB)
-    const currentOwners = property?.owner?.split(";").map((o: string) => o.trim()).filter(Boolean) || []
+    // Parse property owners, accounting for spousal indicators and various separators
+    const parseOwners = (ownerStr: string) => {
+        if (!ownerStr) return [];
+        
+        let cleaned = ownerStr
+            // Remove 'SPS' or 'SPOUSES'
+            .replace(/\b(SPS\.?|SPOUSES)\b/gi, '')
+            // Replace 'MARRIED TO' or 'M/T' with a standard separator '&'
+            .replace(/\b(MARRIED TO|M\/T)\b/gi, '&')
+            .trim();
+            
+        // Split by word 'and', ampersand '&', semicolon ';', or comma ','
+        return cleaned.split(/\band\b|&|;|,/i)
+            .map(o => o.trim())
+            .filter(Boolean);
+    };
 
+    const currentOwners = parseOwners(property?.owner);
     const handleAdd = () => {
-        // Compute base for this specific transfer
-        // Math: Tax Base = Market Value * ( numerator / denominator)
-
+        // Compute base for this specific transfer using the generic calculator
         const numericShare = eval(share) || 1; // Allows "1/2" or "0.5"
-        const taxBase = property.marketValue * numericShare;
-        const basicTaxDue = Math.max(taxBase * 0.0075, 500)
+        
+        const taxBase = TransferTaxCalculator.computeBase(
+            "DEED OF EXTRAJUDICIAL SETTLEMENT",
+            property.marketValue,
+            0,
+            numericShare
+        );
+        
+        const basicTaxDue = TransferTaxCalculator.computeBasicTaxDue(taxBase);
 
         onAddTransfer({
             propertyId: property.id,
