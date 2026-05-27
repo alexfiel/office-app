@@ -178,7 +178,7 @@ export function CollectionEntryForm({ onSuccess }: { onSuccess?: () => void }) {
                     <div key={groupName} className="space-y-3">
                       <h4 className="font-semibold text-sm border-b pb-1 text-primary">{groupName}</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {groupCats.map((cat: any) => (
+                        {(groupCats as any[]).map((cat: any) => (
                           <div key={cat.id} className="flex items-center space-x-2">
                             <Checkbox 
                               id={`cat-${cat.id}`} 
