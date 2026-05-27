@@ -17,6 +17,8 @@ export function CollectionFilter() {
   const [endDate, setEndDate] = useState(searchParams.get("endDate") || "");
   const [month, setMonth] = useState(searchParams.get("month") || "");
   const [year, setYear] = useState(searchParams.get("year") || new Date().getFullYear().toString());
+  const [week, setWeek] = useState(searchParams.get("week") || "");
+  const [quarter, setQuarter] = useState(searchParams.get("quarter") || "1");
 
   useEffect(() => {
     setFilterType(searchParams.get("filterType") || "single");
@@ -25,6 +27,8 @@ export function CollectionFilter() {
     setEndDate(searchParams.get("endDate") || "");
     setMonth(searchParams.get("month") || "");
     setYear(searchParams.get("year") || new Date().getFullYear().toString());
+    setWeek(searchParams.get("week") || "");
+    setQuarter(searchParams.get("quarter") || "1");
   }, [searchParams]);
 
   const handleFilter = (e: React.FormEvent) => {
@@ -39,6 +43,11 @@ export function CollectionFilter() {
     }
     if (filterType === "month" && month) params.set("month", month);
     if (filterType === "year" && year) params.set("year", year);
+    if (filterType === "week" && week) params.set("week", week);
+    if (filterType === "quarter" && quarter && year) {
+      params.set("quarter", quarter);
+      params.set("year", year);
+    }
 
     router.push(`/cashier/collections?${params.toString()}`);
   };
@@ -50,6 +59,8 @@ export function CollectionFilter() {
     setEndDate("");
     setMonth("");
     setYear(new Date().getFullYear().toString());
+    setWeek("");
+    setQuarter("1");
     router.push("/cashier/collections");
   };
 
@@ -64,7 +75,9 @@ export function CollectionFilter() {
         <SelectContent>
           <SelectItem value="single">Single Date</SelectItem>
           <SelectItem value="range">Date Range</SelectItem>
+          <SelectItem value="week">Weekly</SelectItem>
           <SelectItem value="month">Monthly</SelectItem>
+          <SelectItem value="quarter">Quarterly</SelectItem>
           <SelectItem value="year">Yearly</SelectItem>
         </SelectContent>
       </Select>
@@ -81,8 +94,29 @@ export function CollectionFilter() {
         </div>
       )}
 
+      {filterType === "week" && (
+        <Input type="week" value={week} onChange={e => setWeek(e.target.value)} className="w-auto h-9 bg-white" required />
+      )}
+
       {filterType === "month" && (
         <Input type="month" value={month} onChange={e => setMonth(e.target.value)} className="w-auto h-9 bg-white" required />
+      )}
+
+      {filterType === "quarter" && (
+        <div className="flex items-center gap-2">
+          <Select value={quarter} onValueChange={setQuarter}>
+            <SelectTrigger className="w-[80px] h-9 bg-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Q1</SelectItem>
+              <SelectItem value="2">Q2</SelectItem>
+              <SelectItem value="3">Q3</SelectItem>
+              <SelectItem value="4">Q4</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input type="number" min="2000" max="2100" value={year} onChange={e => setYear(e.target.value)} className="w-24 h-9 bg-white" required />
+        </div>
       )}
 
       {filterType === "year" && (

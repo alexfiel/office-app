@@ -112,6 +112,8 @@ export interface CollectionFilters {
   endDate?: string;
   month?: string;
   year?: string;
+  week?: string;
+  quarter?: string;
   unconsolidatedOnly?: boolean;
 }
 
@@ -145,12 +147,42 @@ export async function getRecentCollections(filters?: CollectionFilters) {
             lte.setHours(23, 59, 59, 999);
           }
           break;
+        case 'week':
+          if (filters.week) {
+            const [yearStr, weekNumStr] = filters.week.split("-W");
+            const year = parseInt(yearStr, 10);
+            const week = parseInt(weekNumStr, 10);
+            const simple = new Date(year, 0, 1 + (week - 1) * 7);
+            const dow = simple.getDay();
+            const ISOweekStart = simple;
+            if (dow <= 4)
+              ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+            else
+              ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+            
+            gte = new Date(ISOweekStart);
+            gte.setHours(0, 0, 0, 0);
+            lte = new Date(ISOweekStart);
+            lte.setDate(lte.getDate() + 6);
+            lte.setHours(23, 59, 59, 999);
+          }
+          break;
         case 'month':
           if (filters.month) {
             // month is in YYYY-MM format
             const [y, m] = filters.month.split('-');
             gte = new Date(Number(y), Number(m) - 1, 1, 0, 0, 0, 0);
             lte = new Date(Number(y), Number(m), 0, 23, 59, 59, 999);
+          }
+          break;
+        case 'quarter':
+          if (filters.quarter && filters.year) {
+            const year = Number(filters.year);
+            const q = Number(filters.quarter);
+            const startMonth = (q - 1) * 3;
+            const endMonth = startMonth + 2;
+            gte = new Date(year, startMonth, 1, 0, 0, 0, 0);
+            lte = new Date(year, endMonth + 1, 0, 23, 59, 59, 999);
           }
           break;
         case 'year':

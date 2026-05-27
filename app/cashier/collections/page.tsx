@@ -37,6 +37,7 @@ export default async function CollectionsPage(
     endDate: searchParams.endDate,
     month: searchParams.month,
     year: searchParams.year,
+    week: searchParams.week,
   };
 
   const session = await auth();
@@ -52,15 +53,32 @@ export default async function CollectionsPage(
   const dailyCollections = dailyRes.success ? (dailyRes.data || []) : [];
 
   let reportPeriod = "";
-  if (filters.filterType === "single" && filters.date) {
-    reportPeriod = `Date: ${format(new Date(filters.date), "MMMM d, yyyy")}`;
-  } else if (filters.filterType === "range" && filters.startDate && filters.endDate) {
-    reportPeriod = `Period: ${format(new Date(filters.startDate), "MMM d, yyyy")} to ${format(new Date(filters.endDate), "MMM d, yyyy")}`;
-  } else if (filters.filterType === "month" && filters.month) {
+  if (filters.filterType === 'single' && filters.date) {
+    reportPeriod = `Date: ${format(new Date(filters.date), 'MMMM d, yyyy')}`;
+  } else if (filters.filterType === 'range' && filters.startDate && filters.endDate) {
+    reportPeriod = `Period: ${format(new Date(filters.startDate), 'MMM d, yyyy')} to ${format(new Date(filters.endDate), 'MMM d, yyyy')}`;
+  } else if (filters.filterType === 'month' && filters.month) {
     const [y, m] = filters.month.split('-');
-    reportPeriod = `Month: ${format(new Date(Number(y), Number(m) - 1), "MMMM yyyy")}`;
-  } else if (filters.filterType === "year" && filters.year) {
+    reportPeriod = `Month: ${format(new Date(Number(y), Number(m) - 1), 'MMMM yyyy')}`;
+  } else if (filters.filterType === 'year' && filters.year) {
     reportPeriod = `Year: ${filters.year}`;
+  } else if (filters.filterType === 'quarter' && filters.quarter && filters.year) {
+    reportPeriod = `Quarter: Q${filters.quarter} ${filters.year}`;
+  } else if (filters.filterType === 'week' && filters.week) {
+    const [yearStr, weekNumStr] = filters.week.split("-W");
+    const year = parseInt(yearStr, 10);
+    const week = parseInt(weekNumStr, 10);
+    const simple = new Date(year, 0, 1 + (week - 1) * 7);
+    const dow = simple.getDay();
+    const ISOweekStart = simple;
+    if (dow <= 4)
+      ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+    else
+      ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
+    
+    const weekEnd = new Date(ISOweekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    reportPeriod = `Week: ${format(ISOweekStart, "MMM d, yyyy")} to ${format(weekEnd, "MMM d, yyyy")}`;
   }
 
   return (
@@ -134,6 +152,9 @@ export default async function CollectionsPage(
               <DailyCollectionsTable 
                 reports={dailyCollections} 
                 userName={userName}
+                isAdmin={isAdmin}
+                filterType={filters.filterType || ''}
+                reportPeriod={reportPeriod}
               />
             </CardContent>
           </Card>
