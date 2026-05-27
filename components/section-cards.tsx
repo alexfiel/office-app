@@ -19,7 +19,7 @@ export function SectionCards({ stats }: { stats: any }) {
         <CardHeader>
           <CardDescription>Total Revenue</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl line-clamp-1">
-            P {Number(totalRevenue).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            P {Number(totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </CardTitle>
           <CardAction>
             <Badge variant="outline">
@@ -41,7 +41,7 @@ export function SectionCards({ stats }: { stats: any }) {
         <CardHeader>
           <CardDescription>Transactions Processed</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {totalTransactions.toLocaleString()}
+            {totalTransactions.toLocaleString('en-US')}
           </CardTitle>
           <CardAction>
             <Badge variant="outline">
@@ -63,7 +63,7 @@ export function SectionCards({ stats }: { stats: any }) {
         <CardHeader>
           <CardDescription>Active Assessors</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {activeAssessors.toLocaleString()}
+            {activeAssessors.toLocaleString('en-US')}
           </CardTitle>
           <CardAction>
             <Badge variant="outline">

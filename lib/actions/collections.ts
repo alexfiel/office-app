@@ -112,12 +112,17 @@ export interface CollectionFilters {
   endDate?: string;
   month?: string;
   year?: string;
+  unconsolidatedOnly?: boolean;
 }
 
 export async function getRecentCollections(filters?: CollectionFilters) {
   try {
-    let whereClause = {};
+    let whereClause: any = {};
     let takeClause: number | undefined = 50;
+
+    if (filters?.unconsolidatedOnly) {
+      whereClause.dailyCollectionId = null;
+    }
 
     if (filters?.filterType) {
       let gte: Date | undefined;
@@ -157,9 +162,7 @@ export async function getRecentCollections(filters?: CollectionFilters) {
       }
 
       if (gte && lte) {
-        whereClause = {
-          date: { gte, lte }
-        };
+        whereClause.date = { gte, lte };
         // Disable limit if any valid filter is applied
         takeClause = undefined;
       }

@@ -1,5 +1,6 @@
 import { CollectionEntryForm } from "@/components/cashier/collection-entry-form";
 import { getRecentCollections, CollectionFilters } from "@/lib/actions/collections";
+import { getDailyCollections } from "@/lib/actions/daily-collections";
 import { Metadata } from "next";
 import {
   Card,
@@ -8,21 +9,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { format } from "date-fns";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import Link from "next/link";
 import { auth } from "@/auth";
-import { CollectionTableActions } from "@/components/cashier/collection-table-actions";
-import { ReportCollections } from "@/components/cashier/report-collections";
 import { CollectionFilter } from "@/components/cashier/collection-filter";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UnconsolidatedCollectionsTable } from "@/components/cashier/unconsolidated-collections-table";
+import { DailyCollectionsTable } from "@/components/cashier/daily-collections-table";
 
 export const metadata: Metadata = {
   title: "Collections Entry | Office App",
@@ -49,8 +43,13 @@ export default async function CollectionsPage(
   const isAdmin = (session?.user as any)?.role === "ADMIN";
   const userName = session?.user?.name || "Unknown User";
 
-  const recentRes = await getRecentCollections(filters);
-  const recentCollections = recentRes.success ? (recentRes.data || []) : [];
+  const [recentRes, dailyRes] = await Promise.all([
+    getRecentCollections({ ...filters, unconsolidatedOnly: true }),
+    getDailyCollections(filters)
+  ]);
+
+  const unconsolidatedCollections = recentRes.success ? (recentRes.data || []) : [];
+  const dailyCollections = dailyRes.success ? (dailyRes.data || []) : [];
 
   let reportPeriod = "";
   if (filters.filterType === "single" && filters.date) {
@@ -84,85 +83,62 @@ export default async function CollectionsPage(
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Record Collection</h1>
           <p className="text-muted-foreground mt-2">
-            Enter new collections and view transactions.
+            Enter new collections and generate daily consolidated reports.
           </p>
         </div>
         
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
           {/* Multi-Mode Filter Form */}
           <CollectionFilter />
-
-          {/* Report Button */}
-          <ReportCollections 
-            collections={recentCollections} 
-            userName={userName} 
-            reportPeriod={reportPeriod} 
-          />
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2 items-start">
-        {/* Entry Form */}
-        <CollectionEntryForm />
+      <Tabs defaultValue="entry" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="entry">Collection Entries</TabsTrigger>
+          <TabsTrigger value="reports">Daily Consolidated Reports</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="entry" className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2 items-start">
+            {/* Entry Form */}
+            <CollectionEntryForm />
 
-        {/* Recent Collections Table */}
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle>{reportPeriod ? `Collections for ${reportPeriod}` : "Recent Collections"}</CardTitle>
-            <CardDescription>
-              {reportPeriod ? "Entries for the selected period." : "Latest 50 entries recorded by authorized users."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Control No</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Total (₱)</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Recorded By</TableHead>
-                  {isAdmin && <TableHead className="text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentCollections.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={isAdmin ? 6 : 5} className="text-center text-muted-foreground">
-                      No collections found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  recentCollections.map((col: any) => (
-                    <TableRow key={col.id}>
-                      <TableCell className="font-semibold text-primary">
-                        {col.controlNo}
-                      </TableCell>
-                      <TableCell className="font-medium whitespace-nowrap">
-                        {format(new Date(col.date), "MMM d, yyyy")}
-                      </TableCell>
-                      <TableCell>
-                        {Number(col.totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </TableCell>
-                      <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground" title={col.collectionItems?.map((item: any) => `${item.collectionCategory?.name}: ₱${Number(item.amount).toLocaleString()}`).join(" | ")}>
-                        {col.collectionItems?.map((item: any) => item.collectionCategory?.code).join(", ")}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {col.user?.name || "Unknown"}
-                      </TableCell>
-                      {isAdmin && (
-                        <TableCell className="text-right">
-                          <CollectionTableActions collection={col} />
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+            {/* Unconsolidated Collections Table */}
+            <Card className="w-full">
+              <CardHeader>
+                <CardTitle>{reportPeriod ? `Unconsolidated Collections for ${reportPeriod}` : "Recent Unconsolidated Collections"}</CardTitle>
+                <CardDescription>
+                  Select entries to consolidate into a daily report.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <UnconsolidatedCollectionsTable 
+                  collections={unconsolidatedCollections} 
+                  isAdmin={isAdmin} 
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="reports">
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle>{reportPeriod ? `Daily Reports for ${reportPeriod}` : "Recent Daily Reports"}</CardTitle>
+              <CardDescription>
+                View and print consolidated daily reports.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DailyCollectionsTable 
+                reports={dailyCollections} 
+                userName={userName}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -36,6 +36,7 @@ model User {
   cashAdvanceVouchers           CashAdvanceVoucher[]
   externalReportofDisbursements ExternalReportofDisbursement[]
   collections                   Collections[]
+  dailyCollections              DailyConsolidatedCollection[]
 }
 
 model RealProperty {
@@ -436,6 +437,13 @@ model FundType {
   collectionCategories CollectionCategory[]
 }
 
+model CollectionGroup {
+  id              String           @id @default(cuid())
+  name            String
+  collectionCategories CollectionCategory[]
+  
+}
+
 model CollectionCategory {
   id              String           @id @default(cuid())
   code            String
@@ -443,6 +451,8 @@ model CollectionCategory {
   fundTypeId      String
   fundType        FundType         @relation(fields: [fundTypeId], references: [id])
   collectionItems CollectionItem[]
+  collectionGroupId String?
+  collectionGroup   CollectionGroup?  @relation(fields: [collectionGroupId], references: [id])
 }
 
 model Collections {
@@ -454,6 +464,8 @@ model Collections {
   collectionItems CollectionItem[]
   userId          String
   user            User             @relation(fields: [userId], references: [id])
+  dailyCollectionId String?        @map("daily_collection_id")
+  dailyCollection   DailyConsolidatedCollection? @relation(fields: [dailyCollectionId], references: [id])
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 }
@@ -467,6 +479,25 @@ model CollectionItem {
   amount               Decimal            @db.Decimal(15, 2)
   createdAt            DateTime           @default(now()) @map("created_at")
   updatedAt            DateTime           @updatedAt @map("updated_at")
+}
+
+model DailyConsolidatedCollection {
+  id            String   @id @default(cuid())
+  controlNo     String   @unique @map("control_no")
+  collectionitemids String[] 
+  date          DateTime @default(now())
+  totalAmount   Decimal  @db.Decimal(15, 2)
+  totalDeposits Decimal  @db.Decimal(15, 2)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  collections Collections[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("daily_collections")
 }
 
 model ApiKeyModel {

@@ -1,5 +1,6 @@
 import { AppSidebar } from "@/components/app-sidebar"
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
+import { ChartBarCollections } from "@/components/chart-bar-collections"
 import { DataTable } from "@/components/data-table"
 import { SectionCards } from "@/components/section-cards"
 import { SiteHeader } from "@/components/site-header"
@@ -25,35 +26,44 @@ export default async function Home() {
     role: (session.user as any).role || "USER",
   };
 
-  const transferTaxes = await prisma.transferTax.findMany({
+  const dailyCollections = await prisma.dailyConsolidatedCollection.findMany({
     include: {
       user: {
         select: {
           name: true,
         }
       },
+      collections: {
+        include: {
+          collectionItems: {
+            include: {
+              collectionCategory: true
+            }
+          }
+        }
+      }
     },
     orderBy: {
-      createdAt: 'desc'
+      date: 'desc'
     }
   });
 
   // Calculate high-level stats for SectionCards
   const stats = {
-    totalRevenue: transferTaxes.reduce((sum, tx) => sum + Number(tx.totalamountdue || 0), 0),
-    totalTransactions: transferTaxes.length,
-    activeAssessors: new Set(transferTaxes.map(tx => tx.userId)).size,
+    totalRevenue: dailyCollections.reduce((sum, tx) => sum + Number(tx.totalAmount || 0), 0),
+    totalTransactions: dailyCollections.length,
+    activeAssessors: new Set(dailyCollections.map(tx => tx.userId)).size,
     growthRate: 12.5, // Mock growth for now
   };
 
   // Format data for DataTable
-  const tableData = transferTaxes.map((tx, index) => ({
+  const tableData = dailyCollections.map((tx, index) => ({
     id: index + 1,
-    header: tx.transferee,
-    type: tx.transactionType,
-    status: tx.paymentstatus === "PAID" ? "Done" : "In Process",
-    target: Number(tx.totalamountdue || 0).toLocaleString(),
-    limit: Number(tx.totalmarketvalue || 0).toLocaleString(),
+    header: tx.controlNo,
+    type: "Daily Collection",
+    status: "Consolidated",
+    target: Number(tx.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    limit: Number(tx.totalDeposits || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     reviewer: tx.user?.name || "Unknown",
   }));
 
@@ -73,8 +83,13 @@ export default async function Home() {
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               <SectionCards stats={stats} />
-              <div className="px-4 lg:px-6">
-                <ChartAreaInteractive records={JSON.parse(JSON.stringify(transferTaxes))} />
+              <div className="px-4 lg:px-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2">
+                  <ChartAreaInteractive records={JSON.parse(JSON.stringify(dailyCollections))} />
+                </div>
+                <div className="lg:col-span-1">
+                  <ChartBarCollections records={JSON.parse(JSON.stringify(dailyCollections))} />
+                </div>
               </div>
               <DataTable data={tableData} />
             </div>

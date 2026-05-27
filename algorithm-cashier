@@ -1,0 +1,37 @@
+algorithm for cashier daily consolidated report
+
+login user with role cashier
+
+user should select from collection categories 
+system generate form for collection entry based on categories selected
+
+user will input total amount per category
+user will input the date
+system will generate preview of all categories with total amount before saving
+user will confirm the total amount before saving
+
+system will list all saved inputed categories collections in a table with date and total amounts
+system can generate preview per day or date range (including multiple days) and with recaputulation per fund and 
+user with role cashier can select form the saved categories collections and will be saved to db as daily_collections
+system will generate pdf of the daily collections with control no and qrcode 
+
+system will generate a table of daily collections with control no and qrcode grouped by date range and with summary of recaputulation per fund grouped by date
+
+daily_collections table should include:
+    date
+    control_no
+    collection_category_id
+    amount
+    user_id
+
+daily_collections table should be: date, control_no, total_amount 
+    -generate_qr_code should be triggered automatically once saved to db
+    -pdf should be generated once saved to db
+
+
+    collection_categories_collections table should include:
+        date
+        control_no
+        collection_category_id
+        amount
+        user_id 

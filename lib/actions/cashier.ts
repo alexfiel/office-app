@@ -15,6 +15,18 @@ export async function getFundTypes() {
   }
 }
 
+export async function getCollectionGroups() {
+  try {
+    const groups = await prisma.collectionGroup.findMany({
+      orderBy: { name: "asc" },
+    });
+    return { success: true, data: groups };
+  } catch (error) {
+    console.error("Error fetching collection groups:", error);
+    return { success: false, error: "Failed to fetch collection groups." };
+  }
+}
+
 export async function createFundType(data: { name: string; code: string }) {
   try {
     const newFundType = await prisma.fundType.create({
@@ -31,11 +43,27 @@ export async function createFundType(data: { name: string; code: string }) {
   }
 }
 
+export async function createCollectionGroup(data: { name: string }) {
+  try {
+    const newGroup = await prisma.collectionGroup.create({
+      data: {
+        name: data.name,
+      },
+    });
+    revalidatePath("/cashier/settings");
+    return { success: true, data: newGroup };
+  } catch (error) {
+    console.error("Error creating collection group:", error);
+    return { success: false, error: "Failed to create collection group." };
+  }
+}
+
 export async function getCollectionCategories() {
   try {
     const categories = await prisma.collectionCategory.findMany({
       include: {
         fundType: true,
+        collectionGroup: true,
       },
       orderBy: { name: "asc" },
     });
@@ -50,6 +78,7 @@ export async function createCollectionCategory(data: {
   name: string;
   code: string;
   fundTypeId: string;
+  collectionGroupId?: string | null;
 }) {
   try {
     const newCategory = await prisma.collectionCategory.create({
@@ -57,6 +86,7 @@ export async function createCollectionCategory(data: {
         name: data.name,
         code: data.code,
         fundTypeId: data.fundTypeId,
+        collectionGroupId: data.collectionGroupId || null,
       },
     });
     revalidatePath("/cashier/settings");
@@ -113,9 +143,48 @@ export async function deleteFundType(id: string) {
   }
 }
 
+export async function editCollectionGroup(id: string, data: { name: string }) {
+  try {
+    const session = await auth();
+    if ((session?.user as any)?.role !== "ADMIN") return { success: false, error: "Unauthorized." };
+
+    const updated = await prisma.collectionGroup.update({
+      where: { id },
+      data: { name: data.name },
+    });
+    revalidatePath("/cashier/settings");
+    return { success: true, data: updated };
+  } catch (error) {
+    console.error("Error editing collection group:", error);
+    return { success: false, error: "Failed to edit collection group." };
+  }
+}
+
+export async function deleteCollectionGroup(id: string) {
+  try {
+    const session = await auth();
+    if ((session?.user as any)?.role !== "ADMIN") return { success: false, error: "Unauthorized." };
+
+    const linkedCategories = await prisma.collectionCategory.count({
+      where: { collectionGroupId: id },
+    });
+
+    if (linkedCategories > 0) {
+      return { success: false, error: "Cannot delete Collection Group because it is used by existing Collection Categories." };
+    }
+
+    await prisma.collectionGroup.delete({ where: { id } });
+    revalidatePath("/cashier/settings");
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting collection group:", error);
+    return { success: false, error: "Failed to delete collection group." };
+  }
+}
+
 export async function editCollectionCategory(
   id: string,
-  data: { name: string; code: string; fundTypeId: string }
+  data: { name: string; code: string; fundTypeId: string; collectionGroupId?: string | null }
 ) {
   try {
     const session = await auth();
@@ -127,6 +196,7 @@ export async function editCollectionCategory(
         name: data.name,
         code: data.code,
         fundTypeId: data.fundTypeId,
+        collectionGroupId: data.collectionGroupId || null,
       },
     });
     revalidatePath("/cashier/settings");

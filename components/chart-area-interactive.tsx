@@ -143,6 +143,11 @@ const chartConfig = {
 export function ChartAreaInteractive({ records }: { records: any[] }) {
   const isMobile = useIsMobile()
   const [timeRange, setTimeRange] = React.useState("90d")
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   React.useEffect(() => {
     if (isMobile) {
@@ -156,15 +161,15 @@ export function ChartAreaInteractive({ records }: { records: any[] }) {
     
     // Sort records by date
     const sortedRecords = [...records].sort((a, b) => 
-      new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()
+      new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
     sortedRecords.forEach(record => {
-      const dateStr = new Date(record.transactionDate).toISOString().split('T')[0];
+      const dateStr = new Date(record.date).toISOString().split('T')[0];
       if (!dailyData[dateStr]) {
         dailyData[dateStr] = { date: dateStr, amount: 0, count: 0 };
       }
-      dailyData[dateStr].amount += Number(record.totalamountdue || 0);
+      dailyData[dateStr].amount += Number(record.totalAmount || 0);
       dailyData[dateStr].count += 1;
     });
 
@@ -201,7 +206,7 @@ export function ChartAreaInteractive({ records }: { records: any[] }) {
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Transfer Tax Revenue Trend</CardTitle>
+        <CardTitle>Daily Collections Revenue Trend</CardTitle>
         <CardDescription>
           <span className="hidden @[540px]/card:block">
             Total revenue collected over time

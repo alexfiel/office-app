@@ -160,21 +160,39 @@ export function CollectionEntryForm({ onSuccess }: { onSuccess?: () => void }) {
 
             <div className="space-y-3">
               <Label>Collection Categories</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border p-4 rounded-md max-h-80 overflow-y-auto bg-muted/20">
-                {categories.map((cat) => (
-                  <div key={cat.id} className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={`cat-${cat.id}`} 
-                      checked={selectedCategoryIds.includes(cat.id)}
-                      onCheckedChange={(checked) => handleCategoryToggle(cat.id, checked as boolean)}
-                    />
-                    <Label htmlFor={`cat-${cat.id}`} className="font-normal cursor-pointer">
-                      {cat.name} ({cat.code})
-                    </Label>
-                  </div>
-                ))}
-                {categories.length === 0 && (
-                  <p className="text-sm text-muted-foreground col-span-full">No categories available. Please add them in Settings.</p>
+              <div className="border p-4 rounded-md max-h-96 overflow-y-auto bg-muted/20 space-y-6">
+                {categories.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No categories available. Please add them in Settings.</p>
+                ) : (
+                  Object.entries(
+                    categories.reduce((acc, cat) => {
+                      const groupName = cat.collectionGroup?.name || "Ungrouped";
+                      if (!acc[groupName]) acc[groupName] = [];
+                      acc[groupName].push(cat);
+                      return acc;
+                    }, {} as Record<string, any[]>)
+                  )
+                  // Sort so "Ungrouped" is at the end or top
+                  .sort(([a], [b]) => a === "Ungrouped" ? 1 : b === "Ungrouped" ? -1 : a.localeCompare(b))
+                  .map(([groupName, groupCats]) => (
+                    <div key={groupName} className="space-y-3">
+                      <h4 className="font-semibold text-sm border-b pb-1 text-primary">{groupName}</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {groupCats.map((cat: any) => (
+                          <div key={cat.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`cat-${cat.id}`} 
+                              checked={selectedCategoryIds.includes(cat.id)}
+                              onCheckedChange={(checked) => handleCategoryToggle(cat.id, checked as boolean)}
+                            />
+                            <Label htmlFor={`cat-${cat.id}`} className="font-normal cursor-pointer text-sm">
+                              {cat.name} <span className="text-muted-foreground">({cat.code})</span>
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
