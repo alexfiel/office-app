@@ -10,7 +10,8 @@ import {
     User, 
     Banknote,
     ChevronRight,
-    Loader2
+    Loader2,
+    ChevronDown
 } from 'lucide-react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,14 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { generateRODPDF } from "./fvSettlementReport/reportExternalDisbursement";
+import { reportExternalSummaryByBarangay } from "./fvSettlementReport/reportExternalSummaryByBarangay";
+import { reportExternalFVReportOfDisbursement } from "./fvSettlementReport/reportExternalFV-ReportOfDisbursement";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function ReportOfDisbursementHistory() {
     const [reports, setReports] = useState<any[]>([]);
@@ -150,15 +158,28 @@ export default function ReportOfDisbursementHistory() {
 
                                 {/* Right: Actions */}
                                 <div className="flex items-center gap-2 shrink-0 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm"
-                                        className="h-9 px-3 text-indigo-600 hover:bg-indigo-50"
-                                        onClick={() => generateRODPDF(report)}
-                                    >
-                                        <ExternalLink className="w-4 h-4 mr-2" />
-                                        View PDF
-                                    </Button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm"
+                                                className="h-9 px-3 text-indigo-600 hover:bg-indigo-50"
+                                            >
+                                                <ExternalLink className="w-4 h-4 mr-2" />
+                                                View PDF <ChevronDown className="w-3 h-3 ml-1" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-56">
+                                            <DropdownMenuItem onClick={() => reportExternalFVReportOfDisbursement(report)} className="cursor-pointer">
+                                                <FileText className="w-4 h-4 mr-2 text-indigo-500" />
+                                                Report of Disbursement
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => reportExternalSummaryByBarangay(report)} className="cursor-pointer">
+                                                <FileText className="w-4 h-4 mr-2 text-emerald-500" />
+                                                Summary by Barangay
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                     <Button 
                                         variant="ghost" 
                                         size="sm"

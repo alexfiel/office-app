@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select"
 import { createReportOfDisbursement } from "@/lib/actions/external-fv-report";
 import { getBarangayFromVoucherCode } from "@/lib/utils/barangayParser";
-import { generateRODPDF } from "./fvSettlementReport/reportExternalDisbursement";
+import { reportExternalSummaryByBarangay } from "./fvSettlementReport/reportExternalSummaryByBarangay";
 import { FileText, Save, CheckSquare, Square, Banknote } from "lucide-react";
 
 type Liquidation = any;
@@ -135,7 +135,7 @@ export default function ReportOfDisbursementWorkspace({
             toast.success(`Successfully generated report ${createdReport.reportNumber}!`);
             
             // Trigger PDF Download
-            generateRODPDF(createdReport);
+            reportExternalSummaryByBarangay(createdReport);
 
             setSelectedLiqIds([]);
         } catch (error: any) {

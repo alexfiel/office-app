@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export const generateRODPDF = (report: any) => {
+export const reportExternalSummaryByBarangay = (report: any) => {
     if (!report) return;
 
     const pdf = new jsPDF({
@@ -31,29 +31,21 @@ export const generateRODPDF = (report: any) => {
     currentY += 12;
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(14);
-    pdf.text("REPORT OF DISBURSEMENT", centerX, currentY, { align: "center" });
+    pdf.text("SUMMARY OF REDEEMED VOUCHERS PER BARANGAY", centerX, currentY, { align: "center" });
 
     pdf.setLineWidth(0.5);
-    pdf.line(centerX - 40, currentY + 1, centerX + 40, currentY + 1);
+    pdf.line(centerX - 68, currentY + 1, centerX + 68, currentY + 1);
 
     currentY += 15;
     pdf.setFontSize(10);
-    
+
     // Accountable Officer / Payee beside Control Number
-    pdf.setFont("helvetica", "italic");
-    pdf.text("Accountable Officer:", 15, currentY);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(report.cashAdvanceVoucher?.payee || "N/A", 50, currentY);
 
     pdf.setFont("helvetica", "italic");
     pdf.text("Control No:", 145, currentY);
     pdf.setFont("helvetica", "bold");
     pdf.text(report.reportNumber, 168, currentY);
 
-    currentY += 6;
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8);
-    pdf.text("Designation:", 15, currentY);
 
     currentY += 10;
 
@@ -61,12 +53,12 @@ export const generateRODPDF = (report: any) => {
 
     // Table Headers
     const tableHeaders = [["Liquidation No.", "Date", "Barangay", "No. of Vouchers", "Amount"]];
-    
+
     // Table Rows - Sorted by Liquidation No and Date
     const sortedDetails = [...(report.details || [])].sort((a: any, b: any) => {
         const liqCompare = (a.liquidationNo || "").localeCompare(b.liquidationNo || "");
         if (liqCompare !== 0) return liqCompare;
-        
+
         const dateA = a.liquidationDate ? new Date(a.liquidationDate).getTime() : 0;
         const dateB = b.liquidationDate ? new Date(b.liquidationDate).getTime() : 0;
         return dateA - dateB;
@@ -136,38 +128,6 @@ export const generateRODPDF = (report: any) => {
         }
     });
 
-    const summaryY = (pdf as any).lastAutoTable.finalY + 8;
-
-    autoTable(pdf, {
-        body: [
-            [
-                { content: 'Amount of Cash Advance:', styles: { halign: 'left', fontStyle: 'normal' } },
-                { content: `P${(report.cashAdvanceVoucher?.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, styles: { halign: 'right', fontStyle: 'bold' } }
-            ],
-            [
-                { content: 'Total Amount Disbursed:', styles: { halign: 'left', fontStyle: 'normal' } },
-                { content: `P${report.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, styles: { halign: 'right', fontStyle: 'bold' } }
-            ],
-            [
-                { content: 'Return of Cash Advance per O.R. No. __________ dated: __________', styles: { halign: 'left', fontStyle: 'normal' } },
-                { content: '____________________', styles: { halign: 'right' } }
-            ],
-            [
-                { content: 'Remaining Cash Advance:', styles: { halign: 'right', fontStyle: 'bold' } },
-                {
-                    content: `P${((report.cashAdvanceVoucher?.amount || 0) - report.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-                    styles: { halign: 'right', fontStyle: 'bold' }
-                }
-            ]
-        ],
-        startY: summaryY,
-        theme: 'grid',
-        styles: { fontSize: 10 },
-        columnStyles: {
-            0: { cellWidth: 150 },
-            1: { cellWidth: 35, halign: 'right' }
-        }
-    });
 
     const finalY = (pdf as any).lastAutoTable.finalY + 15;
 

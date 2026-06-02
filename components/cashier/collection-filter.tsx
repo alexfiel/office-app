@@ -99,7 +99,49 @@ export function CollectionFilter() {
       )}
 
       {filterType === "month" && (
-        <Input type="month" value={month} onChange={e => setMonth(e.target.value)} className="w-auto h-9 bg-white" required />
+        <div className="flex items-center gap-2">
+          <Select 
+            value={month ? month.split('-')[1] : ""} 
+            onValueChange={(m) => {
+              const currentYear = (month ? month.split('-')[0] : year) || new Date().getFullYear().toString();
+              setMonth(`${currentYear}-${m}`);
+            }}
+          >
+            <SelectTrigger className="w-[140px] h-9 bg-white">
+              <SelectValue placeholder="Select Month" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="01">January</SelectItem>
+              <SelectItem value="02">February</SelectItem>
+              <SelectItem value="03">March</SelectItem>
+              <SelectItem value="04">April</SelectItem>
+              <SelectItem value="05">May</SelectItem>
+              <SelectItem value="06">June</SelectItem>
+              <SelectItem value="07">July</SelectItem>
+              <SelectItem value="08">August</SelectItem>
+              <SelectItem value="09">September</SelectItem>
+              <SelectItem value="10">October</SelectItem>
+              <SelectItem value="11">November</SelectItem>
+              <SelectItem value="12">December</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input 
+            type="number" 
+            min="2000" 
+            max="2100" 
+            value={month ? month.split('-')[0] : year} 
+            onChange={e => {
+              const y = e.target.value;
+              setYear(y);
+              const m = month ? month.split('-')[1] : "";
+              if (m) {
+                setMonth(`${y}-${m}`);
+              }
+            }} 
+            className="w-24 h-9 bg-white" 
+            required 
+          />
+        </div>
       )}
 
       {filterType === "quarter" && (
