@@ -2,8 +2,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 
-export async function getFundTypes() {
+export const getFundTypes = cache(async function() {
   try {
     const fundTypes = await prisma.fundType.findMany({
       orderBy: { name: "asc" },
@@ -13,9 +14,9 @@ export async function getFundTypes() {
     console.error("Error fetching fund types:", error);
     return { success: false, error: "Failed to fetch fund types." };
   }
-}
+});
 
-export async function getCollectionGroups() {
+export const getCollectionGroups = cache(async function() {
   try {
     const groups = await prisma.collectionGroup.findMany({
       orderBy: { name: "asc" },
@@ -25,7 +26,7 @@ export async function getCollectionGroups() {
     console.error("Error fetching collection groups:", error);
     return { success: false, error: "Failed to fetch collection groups." };
   }
-}
+});
 
 export async function createFundType(data: { name: string; code: string }) {
   try {
@@ -58,7 +59,7 @@ export async function createCollectionGroup(data: { name: string }) {
   }
 }
 
-export async function getCollectionCategories() {
+export const getCollectionCategories = cache(async function() {
   try {
     const categories = await prisma.collectionCategory.findMany({
       include: {
@@ -72,7 +73,7 @@ export async function getCollectionCategories() {
     console.error("Error fetching collection categories:", error);
     return { success: false, error: "Failed to fetch collection categories." };
   }
-}
+});
 
 export async function createCollectionCategory(data: {
   name: string;

@@ -113,7 +113,7 @@ model TransferTaxDetails {
   area           Float
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-  transferTaxId  String
+  transferTaxId  String5
   realPropertyId String
   userId         String
   realProperty   RealProperty @relation(fields: [realPropertyId], references: [id])

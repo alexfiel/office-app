@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { Prisma } from "@prisma/client";
+import { cache } from "react";
 
 export async function createDailyCollection(collectionIds: string[]) {
   try {
@@ -125,7 +126,7 @@ export interface DailyCollectionFilters {
   quarter?: string;
 }
 
-export async function getDailyCollections(filters?: DailyCollectionFilters) {
+export const getDailyCollections = cache(async function(filters?: DailyCollectionFilters) {
   try {
     let whereClause = {};
     let takeClause: number | undefined = 50;
@@ -236,7 +237,7 @@ export async function getDailyCollections(filters?: DailyCollectionFilters) {
     console.error("Error fetching daily collections:", error);
     return { success: false, error: "Failed to load daily collections." };
   }
-}
+});
 
 function serializeDailyCollection(col: any) {
   return {

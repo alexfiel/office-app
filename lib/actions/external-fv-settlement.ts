@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { cache } from "react"
 
 export type ExternalTransactionData = {
     voucherCode: string
@@ -71,7 +72,7 @@ export async function uploadExternalSettlements(
     }
 }
 
-export async function getExternalSettlements() {
+export const getExternalSettlements = cache(async function() {
     return await prisma.externalFVSettlement.findMany({
         where: {
             status: "forLiquidation"
@@ -83,7 +84,7 @@ export async function getExternalSettlements() {
             datePaid: 'desc'
         }
     });
-}
+});
 
 export async function createExternalFVLiquidation(
     userId: string,
@@ -147,7 +148,7 @@ export async function createExternalFVLiquidation(
     }
 }
 
-export async function getExternalLiquidations(startDate?: Date, endDate?: Date) {
+export const getExternalLiquidations = cache(async function(startDate?: Date, endDate?: Date) {
     const where: any = {};
     
     if (startDate || endDate) {
@@ -196,7 +197,7 @@ export async function getExternalLiquidations(startDate?: Date, endDate?: Date) 
             }))
         }))
     }));
-}
+});
 
 export async function voidExternalFVSettlement(id: string) {
     try {

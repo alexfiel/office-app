@@ -2,11 +2,12 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 
 /**
  * Fetches all Liquidations that have NOT yet been assigned to a Report of Disbursement
  */
-export async function getUnreportedLiquidations() {
+export const getUnreportedLiquidations = cache(async function() {
     try {
         const liquidations = await prisma.externalFVLiquidation.findMany({
             where: {
@@ -41,12 +42,12 @@ export async function getUnreportedLiquidations() {
         console.error("Failed to fetch unreported liquidations:", error);
         throw new Error("Failed to fetch liquidations");
     }
-}
+});
 
 /**
  * Fetches active Cash Advance Vouchers
  */
-export async function getActiveCashAdvances() {
+export const getActiveCashAdvances = cache(async function() {
     try {
         const cas = await prisma.cashAdvanceVoucher.findMany({
             where: {
@@ -66,7 +67,7 @@ export async function getActiveCashAdvances() {
         console.error("Failed to fetch cash advances:", error);
         throw new Error("Failed to fetch cash advances");
     }
-}
+});
 
 /**
  * Creates a SINGLE Report of Disbursement with multiple Granular Barangay details
@@ -190,7 +191,7 @@ export async function createReportOfDisbursement(data: {
 /**
  * Fetches all created Reports of Disbursement
  */
-export async function getDisbursementReports() {
+export const getDisbursementReports = cache(async function() {
     try {
         const reports = await prisma.externalReportofDisbursement.findMany({
             include: {
@@ -225,7 +226,7 @@ export async function getDisbursementReports() {
         console.error("Failed to fetch disbursement reports:", error);
         throw new Error("Failed to fetch reports");
     }
-}
+});
 
 /**
  * Deletes a Report of Disbursement and restores the Cash Advance balance

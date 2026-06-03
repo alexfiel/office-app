@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import { cache } from "react";
 
 export async function createCollection(data: {
   date: Date;
@@ -117,7 +118,7 @@ export interface CollectionFilters {
   unconsolidatedOnly?: boolean;
 }
 
-export async function getRecentCollections(filters?: CollectionFilters) {
+export const getRecentCollections = cache(async function(filters?: CollectionFilters) {
   try {
     let whereClause: any = {};
     let takeClause: number | undefined = 50;
@@ -234,7 +235,7 @@ export async function getRecentCollections(filters?: CollectionFilters) {
     console.error("Error fetching collections:", error);
     return { success: false, error: "Failed to load recent collections." };
   }
-}
+});
 
 export async function deleteCollection(id: string) {
   try {
