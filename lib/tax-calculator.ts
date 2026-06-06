@@ -1,11 +1,14 @@
 import { calculateTaxPenalties, PenaltyResult } from "./tax-utils";
 
-export type TransactionType = 
-    | "DEED OF SALE" 
-    | "CERTIFICATE OF SALE" 
-    | "DEED OF DONATION" 
-    | "DEED OF EXTRAJUDICIAL SETTLEMENT" 
-    | "DEED OF PARTITION" 
+export type TransactionType =
+    | "DEED OF SALE"
+    | "CERTIFICATE OF SALE"
+    | "DEED OF DONATION"
+    | "DEED OF EXTRAJUDICIAL SETTLEMENT"
+    | "DEED OF PARTITION"
+    | "DEED OF ASSIGNMENT OF RIGHTS"
+    | "DEED OF WAIVER OF RIGHTS"
+    | "DEED OF ADJUDICATION"
     | string;
 
 export interface ComputationResult extends PenaltyResult {
