@@ -138,15 +138,15 @@ export function TransferTaxTransaction() {
         }
 
         const transactionData = {
-            transferee,
-            transferor,
+            transferee: transferee.toUpperCase(),
+            transferor: transferor.toUpperCase(),
             transactionType,
             considerationValue: parseFloat(considerationValue) || 0,
             propertyEjsData: isEjsType ? propertyEjsData : undefined
         };
 
         // Save data in cookies
-        document.cookie = `transferTaxTransaction=${encodeURIComponent(JSON.stringify(transactionData))}; path=/; max-age=86400`;
+        document.cookie = `transferTaxTransaction=${encodeURIComponent(JSON.stringify(transactionData))}; path=/`;
 
         console.log("Transaction details saved:", transactionData);
         // Navigate to Step 4 (Computation / Review)

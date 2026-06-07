@@ -81,7 +81,7 @@ export function SearchProperty() {
     }, []);
 
     const saveCartToCookies = (newCart: RealPropertyInfo[]) => {
-        document.cookie = `rpt-cart=${encodeURIComponent(JSON.stringify(newCart))}; path=/; max-age=86400`;
+        document.cookie = `rpt-cart=${encodeURIComponent(JSON.stringify(newCart))}; path=/`;
     };
 
     const addToCart = (property: RealPropertyInfo) => {

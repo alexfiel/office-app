@@ -159,7 +159,7 @@ export function NotarialDocument() {
                 };
 
                 // Save data in cookies
-                document.cookie = `transferTaxDocument=${encodeURIComponent(JSON.stringify(documentData))}; path=/; max-age=86400`; // 1 day expiry
+                document.cookie = `transferTaxDocument=${encodeURIComponent(JSON.stringify(documentData))}; path=/`; // session cookie
                 
                 console.log("Document uploaded and data saved to cookies:", documentData);
                 router.push("/newTransferTax/search-property");

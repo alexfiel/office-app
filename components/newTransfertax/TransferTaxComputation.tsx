@@ -144,7 +144,7 @@ export function TransferTaxComputation() {
             // If NotarialDocument was created newly, update its ID in the cookie so next tx can link to it
             if (result.notarialDocumentId && !documentData.id) {
                 const updatedDocData = { ...documentData, id: result.notarialDocumentId };
-                document.cookie = `transferTaxDocument=${encodeURIComponent(JSON.stringify(updatedDocData))}; path=/; max-age=86400`;
+                document.cookie = `transferTaxDocument=${encodeURIComponent(JSON.stringify(updatedDocData))}; path=/`;
                 setDocumentData(updatedDocData);
             }
 
