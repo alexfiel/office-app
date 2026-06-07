@@ -109,6 +109,11 @@ const data = {
       url: "/transfertax",
       icon: IconCalculatorFilled,
     },
+    {
+      title: "Transfer Tax Computation",
+      url: "/newTransferTax",
+      icon: IconCalculatorFilled,
+    },
   ],
 
   cashier: [
