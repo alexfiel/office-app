@@ -35,6 +35,7 @@ export async function GET(req: Request) {
                 { taxdecnumber: { contains: query, mode: "insensitive" } },
                 { pin: { contains: query, mode: "insensitive" } },
                 { owner: { contains: query, mode: "insensitive" } },
+                { tctOct: { contains: query, mode: "insensitive" } },
             ];
         } else if (tdNo || pin) {
             // SPECIFIC FIELD SEARCH (LEGACY SUPPORT)
