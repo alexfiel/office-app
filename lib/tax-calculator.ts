@@ -64,11 +64,12 @@ export class TransferTaxCalculator {
         totalMarketValue: number,
         consideration: number,
         notarialDate: string,
-        share: number = 1
+        share: number = 1,
+        referenceDate?: Date
     ): ComputationResult {
         const taxBase = this.computeBase(transactionType, totalMarketValue, consideration, share);
         const basicTaxDue = this.computeBasicTaxDue(taxBase);
-        const penalties = calculateTaxPenalties(basicTaxDue, notarialDate);
+        const penalties = calculateTaxPenalties(basicTaxDue, notarialDate, referenceDate);
 
         return {
             totalMarketValue: Number(totalMarketValue) || 0,

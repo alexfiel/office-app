@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { TransferTaxCalculator } from "@/lib/tax-calculator";
 
 const parseOwners = (ownerStr: string) => {
     if (!ownerStr) return [];
@@ -55,27 +56,53 @@ export async function saveTransferTaxTransaction(data: any) {
             notarialId = newDoc.id;
         }
 
-        // Generate a random control number
-        const controlNumber = `TT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-        // 2. Create NewTransferTax
-        const newTransferTax = await prisma.newTransferTax.create({
-            data: {
-                t_controlNumber: controlNumber,
-                t_TotalAmountDue: computationData.totalAmountDue,
-                t_TotalSurcharge: computationData.surcharge,
-                t_TotalInterest: computationData.interest,
+        // 2. Check if a pending NewTransferTax already exists for this NotarialDocument
+        let newTransferTax = await prisma.newTransferTax.findFirst({
+            where: {
                 t_NotarialId: notarialId,
-                t_DateCompute: new Date(),
-                t_validity: new Date(new Date().setDate(new Date().getDate() + 30)), // 30 days validity?
-                t_daysElapsed: computationData.daysElapsed,
-                t_status: "pending",
-                t_paymentStatus: "unpaid",
-                t_paymentReference: `PR-${Date.now()}`, // Or leave empty if not required, but it's marked unique and not nullable? Let's check schema.
-                t_remarks: "Processed via portal",
-                t_userId: userId,
+                t_status: "pending"
             }
         });
+
+        if (newTransferTax) {
+            // Append to existing
+            newTransferTax = await prisma.newTransferTax.update({
+                where: { id: newTransferTax.id },
+                data: {
+                    t_TotalMarketValue: { increment: computationData.totalMarketValue || 0 },
+                    t_TotalConsiderationValue: { increment: computationData.considerationValue || 0 },
+                    t_TaxBase: { increment: computationData.taxBase || 0 },
+                    t_TotalAmountDue: { increment: computationData.totalAmountDue },
+                    t_TotalSurcharge: { increment: computationData.surcharge },
+                    t_TotalInterest: { increment: computationData.interest },
+                }
+            });
+        } else {
+            // Generate a random control number
+            const controlNumber = `TT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+            // Create new NewTransferTax
+            newTransferTax = await prisma.newTransferTax.create({
+                data: {
+                    t_controlNumber: controlNumber,
+                    t_TotalMarketValue: computationData.totalMarketValue || 0,
+                    t_TotalConsiderationValue: computationData.considerationValue || 0,
+                    t_TaxBase: computationData.taxBase || 0,
+                    t_TotalAmountDue: computationData.totalAmountDue,
+                    t_TotalSurcharge: computationData.surcharge,
+                    t_TotalInterest: computationData.interest,
+                    t_NotarialId: notarialId,
+                    t_DateCompute: new Date(),
+                    t_validity: computationData.validityDate === "MAXIMUM INTEREST REACHED" ? new Date("2099-12-31") : new Date(computationData.validityDate || new Date().setDate(new Date().getDate() + 30)),
+                    t_daysElapsed: computationData.daysElapsed,
+                    t_status: "pending",
+                    t_paymentStatus: "unpaid",
+                    t_paymentReference: `PR-${Date.now()}`, 
+                    t_remarks: "Processed via portal",
+                    t_userId: userId,
+                }
+            });
+        }
 
         // 3. Create Details and update real property
         for (const property of cart) {
@@ -84,8 +111,8 @@ export async function saveTransferTaxTransaction(data: any) {
             
             let displayValue = Number(property.marketValue);
             if (isEjsType && pData) {
-                const totalOwners = pData.parsedOwners.length;
-                const selectedCount = pData.selectedOwners.length;
+                const totalOwners = pData.parsedOwners?.length || 0;
+                const selectedCount = pData.selectedOwners?.length || 0;
                 if (totalOwners > 0 && selectedCount > 0) {
                     displayValue = (displayValue / totalOwners) * selectedCount;
                 } else if (totalOwners > 0) {
@@ -94,22 +121,25 @@ export async function saveTransferTaxTransaction(data: any) {
             }
 
             const considerationValue = transactionData.transactionType === "Sale" ? Number(transactionData.considerationValue) : 0;
-            const taxBase = Math.max(displayValue, considerationValue);
             
-            // Apportion tax due simply (this could be proportionate if needed, but here we just store the totals or proportional)
-            // Wait, does the schema expect proportional tax per property?
-            // "nt_transfertaxDue Decimal"
-            // For simplicity, if it's 1 property, it's just the tax. If multiple, we should apportion.
-            const apportionedDue = taxBase * 0.005; 
-            const apportionedSurcharge = computationData.daysElapsed > 60 ? apportionedDue * 0.25 : 0;
+            let mappedType = transactionData.transactionType.toUpperCase();
+            if (mappedType === "SALE") mappedType = "DEED OF SALE";
+            else if (mappedType === "EXTRAJUDICIAL SETTLEMENT") mappedType = "DEED OF EXTRAJUDICIAL SETTLEMENT";
+            else if (mappedType === "DONATION") mappedType = "DEED OF DONATION";
+            else if (mappedType === "WAIVER OF RIGHTS") mappedType = "DEED OF WAIVER OF RIGHTS";
+
+            const computed = TransferTaxCalculator.computeTotal(
+                mappedType,
+                displayValue,
+                considerationValue,
+                documentData.notarialDate,
+                1 // share already applied to displayValue
+            );
             
-            let apportionedInterest = 0;
-            if (computationData.daysElapsed > 60) {
-                const daysDelayed = computationData.daysElapsed - 60;
-                const monthsDelayed = Math.ceil(daysDelayed / 30);
-                const cappedMonths = Math.min(monthsDelayed, 36);
-                apportionedInterest = apportionedDue * 0.02 * cappedMonths;
-            }
+            const taxBase = computed.taxBase;
+            const apportionedDue = computed.basicTaxDue; 
+            const apportionedSurcharge = computed.surcharge;
+            const apportionedInterest = computed.interest;
 
             const transfereeCaps = transactionData.transferee ? transactionData.transferee.toUpperCase() : "";
             const transferorCaps = transactionData.transferor ? transactionData.transferor.toUpperCase() : "";
@@ -319,5 +349,84 @@ export async function deleteTransferTax(id: string) {
     } catch (error) {
         console.error("Error deleting transaction:", error);
         return { error: "Failed to delete transaction." };
+    }
+}
+
+export async function recomputeTransferTax(id: string) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized. Please log in." };
+        }
+
+        const tax = await prisma.newTransferTax.findUnique({
+            where: { id },
+            include: {
+                notarialDocument: true,
+                t_transfertaxdetails: true
+            }
+        });
+
+        if (!tax || !tax.notarialDocument) {
+            return { error: "Transaction or Notarial Document not found." };
+        }
+
+        const today = new Date();
+        let totalSurcharge = 0;
+        let totalInterest = 0;
+        let totalAmountDue = 0;
+        let overallDaysElapsed = 0;
+        let overallValidityDate = "";
+
+        // Recompute details
+        for (const detail of tax.t_transfertaxdetails) {
+            let mappedType = detail.nt_transactiontype.toUpperCase();
+            if (mappedType === "SALE") mappedType = "DEED OF SALE";
+            else if (mappedType === "EXTRAJUDICIAL SETTLEMENT") mappedType = "DEED OF EXTRAJUDICIAL SETTLEMENT";
+            else if (mappedType === "DONATION") mappedType = "DEED OF DONATION";
+            else if (mappedType === "WAIVER OF RIGHTS") mappedType = "DEED OF WAIVER OF RIGHTS";
+
+            const computed = TransferTaxCalculator.computeTotal(
+                mappedType,
+                Number(detail.nt_marketvalue),
+                Number(detail.nt_considerationvalue),
+                tax.notarialDocument.notarialDate.toISOString(),
+                1,
+                today
+            );
+
+            await prisma.newTransferTaxDetails.update({
+                where: { id: detail.id },
+                data: {
+                    nt_surcharge: computed.surcharge,
+                    nt_interest: computed.interest,
+                    nt_totalTransferTaxDue: computed.basicTaxDue + computed.surcharge + computed.interest
+                }
+            });
+
+            totalSurcharge += computed.surcharge;
+            totalInterest += computed.interest;
+            totalAmountDue += (computed.basicTaxDue + computed.surcharge + computed.interest);
+            overallDaysElapsed = computed.daysElapsed;
+            overallValidityDate = computed.validityDate;
+        }
+
+        // Update Master
+        await prisma.newTransferTax.update({
+            where: { id },
+            data: {
+                t_DateCompute: today,
+                t_TotalSurcharge: totalSurcharge,
+                t_TotalInterest: totalInterest,
+                t_TotalAmountDue: totalAmountDue,
+                t_daysElapsed: overallDaysElapsed,
+                t_validity: overallValidityDate === "MAXIMUM INTEREST REACHED" ? new Date("2099-12-31") : new Date(overallValidityDate || new Date().setDate(new Date().getDate() + 30))
+            }
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error("Error recomputing transaction:", error);
+        return { error: "Failed to recompute transaction." };
     }
 }

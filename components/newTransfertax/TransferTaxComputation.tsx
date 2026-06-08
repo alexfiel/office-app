@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, Calculator, ArrowLeft, ArrowRight, Save, CalendarDays, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { saveTransferTaxTransaction } from "@/lib/actions/transfertax-actions";
+import { calculateTaxPenalties } from "@/lib/tax-utils";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -96,28 +97,8 @@ export function TransferTaxComputation() {
     const taxBase = Math.max(totalMarketValue, considerationValue);
     const taxDue = taxBase * LOCAL_TAX_RATE;
 
-    // Date computation
-    const notarialDate = new Date(documentData.notarialDate);
-    const today = new Date();
-    notarialDate.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
-    
-    // Number of days elapsed
-    const diffTime = today.getTime() - notarialDate.getTime();
-    const daysElapsed = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24))); // Avoid negative if future date
-
-    let surcharge = 0;
-    let interest = 0;
-    
-    if (daysElapsed > GRACE_PERIOD_DAYS) {
-        surcharge = taxDue * SURCHARGE_RATE;
-        const daysDelayed = daysElapsed - GRACE_PERIOD_DAYS;
-        const monthsDelayed = Math.ceil(daysDelayed / 30);
-        const cappedMonths = Math.min(monthsDelayed, MAX_INTEREST_MONTHS);
-        interest = taxDue * INTEREST_RATE_PER_MONTH * cappedMonths;
-    }
-
-    const totalAmountDue = taxDue + surcharge + interest;
+    const penaltyResult = calculateTaxPenalties(taxDue, documentData.notarialDate);
+    const { daysElapsed, surcharge, interest, totalAmountDue, validityDate: validityDateStr } = penaltyResult;
 
     const handleSaveTransaction = async () => {
         setIsSubmitting(true);
@@ -130,7 +111,11 @@ export function TransferTaxComputation() {
                     totalAmountDue,
                     surcharge,
                     interest,
-                    daysElapsed
+                    daysElapsed,
+                    validityDate: validityDateStr,
+                    totalMarketValue,
+                    considerationValue,
+                    taxBase
                 }
             });
 

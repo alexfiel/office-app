@@ -129,9 +129,12 @@ model TransferTaxDetails {
 model NewTransferTax {
   id String @id @default(cuid())
   t_controlNumber String @unique
-  t_TotalAmountDue Decimal @default(0.00)
+  t_TotalMarketValue Decimal @default(0.00)
+  t_TotalConsiderationValue Decimal @default(0.00)
+  t_TaxBase Decimal @default(0.00)
   t_TotalSurcharge Decimal @default(0.00)
   t_TotalInterest Decimal @default(0.00)
+  t_TotalAmountDue Decimal @default(0.00)
   t_NotarialId String 
   t_DateCompute DateTime
   t_validity DateTime
@@ -161,13 +164,12 @@ model NewTransferTaxDetails {
   nt_lotnumber String 
   nt_area Float 
   nt_marketvalue Decimal 
-  nt_considerationvalue Decimal 
-  nt_taxbase Decimal 
-  nt_transfertaxDue Decimal
-  nt_surcharge Decimal
-  nt_interest Decimal
-  nt_totalTransferTaxDue Decimal 
-
+  nt_considerationvalue Decimal @default(0.00)
+  nt_taxbase Decimal @default(0.00)
+  nt_transfertaxDue Decimal @default(0.00)
+  nt_surcharge Decimal @default(0.00)
+  nt_interest Decimal @default(0.00)
+  nt_totalTransferTaxDue Decimal @default(0.00)
   //relations
   nt_transfertaxid String 
   nt_userid String 
@@ -177,6 +179,7 @@ model NewTransferTaxDetails {
   user User @relation(fields: [nt_userid], references: [id])
   realProperty RealProperty @relation(fields: [nt_realpropertyid], references: [id]) 
 }
+
 
 model capturedPayment {
   id String @id @default(cuid())

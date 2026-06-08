@@ -124,10 +124,10 @@ export default function NotarialDocumentSummary() {
                                             {tx.t_controlNumber}
                                         </td>
                                         <td className="px-6 py-4 font-medium text-gray-900">
-                                            {tx.t_transfertaxdetails[0]?.nt_transferror || "N/A"}
+                                            {Array.from(new Set(tx.t_transfertaxdetails.map((d: any) => d.nt_transferror))).join(" / ") || "N/A"}
                                         </td>
                                         <td className="px-6 py-4 font-medium text-gray-900">
-                                            {tx.t_transfertaxdetails[0]?.nt_transferee || "N/A"}
+                                            {Array.from(new Set(tx.t_transfertaxdetails.map((d: any) => d.nt_transferee))).join(" / ") || "N/A"}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col gap-1.5">
