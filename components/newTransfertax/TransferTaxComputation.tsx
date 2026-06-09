@@ -79,14 +79,58 @@ export function TransferTaxComputation() {
     const totalMarketValue = cart.reduce((acc, property) => {
         const pData = transactionData.propertyEjsData?.[property.id];
         const isEjsType = ["Extrajudicial Settlement", "Donation", "Waiver of Rights"].includes(transactionData.transactionType);
+        const isPartitionType = transactionData.transactionType === "Partition";
+        const isAdjudicationType = transactionData.transactionType === "Adjudication";
         
         let displayValue = Number(property.marketValue);
+        let finalArea = Number(property.area) || 0;
+
         if (isEjsType && pData) {
             const totalOwners = pData.parsedOwners.length;
             const selectedCount = pData.selectedOwners.length;
             if (totalOwners > 0 && selectedCount > 0) {
                 displayValue = (displayValue / totalOwners) * selectedCount;
             } else if (totalOwners > 0) {
+                displayValue = 0;
+            }
+        } else if (isPartitionType && pData) {
+            const suppliedArea = pData.suppliedArea || 0;
+            if (suppliedArea > 0 && finalArea > 0) {
+                displayValue = (displayValue / finalArea) * suppliedArea;
+            } else {
+                displayValue = 0;
+            }
+        } else if (isAdjudicationType && pData) {
+            if (pData.adjudicationType === "Whole") {
+                // keep 100%
+            } else if (pData.adjudicationType === "Portion") {
+                if (pData.portionType === "Percent") {
+                    const pct = pData.percentShare || 0;
+                    displayValue = displayValue * (pct / 100);
+                } else if (pData.portionType === "Area") {
+                    const suppliedArea = pData.suppliedArea || 0;
+                    if (suppliedArea > 0 && finalArea > 0) {
+                        displayValue = (displayValue / finalArea) * suppliedArea;
+                    } else {
+                        displayValue = 0;
+                    }
+                } else {
+                    displayValue = 0;
+                }
+            } else {
+                displayValue = 0;
+            }
+        } else if (transactionData.transactionType === "Sale" && pData) {
+            if (pData.saleScope === "Whole") {
+                // keep 100%
+            } else if (pData.saleScope === "Portion") {
+                const suppliedArea = pData.suppliedArea || 0;
+                if (suppliedArea > 0 && finalArea > 0) {
+                    displayValue = (displayValue / finalArea) * suppliedArea;
+                } else {
+                    displayValue = 0;
+                }
+            } else {
                 displayValue = 0;
             }
         }
@@ -103,6 +147,19 @@ export function TransferTaxComputation() {
     const handleSaveTransaction = async () => {
         setIsSubmitting(true);
         try {
+            // Verify if attachment was properly uploaded
+            if (!documentData?.documentUrl) {
+                toast.error("Missing document attachment. Please go back and upload the Notarial Document.");
+                setIsSubmitting(false);
+                return;
+            }
+
+            if (documentData.documentUrl.startsWith('blob:')) {
+                toast.error("Document attachment was not properly saved. Please go back and re-upload the Notarial Document.");
+                setIsSubmitting(false);
+                return;
+            }
+
             const result = await saveTransferTaxTransaction({
                 documentData,
                 transactionData,

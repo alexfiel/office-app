@@ -182,6 +182,10 @@ export function SearchProperty() {
                                                                 <span className="font-medium text-gray-900">{property.pin}</span>
                                                             </div>
                                                             <div className="flex items-center">
+                                                                <span className="font-semibold text-gray-500 mr-2">Lot No:</span> 
+                                                                <span className="font-medium text-gray-900">{property.lotNumber || "N/A"}</span>
+                                                            </div>
+                                                            <div className="flex items-center">
                                                                 <span className="font-semibold text-gray-500 mr-2">Area:</span> 
                                                                 <span className="font-medium text-gray-900">{property.area} sq.m.</span>
                                                             </div>
@@ -242,7 +246,7 @@ export function SearchProperty() {
                                 <div key={property.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 border rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
                                     <div>
                                         <h4 className="font-bold text-gray-900">{property.owner}</h4>
-                                        <p className="text-sm text-gray-600 mt-1">Tax Dec: <span className="font-medium text-gray-900">{property.taxdecnumber}</span> • PIN: <span className="font-medium text-gray-900">{property.pin}</span></p>
+                                        <p className="text-sm text-gray-600 mt-1">Tax Dec: <span className="font-medium text-gray-900">{property.taxdecnumber}</span> • PIN: <span className="font-medium text-gray-900">{property.pin}</span> • Lot No: <span className="font-medium text-gray-900">{property.lotNumber || "N/A"}</span></p>
                                     </div>
                                     <Button
                                         variant="destructive"

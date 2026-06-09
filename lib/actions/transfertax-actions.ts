@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { TransferTaxCalculator } from "@/lib/tax-calculator";
+import { revalidatePath } from "next/cache";
 
 const parseOwners = (ownerStr: string) => {
     if (!ownerStr) return [];
@@ -49,7 +50,7 @@ export async function saveTransferTaxTransaction(data: any) {
                     documentNumber: documentData.documentNumber,
                     notarialDate: new Date(documentData.notarialDate),
                     notarizedBy: documentData.notarizedBy,
-                    document_url: documentData.fileUrl || "",
+                    document_url: documentData.documentUrl || "",
                     userId: userId
                 }
             });
@@ -108,14 +109,73 @@ export async function saveTransferTaxTransaction(data: any) {
         for (const property of cart) {
             const pData = transactionData.propertyEjsData?.[property.id];
             const isEjsType = ["Extrajudicial Settlement", "Donation", "Waiver of Rights"].includes(transactionData.transactionType);
+            const isPartitionType = transactionData.transactionType === "Partition";
+            const isAdjudicationType = transactionData.transactionType === "Adjudication";
             
             let displayValue = Number(property.marketValue);
+            let finalArea = Number(property.area) || 0;
+            let finalLotNumber = property.lotNumber || "";
+
             if (isEjsType && pData) {
                 const totalOwners = pData.parsedOwners?.length || 0;
                 const selectedCount = pData.selectedOwners?.length || 0;
                 if (totalOwners > 0 && selectedCount > 0) {
                     displayValue = (displayValue / totalOwners) * selectedCount;
                 } else if (totalOwners > 0) {
+                    displayValue = 0;
+                }
+            } else if (isPartitionType && pData) {
+                const suppliedArea = pData.suppliedArea || 0;
+                if (suppliedArea > 0 && finalArea > 0) {
+                    displayValue = (displayValue / finalArea) * suppliedArea;
+                    finalArea = suppliedArea;
+                } else {
+                    displayValue = 0;
+                }
+                if (pData.newLotNumber) {
+                    finalLotNumber = pData.newLotNumber;
+                }
+            } else if (isAdjudicationType && pData) {
+                if (pData.adjudicationType === "Whole") {
+                    // Keep 100% displayValue and original area
+                } else if (pData.adjudicationType === "Portion") {
+                    if (pData.portionType === "Percent") {
+                        const pct = pData.percentShare || 0;
+                        displayValue = displayValue * (pct / 100);
+                        // Optional: compute finalArea if percent is applied
+                        finalArea = finalArea * (pct / 100);
+                    } else if (pData.portionType === "Area") {
+                        const suppliedArea = pData.suppliedArea || 0;
+                        if (suppliedArea > 0 && finalArea > 0) {
+                            displayValue = (displayValue / finalArea) * suppliedArea;
+                            finalArea = suppliedArea;
+                        } else {
+                            displayValue = 0;
+                        }
+                        if (pData.newLotNumber) {
+                            finalLotNumber = pData.newLotNumber;
+                        }
+                    } else {
+                        displayValue = 0;
+                    }
+                } else {
+                    displayValue = 0;
+                }
+            } else if (transactionData.transactionType === "Sale" && pData) {
+                if (pData.saleScope === "Whole") {
+                    // Keep 100% displayValue and original area
+                } else if (pData.saleScope === "Portion") {
+                    const suppliedArea = pData.suppliedArea || 0;
+                    if (suppliedArea > 0 && finalArea > 0) {
+                        displayValue = (displayValue / finalArea) * suppliedArea;
+                        finalArea = suppliedArea;
+                    } else {
+                        displayValue = 0;
+                    }
+                    if (pData.newLotNumber) {
+                        finalLotNumber = pData.newLotNumber;
+                    }
+                } else {
                     displayValue = 0;
                 }
             }
@@ -127,6 +187,8 @@ export async function saveTransferTaxTransaction(data: any) {
             else if (mappedType === "EXTRAJUDICIAL SETTLEMENT") mappedType = "DEED OF EXTRAJUDICIAL SETTLEMENT";
             else if (mappedType === "DONATION") mappedType = "DEED OF DONATION";
             else if (mappedType === "WAIVER OF RIGHTS") mappedType = "DEED OF WAIVER OF RIGHTS";
+            else if (mappedType === "PARTITION") mappedType = "DEED OF PARTITION";
+            else if (mappedType === "ADJUDICATION") mappedType = "DEED OF ADJUDICATION";
 
             const computed = TransferTaxCalculator.computeTotal(
                 mappedType,
@@ -150,8 +212,8 @@ export async function saveTransferTaxTransaction(data: any) {
                     nt_transferror: transferorCaps,
                     nt_transactiontype: transactionData.transactionType,
                     nt_taxdecnumber: property.taxdecnumber,
-                    nt_lotnumber: property.lotNumber || "",
-                    nt_area: Number(property.area) || 0,
+                    nt_lotnumber: finalLotNumber,
+                    nt_area: finalArea,
                     nt_marketvalue: displayValue,
                     nt_considerationvalue: considerationValue,
                     nt_taxbase: taxBase,
@@ -189,7 +251,7 @@ export async function saveTransferTaxTransaction(data: any) {
                     const currentOwners = parseOwners(property.owner);
                     
                     const newOwnerList = currentOwners.filter((o: string) => {
-                        return !transferorsToRemove.some(tToRemove => o.includes(tToRemove) || tToRemove.includes(o));
+                        return !transferorsToRemove.some((tToRemove: string) => o.includes(tToRemove) || tToRemove.includes(o));
                     });
                     
                     updatedOwner = newOwnerList.join(", ");
@@ -199,12 +261,53 @@ export async function saveTransferTaxTransaction(data: any) {
                 }
             }
 
-            await prisma.realProperty.update({
-                where: { id: property.id },
-                data: {
-                    owner: updatedOwner
-                }
-            });
+            const isPortionOnly = finalArea < Number(property.area);
+
+            if (isPortionOnly) {
+                // Generate 3 random uppercase letters
+                const randomLetters = Array.from({ length: 3 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
+                const newPin = `${property.pin}-${randomLetters}`;
+                
+                // Ensure unique objid
+                const uniqueIdSegment = Math.random().toString(36).substring(2, 7).toUpperCase();
+
+                // Update original property (reduce area and market value, retain owner)
+                await prisma.realProperty.update({
+                    where: { id: property.id },
+                    data: {
+                        area: Number(property.area) - finalArea,
+                        marketValue: Number(property.marketValue) - displayValue,
+                    }
+                });
+
+                // Create the new portion property
+                await prisma.realProperty.create({
+                    data: {
+                        objid: `${property.objid}-PORTION-${randomLetters}-${uniqueIdSegment}`,
+                        pin: newPin,
+                        taxdecnumber: property.taxdecnumber,
+                        owner: updatedOwner,
+                        rputype: property.rputype,
+                        barangay: property.barangay,
+                        classcode: property.classcode,
+                        lotNumber: finalLotNumber,
+                        blockNumber: property.blockNumber,
+                        surveyno: property.surveyno,
+                        tctOct: property.tctOct,
+                        area: finalArea,
+                        marketValue: displayValue,
+                        userId: userId,
+                    }
+                });
+            } else {
+                // Update original property completely (full transfer)
+                await prisma.realProperty.update({
+                    where: { id: property.id },
+                    data: {
+                        owner: updatedOwner
+                    }
+                });
+            }
         }
 
         return { success: true, notarialDocumentId: notarialId };
@@ -282,6 +385,48 @@ export async function getAllTransferTaxes() {
     } catch (error) {
         console.error("Error fetching all transactions:", error);
         return { error: "Failed to fetch transactions." };
+    }
+}
+
+export async function getPaginatedTransferTaxes(page: number = 1, limit: number = 10) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized. Please log in." };
+        }
+
+        const skip = (page - 1) * limit;
+
+        const [taxes, total] = await Promise.all([
+            prisma.newTransferTax.findMany({
+                skip,
+                take: limit,
+                include: {
+                    notarialDocument: true,
+                    t_transfertaxdetails: {
+                        include: {
+                            realProperty: true
+                        }
+                    }
+                },
+                orderBy: {
+                    t_DateCompute: 'desc'
+                }
+            }),
+            prisma.newTransferTax.count()
+        ]);
+
+        const plainTaxes = JSON.parse(JSON.stringify(taxes));
+
+        return { 
+            success: true, 
+            taxes: plainTaxes, 
+            total, 
+            totalPages: Math.ceil(total / limit) 
+        };
+    } catch (error) {
+        console.error("Error fetching paginated transactions:", error);
+        return { error: "Failed to fetch paginated transactions." };
     }
 }
 
@@ -385,6 +530,8 @@ export async function recomputeTransferTax(id: string) {
             else if (mappedType === "EXTRAJUDICIAL SETTLEMENT") mappedType = "DEED OF EXTRAJUDICIAL SETTLEMENT";
             else if (mappedType === "DONATION") mappedType = "DEED OF DONATION";
             else if (mappedType === "WAIVER OF RIGHTS") mappedType = "DEED OF WAIVER OF RIGHTS";
+            else if (mappedType === "PARTITION") mappedType = "DEED OF PARTITION";
+            else if (mappedType === "ADJUDICATION") mappedType = "DEED OF ADJUDICATION";
 
             const computed = TransferTaxCalculator.computeTotal(
                 mappedType,
@@ -428,5 +575,138 @@ export async function recomputeTransferTax(id: string) {
     } catch (error) {
         console.error("Error recomputing transaction:", error);
         return { error: "Failed to recompute transaction." };
+    }
+}
+
+export async function updateBasicTransferTax(transactionId: string, detailsPayload: any[]) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized. Please log in." };
+        }
+
+        // Fetch transaction and notarial doc to get dates
+        const tx = await prisma.newTransferTax.findUnique({
+            where: { id: transactionId },
+            include: { notarialDocument: true, t_transfertaxdetails: true }
+        });
+
+        if (!tx) return { error: "Transaction not found." };
+
+        const notarialDateStr = tx.notarialDocument.notarialDate.toISOString();
+        const dateComputeStr = tx.t_DateCompute.toISOString();
+
+        let updatedTotalMarketValue = 0;
+        let updatedTotalConsideration = 0;
+        let updatedTaxBase = 0;
+        let updatedTotalSurcharge = 0;
+        let updatedTotalInterest = 0;
+        let updatedTotalAmountDue = 0;
+
+        // Start a transaction to safely update all records
+        await prisma.$transaction(async (prisma) => {
+            // First update all details and accumulate totals
+            for (const payload of detailsPayload) {
+                const detail = tx.t_transfertaxdetails.find((d: any) => d.id === payload.id);
+                if (!detail) continue;
+
+                const mv = Number(detail.nt_marketvalue);
+                const cv = Number(payload.considerationValue);
+                const itemTaxBase = Math.max(mv, cv);
+                const basicTaxDue = Math.max(itemTaxBase * 0.0075, 500);
+
+                // Need to recompute penalties
+                const calc = TransferTaxCalculator.calculateBasic(basicTaxDue, notarialDateStr, dateComputeStr);
+
+                await prisma.newTransferTaxDetails.update({
+                    where: { id: payload.id },
+                    data: {
+                        nt_transferee: payload.transferee,
+                        nt_transferror: payload.transferror,
+                        nt_considerationvalue: cv,
+                        nt_taxbase: itemTaxBase,
+                        nt_transfertaxDue: basicTaxDue,
+                        nt_surcharge: calc.surcharge,
+                        nt_interest: calc.interest,
+                        nt_totalTransferTaxDue: calc.totalAmountDue
+                    }
+                });
+
+                const newOwnerList = parseOwners(payload.transferee).join(", ");
+                await prisma.realProperty.update({
+                    where: { id: detail.nt_realpropertyid },
+                    data: { owner: newOwnerList }
+                });
+            }
+
+            // Now recompute the grand totals using exactly the grouped logic we use in the UI and save logic!
+            const refreshedDetails = await prisma.newTransferTaxDetails.findMany({
+                where: { nt_transfertaxid: transactionId }
+            });
+
+            // Group by type, transferor, transferee to match the grouping logic
+            const grouped: Record<string, any[]> = {};
+            refreshedDetails.forEach((dt: any) => {
+                const key = `${dt.nt_transactiontype}-${dt.nt_transferror}-${dt.nt_transferee}`;
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(dt);
+            });
+
+            Object.values(grouped).forEach(groupDetails => {
+                let groupMarketValue = 0;
+                let groupConsideration = 0;
+
+                groupDetails.forEach((dt: any) => {
+                    groupMarketValue += Number(dt.nt_marketvalue);
+                    if (Number(dt.nt_considerationvalue) > groupConsideration) {
+                        groupConsideration = Number(dt.nt_considerationvalue);
+                    }
+                });
+
+                const groupTaxBase = Math.max(groupMarketValue, groupConsideration);
+                const groupBasicTax = Math.max(groupTaxBase * 0.0075, 500);
+
+                const penalties = TransferTaxCalculator.calculateBasic(groupBasicTax, notarialDateStr, dateComputeStr);
+
+                updatedTotalMarketValue += groupMarketValue;
+                updatedTotalConsideration += groupConsideration;
+                updatedTaxBase += groupTaxBase;
+                updatedTotalSurcharge += penalties.surcharge;
+                updatedTotalInterest += penalties.interest;
+                updatedTotalAmountDue += penalties.totalAmountDue;
+            });
+
+            // Finally update the NewTransferTax summary
+            await prisma.newTransferTax.update({
+                where: { id: transactionId },
+                data: {
+                    t_TotalMarketValue: updatedTotalMarketValue,
+                    t_TotalConsiderationValue: updatedTotalConsideration,
+                    t_TaxBase: updatedTaxBase,
+                    t_TotalSurcharge: updatedTotalSurcharge,
+                    t_TotalInterest: updatedTotalInterest,
+                    t_TotalAmountDue: updatedTotalAmountDue
+                }
+            });
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error("Error in updateBasicTransferTax:", error);
+        return { error: "Failed to update transaction." };
+    }
+}
+
+export async function updateNotarialDocumentAttachment(notarialId: string, documentUrl: string) {
+    try {
+        await prisma.notarialDocument.update({
+            where: { id: notarialId },
+            data: { document_url: documentUrl }
+        });
+        revalidatePath('/newTransferTax');
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to update attachment", error);
+        return { success: false, error: "Failed to update attachment" };
     }
 }

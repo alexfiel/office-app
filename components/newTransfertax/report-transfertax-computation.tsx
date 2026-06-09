@@ -354,7 +354,6 @@ export function ReportTransferTaxComputation({ data, userName }: ReportTransferT
                 </tr>
               ))}
             </tbody>
-            <br />
             <tfoot>
               <tr>
                 <td colSpan={11} className="border border-gray-300 px-1 py-1.5"></td>

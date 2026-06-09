@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-
+import { SavedTransactionsCart } from "@/components/newTransfertax/SavedTransactionsCart";
 export default function NewTransferTaxLayout({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // We use sessionStorage to determine if this is a completely fresh tab/browser session.
@@ -17,5 +17,10 @@ export default function NewTransferTaxLayout({ children }: { children: React.Rea
         }
     }, []);
 
-    return <>{children}</>;
+    return (
+        <>
+            {children}
+            <SavedTransactionsCart />
+        </>
+    );
 }

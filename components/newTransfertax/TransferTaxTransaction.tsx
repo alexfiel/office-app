@@ -32,6 +32,12 @@ type EjsData = {
     parsedOwners: string[];
     selectedOwners: string[];
     adjustedMarketValue: number;
+    suppliedArea?: number;
+    newLotNumber?: string;
+    adjudicationType?: "Whole" | "Portion" | "";
+    portionType?: "Percent" | "Area" | "";
+    percentShare?: number;
+    saleScope?: "Whole" | "Portion" | "";
 };
 
 export function TransferTaxTransaction() {
@@ -46,6 +52,9 @@ export function TransferTaxTransaction() {
 
     const EJS_TYPES = ["Extrajudicial Settlement", "Donation", "Waiver of Rights"];
     const isEjsType = EJS_TYPES.includes(transactionType);
+    const isPartitionType = transactionType === "Partition";
+    const isAdjudicationType = transactionType === "Adjudication";
+    const isSaleType = transactionType === "Sale";
 
     // Load data from cookies
     useEffect(() => {
@@ -88,7 +97,7 @@ export function TransferTaxTransaction() {
 
     // Initialize EJS Data when transaction type changes
     useEffect(() => {
-        if (isEjsType && cart.length > 0) {
+        if ((isEjsType || isPartitionType || isAdjudicationType || isSaleType) && cart.length > 0) {
             // eslint-disable-next-line
             setPropertyEjsData(prev => {
                 const newData = { ...prev };
@@ -98,7 +107,13 @@ export function TransferTaxTransaction() {
                         newData[p.id] = {
                             parsedOwners: parseOwners(p.owner),
                             selectedOwners: [],
-                            adjustedMarketValue: 0
+                            adjustedMarketValue: 0,
+                            suppliedArea: 0,
+                            newLotNumber: "",
+                            adjudicationType: "",
+                            portionType: "",
+                            percentShare: 0,
+                            saleScope: ""
                         };
                         changed = true;
                     }
@@ -106,7 +121,7 @@ export function TransferTaxTransaction() {
                 return changed ? newData : prev;
             });
         }
-    }, [isEjsType, cart]);
+    }, [isEjsType, isPartitionType, isAdjudicationType, isSaleType, cart]);
 
     // Auto-populate Transferor based on selected distinct owners
     useEffect(() => {
@@ -142,7 +157,7 @@ export function TransferTaxTransaction() {
             transferor: transferor.toUpperCase(),
             transactionType,
             considerationValue: parseFloat(considerationValue) || 0,
-            propertyEjsData: isEjsType ? propertyEjsData : undefined
+            propertyEjsData: (isEjsType || isPartitionType || isAdjudicationType || isSaleType) ? propertyEjsData : undefined
         };
 
         // Save data in cookies
@@ -167,6 +182,49 @@ export function TransferTaxTransaction() {
             if (totalOwners > 0 && selectedCount > 0) {
                 displayValue = (displayValue / totalOwners) * selectedCount;
             } else if (totalOwners > 0) {
+                displayValue = 0;
+            }
+        } else if (isPartitionType && pData) {
+            const suppliedArea = pData.suppliedArea || 0;
+            const originalArea = Number(property.area) || 1;
+            if (suppliedArea > 0) {
+                displayValue = (displayValue / originalArea) * suppliedArea;
+            } else {
+                displayValue = 0;
+            }
+        } else if (isAdjudicationType && pData) {
+            if (pData.adjudicationType === "Whole") {
+                // Keep 100% displayValue
+            } else if (pData.adjudicationType === "Portion") {
+                if (pData.portionType === "Percent") {
+                    const pct = pData.percentShare || 0;
+                    displayValue = displayValue * (pct / 100);
+                } else if (pData.portionType === "Area") {
+                    const suppliedArea = pData.suppliedArea || 0;
+                    const originalArea = Number(property.area) || 1;
+                    if (suppliedArea > 0) {
+                        displayValue = (displayValue / originalArea) * suppliedArea;
+                    } else {
+                        displayValue = 0;
+                    }
+                } else {
+                    displayValue = 0;
+                }
+            } else {
+                displayValue = 0;
+            }
+        } else if (isSaleType && pData) {
+            if (pData.saleScope === "Whole") {
+                // Keep 100% displayValue
+            } else if (pData.saleScope === "Portion") {
+                const suppliedArea = pData.suppliedArea || 0;
+                const originalArea = Number(property.area) || 1;
+                if (suppliedArea > 0) {
+                    displayValue = (displayValue / originalArea) * suppliedArea;
+                } else {
+                    displayValue = 0;
+                }
+            } else {
                 displayValue = 0;
             }
         }
@@ -215,6 +273,49 @@ export function TransferTaxTransaction() {
                                     } else if (totalOwners > 0) {
                                         displayValue = 0; // Or keep original? The spec implies fraction based on selected
                                     }
+                                } else if (isPartitionType && pData) {
+                                    const suppliedArea = pData.suppliedArea || 0;
+                                    const originalArea = Number(property.area) || 1;
+                                    if (suppliedArea > 0) {
+                                        displayValue = (displayValue / originalArea) * suppliedArea;
+                                    } else {
+                                        displayValue = 0;
+                                    }
+                                } else if (isAdjudicationType && pData) {
+                                    if (pData.adjudicationType === "Whole") {
+                                        // Keep 100% displayValue
+                                    } else if (pData.adjudicationType === "Portion") {
+                                        if (pData.portionType === "Percent") {
+                                            const pct = pData.percentShare || 0;
+                                            displayValue = displayValue * (pct / 100);
+                                        } else if (pData.portionType === "Area") {
+                                            const suppliedArea = pData.suppliedArea || 0;
+                                            const originalArea = Number(property.area) || 1;
+                                            if (suppliedArea > 0) {
+                                                displayValue = (displayValue / originalArea) * suppliedArea;
+                                            } else {
+                                                displayValue = 0;
+                                            }
+                                        } else {
+                                            displayValue = 0;
+                                        }
+                                    } else {
+                                        displayValue = 0;
+                                    }
+                                } else if (isSaleType && pData) {
+                                    if (pData.saleScope === "Whole") {
+                                        // Keep 100% displayValue
+                                    } else if (pData.saleScope === "Portion") {
+                                        const suppliedArea = pData.suppliedArea || 0;
+                                        const originalArea = Number(property.area) || 1;
+                                        if (suppliedArea > 0) {
+                                            displayValue = (displayValue / originalArea) * suppliedArea;
+                                        } else {
+                                            displayValue = 0;
+                                        }
+                                    } else {
+                                        displayValue = 0;
+                                    }
                                 }
 
                                 return (
@@ -229,13 +330,15 @@ export function TransferTaxTransaction() {
                                                     <p className="text-sm text-gray-600 mt-0.5">
                                                         Tax Dec: <span className="font-medium text-gray-900">{property.taxdecnumber}</span>
                                                         <span className="mx-2">•</span>
+                                                        Lot No: <span className="font-medium text-gray-900">{property.lotNumber || "N/A"}</span>
+                                                        <span className="mx-2">•</span>
                                                         Area: <span className="font-medium text-gray-900">{property.area} sq.m.</span>
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="text-right w-full sm:w-auto mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-200">
                                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                                                    {isEjsType ? "Adjusted Market Value" : "Market Value"}
+                                                    {isEjsType || isPartitionType || isAdjudicationType || isSaleType ? "Adjusted Market Value" : "Market Value"}
                                                 </p>
                                                 <p className="font-bold text-gray-900">₱{displayValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             </div>
@@ -289,6 +392,261 @@ export function TransferTaxTransaction() {
                                                 )}
                                             </div>
                                         )}
+
+                                        {isPartitionType && pData && (
+                                            <div className="mt-2 pt-4 border-t border-gray-200/60 animate-in fade-in duration-300 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor={`area-${property.id}`} className="text-sm font-medium text-gray-700">Supplied Area (sq.m.)</Label>
+                                                    <Input
+                                                        id={`area-${property.id}`}
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        placeholder={`Max: ${property.area}`}
+                                                        value={pData.suppliedArea || ""}
+                                                        onChange={(e) => {
+                                                            const val = Number(e.target.value);
+                                                            setPropertyEjsData(prev => ({
+                                                                ...prev,
+                                                                [property.id]: {
+                                                                    ...prev[property.id],
+                                                                    suppliedArea: val
+                                                                }
+                                                            }));
+                                                        }}
+                                                        className="bg-gray-50/50 focus:bg-white shadow-sm h-11"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor={`lot-${property.id}`} className="text-sm font-medium text-gray-700">New Lot Number</Label>
+                                                    <Input
+                                                        id={`lot-${property.id}`}
+                                                        type="text"
+                                                        placeholder="e.g. 123-A"
+                                                        value={pData.newLotNumber || ""}
+                                                        onChange={(e) => {
+                                                            setPropertyEjsData(prev => ({
+                                                                ...prev,
+                                                                [property.id]: {
+                                                                    ...prev[property.id],
+                                                                    newLotNumber: e.target.value
+                                                                }
+                                                            }));
+                                                        }}
+                                                        className="bg-gray-50/50 focus:bg-white shadow-sm h-11 uppercase"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {isAdjudicationType && pData && (
+                                            <div className="mt-2 pt-4 border-t border-gray-200/60 animate-in fade-in duration-300 space-y-4">
+                                                <div className="flex gap-4">
+                                                    <div className="flex-1 space-y-2">
+                                                        <Label className="text-sm font-medium text-gray-700">Adjudication Scope</Label>
+                                                        <Select 
+                                                            value={pData.adjudicationType || ""} 
+                                                            onValueChange={(val: "Whole" | "Portion") => {
+                                                                setPropertyEjsData(prev => ({
+                                                                    ...prev,
+                                                                    [property.id]: {
+                                                                        ...prev[property.id],
+                                                                        adjudicationType: val,
+                                                                        portionType: "",
+                                                                        suppliedArea: 0,
+                                                                        percentShare: 0
+                                                                    }
+                                                                }));
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="bg-white">
+                                                                <SelectValue placeholder="Select Scope" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="Whole">Whole</SelectItem>
+                                                                <SelectItem value="Portion">Portion</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                </div>
+
+                                                {pData.adjudicationType === "Portion" && (
+                                                    <div className="flex flex-col sm:flex-row gap-4 p-4 border border-emerald-100 bg-emerald-50/30 rounded-lg">
+                                                        <div className="flex-1 space-y-2">
+                                                            <Label className="text-sm font-medium text-gray-700">Compute By</Label>
+                                                            <Select 
+                                                                value={pData.portionType || ""} 
+                                                                onValueChange={(val: "Percent" | "Area") => {
+                                                                    setPropertyEjsData(prev => ({
+                                                                        ...prev,
+                                                                        [property.id]: {
+                                                                            ...prev[property.id],
+                                                                            portionType: val,
+                                                                            suppliedArea: 0,
+                                                                            percentShare: 0,
+                                                                            newLotNumber: val === "Area" ? property.lotNumber || "" : ""
+                                                                        }
+                                                                    }));
+                                                                }}
+                                                            >
+                                                                <SelectTrigger className="bg-white">
+                                                                    <SelectValue placeholder="Select Type" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="Percent">Percent Share</SelectItem>
+                                                                    <SelectItem value="Area">Area</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+
+                                                        {pData.portionType === "Percent" && (
+                                                            <div className="flex-1 space-y-2">
+                                                                <Label className="text-sm font-medium text-gray-700">Percent Share (%)</Label>
+                                                                <Input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="100"
+                                                                    step="0.1"
+                                                                    placeholder="e.g. 50"
+                                                                    value={pData.percentShare || ""}
+                                                                    onChange={(e) => {
+                                                                        const val = Number(e.target.value);
+                                                                        setPropertyEjsData(prev => ({
+                                                                            ...prev,
+                                                                            [property.id]: {
+                                                                                ...prev[property.id],
+                                                                                percentShare: val
+                                                                            }
+                                                                        }));
+                                                                    }}
+                                                                    className="bg-white"
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        {pData.portionType === "Area" && (
+                                                            <>
+                                                                <div className="flex-1 space-y-2">
+                                                                    <Label className="text-sm font-medium text-gray-700">Supplied Area (sq.m.)</Label>
+                                                                    <Input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        step="0.01"
+                                                                        placeholder={`Max: ${property.area}`}
+                                                                        value={pData.suppliedArea || ""}
+                                                                        onChange={(e) => {
+                                                                            const val = Number(e.target.value);
+                                                                            setPropertyEjsData(prev => ({
+                                                                                ...prev,
+                                                                                [property.id]: {
+                                                                                    ...prev[property.id],
+                                                                                    suppliedArea: val
+                                                                                }
+                                                                            }));
+                                                                        }}
+                                                                        className="bg-white"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex-1 space-y-2">
+                                                                    <Label className="text-sm font-medium text-gray-700">New Lot Number</Label>
+                                                                    <Input
+                                                                        type="text"
+                                                                        placeholder="e.g. 123-A"
+                                                                        value={pData.newLotNumber || ""}
+                                                                        onChange={(e) => {
+                                                                            setPropertyEjsData(prev => ({
+                                                                                ...prev,
+                                                                                [property.id]: {
+                                                                                    ...prev[property.id],
+                                                                                    newLotNumber: e.target.value
+                                                                                }
+                                                                            }));
+                                                                        }}
+                                                                        className="bg-white"
+                                                                    />
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {isSaleType && pData && (
+                                            <div className="mt-2 pt-4 border-t border-gray-200/60 animate-in fade-in duration-300 space-y-4">
+                                                <div className="flex gap-4">
+                                                    <div className="flex-1 space-y-2">
+                                                        <Label className="text-sm font-medium text-gray-700">Sale Scope</Label>
+                                                        <Select 
+                                                            value={pData.saleScope || ""} 
+                                                            onValueChange={(val: "Whole" | "Portion") => {
+                                                                setPropertyEjsData(prev => ({
+                                                                    ...prev,
+                                                                    [property.id]: {
+                                                                        ...prev[property.id],
+                                                                        saleScope: val,
+                                                                        suppliedArea: 0,
+                                                                        newLotNumber: val === "Portion" ? property.lotNumber || "" : ""
+                                                                    }
+                                                                }));
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="bg-white">
+                                                                <SelectValue placeholder="Select Scope" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="Whole">Whole</SelectItem>
+                                                                <SelectItem value="Portion">Portion</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                </div>
+
+                                                {pData.saleScope === "Portion" && (
+                                                    <div className="flex flex-col sm:flex-row gap-4 p-4 border border-emerald-100 bg-emerald-50/30 rounded-lg">
+                                                        <div className="flex-1 space-y-2">
+                                                            <Label className="text-sm font-medium text-gray-700">Sale Area (sq.m.)</Label>
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.01"
+                                                                placeholder={`Max: ${property.area}`}
+                                                                value={pData.suppliedArea || ""}
+                                                                onChange={(e) => {
+                                                                    const val = Number(e.target.value);
+                                                                    setPropertyEjsData(prev => ({
+                                                                        ...prev,
+                                                                        [property.id]: {
+                                                                            ...prev[property.id],
+                                                                            suppliedArea: val
+                                                                        }
+                                                                    }));
+                                                                }}
+                                                                className="bg-white"
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 space-y-2">
+                                                            <Label className="text-sm font-medium text-gray-700">New Lot Number</Label>
+                                                            <Input
+                                                                type="text"
+                                                                placeholder="e.g. 123-A"
+                                                                value={pData.newLotNumber || ""}
+                                                                onChange={(e) => {
+                                                                    setPropertyEjsData(prev => ({
+                                                                        ...prev,
+                                                                        [property.id]: {
+                                                                            ...prev[property.id],
+                                                                            newLotNumber: e.target.value
+                                                                        }
+                                                                    }));
+                                                                }}
+                                                                className="bg-white"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -334,6 +692,8 @@ export function TransferTaxTransaction() {
                                         <SelectItem value="Donation">Donation</SelectItem>
                                         <SelectItem value="Extrajudicial Settlement">Extrajudicial Settlement</SelectItem>
                                         <SelectItem value="Partition">Partition</SelectItem>
+                                        <SelectItem value="Adjudication">Adjudication</SelectItem>
+                                        <SelectItem value="Exchange">Exchange</SelectItem>
                                         <SelectItem value="Waiver of Rights">Waiver of Rights</SelectItem>
                                         <SelectItem value="Assignment">Assignment</SelectItem>
 
