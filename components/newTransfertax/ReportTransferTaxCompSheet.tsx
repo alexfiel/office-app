@@ -32,6 +32,7 @@ export function ReportTransferTaxCompSheet({
 }: ReportTransferTaxComputationProps) {
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [base64Logo, setBase64Logo] = useState<string>('');
+    const [base64CityLogo, setBase64CityLogo] = useState<string>('');
 
     useEffect(() => {
         const loadImages = async () => {
@@ -39,6 +40,10 @@ export function ReportTransferTaxCompSheet({
                 const logoUrl = '/cto_logo.png';
                 const base64 = await loadBase64Image(logoUrl);
                 setBase64Logo(base64);
+
+                const cityLogoUrl = '/Tagbilaran-City-Seal-Logo-rev.png';
+                const cityBase64 = await loadBase64Image(cityLogoUrl);
+                setBase64CityLogo(cityBase64);
             } catch (error) {
                 console.error('Error loading images:', error);
             }
@@ -64,9 +69,14 @@ export function ReportTransferTaxCompSheet({
             const centerX = FOLIO_WIDTH / 2;
             let currentY = M + 10;
 
-            // Draw Logo
+            // Draw Logo Left
             if (base64Logo) {
                 pdf.addImage(base64Logo, 'PNG', 15, currentY - 5, 20, 20);
+            }
+
+            // Draw Logo Right
+            if (base64CityLogo) {
+                pdf.addImage(base64CityLogo, 'PNG', FOLIO_WIDTH - 35, currentY - 5, 20, 20);
             }
 
             // Draw Header
@@ -78,6 +88,10 @@ export function ReportTransferTaxCompSheet({
             currentY += 5;
             pdf.setFontSize(12);
             pdf.text("CITY GOVERNMENT OF TAGBILARAN", centerX, currentY, { align: "center" });
+
+            currentY += 5;
+            pdf.setFontSize(11);
+            pdf.text("OFFICE OF THE CITY TREASURER", centerX, currentY, { align: "center" });
 
             currentY += 5;
             pdf.setFontSize(9);
@@ -148,6 +162,8 @@ export function ReportTransferTaxCompSheet({
 
                 currentY += 4;
 
+
+
                 // Group Details for NewTransfertaxDetails to create Sub Header and Sub Detail Tables
                 const details = tx.t_transfertaxdetails || [];
 
@@ -171,7 +187,7 @@ export function ReportTransferTaxCompSheet({
                         startY: currentY,
                         margin: { left: M, right: M },
                         headStyles: { fillColor: [240, 240, 240], textColor: 0, fontSize: 7, halign: 'center', fontStyle: 'bold' },
-                        bodyStyles: { fontSize: 7, halign: 'center' },
+                        bodyStyles: { fontSize: 10, halign: 'center' },
                         head: [["Transferor", "Transferee", "Transaction Type"]],
                         body: [[
                             firstDt.nt_transferror || "N/A",
@@ -249,7 +265,7 @@ export function ReportTransferTaxCompSheet({
                         startY: currentY,
                         margin: { left: M, right: M },
                         headStyles: { fillColor: [250, 250, 250], textColor: 0, fontSize: 6, halign: 'center', fontStyle: 'bold' },
-                        bodyStyles: { fontSize: 6 },
+                        bodyStyles: { fontSize: 8 },
                         columnStyles: {
                             2: { halign: 'center' },
                             3: { halign: 'right' },
@@ -274,6 +290,33 @@ export function ReportTransferTaxCompSheet({
                 const labelX = FOLIO_WIDTH - M - 60;
                 const valueX = FOLIO_WIDTH - M;
 
+                let leftY = currentY;
+                if (tx.t_status === "Paid" || tx.capturedPayment) {
+                    pdf.setTextColor(39, 174, 96); // Green
+                    pdf.text(`STATUS: PAID`, M, leftY);
+
+                    if (tx.capturedPayment) {
+                        pdf.setTextColor(0);
+                        pdf.setFont("helvetica", "normal");
+                        leftY += 4;
+                        pdf.text(`Receipt No: ${tx.capturedPayment.cp_receiptnumber || "N/A"}`, M, leftY);
+                        leftY += 4;
+                        const pAmount = Number(tx.capturedPayment.cp_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                        pdf.text(`Amount: Php ${pAmount}`, M, leftY);
+                        leftY += 4;
+                        const pDate = tx.capturedPayment.cp_paymentDate ? new Date(tx.capturedPayment.cp_paymentDate).toLocaleDateString() : "N/A";
+                        pdf.text(`Date Paid: ${pDate}`, M, leftY);
+                        leftY += 4;
+                        pdf.text(`Mode: ${tx.capturedPayment.cp_modeOfPayment || "N/A"}`, M, leftY);
+                        pdf.setFont("helvetica", "bold");
+                    }
+                } else {
+                    pdf.setTextColor(192, 57, 43); // Red
+                    pdf.text(`STATUS: PENDING PAYMENT`, M, leftY);
+                    pdf.setTextColor(0);
+                }
+
+                pdf.setTextColor(0);
                 pdf.text("Total Tax Due:", labelX, currentY);
                 pdf.text(`Php ${txTotalTaxDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
                 currentY += 4;
@@ -290,7 +333,8 @@ export function ReportTransferTaxCompSheet({
                 pdf.text("Grand Total Tax Due:", labelX, currentY);
                 pdf.text(`Php ${txGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
 
-                currentY += 10;
+                // Ensure currentY is pushed down enough if leftY went further down
+                currentY = Math.max(currentY, leftY) + 10;
 
                 // Add a line separator if not the last transaction
                 if (index < transactions.length - 1) {

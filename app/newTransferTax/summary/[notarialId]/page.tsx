@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { ReportTransferTaxCompSheet } from "@/components/newTransfertax/ReportTransferTaxCompSheet";
+import { useSession } from "next-auth/react";
 
 export default function NotarialDocumentSummary() {
+    const { data: session } = useSession();
     const params = useParams();
     const router = useRouter();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,7 +76,7 @@ export default function NotarialDocumentSummary() {
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         Back to Home
                     </Button>
-                    <ReportTransferTaxCompSheet data={data} userName="TRANSFER TAX ASSESSOR" />
+                    <ReportTransferTaxCompSheet data={data} userName={session?.user?.name || "TRANSFER TAX ASSESSOR"} />
                 </div>
             </div>
 

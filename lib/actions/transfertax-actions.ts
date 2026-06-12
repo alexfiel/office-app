@@ -79,8 +79,21 @@ export async function saveTransferTaxTransaction(data: any) {
                 }
             });
         } else {
-            // Generate a random control number
-            const controlNumber = `TT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            // Generate a series control number CTO-TAGB-000000
+            const lastTx = await prisma.newTransferTax.findFirst({
+                where: { t_controlNumber: { startsWith: "CTO-TAGB-" } },
+                orderBy: { t_controlNumber: 'desc' }
+            });
+
+            let nextNumber = 1;
+            if (lastTx && lastTx.t_controlNumber) {
+                const parts = lastTx.t_controlNumber.split('-');
+                if (parts.length === 3) {
+                    nextNumber = parseInt(parts[2], 10) + 1;
+                }
+            }
+
+            const controlNumber = `CTO-TAGB-${String(nextNumber).padStart(6, '0')}`;
 
             // Create new NewTransferTax
             newTransferTax = await prisma.newTransferTax.create({
@@ -337,7 +350,8 @@ export async function getTransactionsByNotarialId(notarialId: string) {
                             include: {
                                 realProperty: true
                             }
-                        }
+                        },
+                        capturedPayment: true
                     },
                     orderBy: {
                         t_DateCompute: 'desc'

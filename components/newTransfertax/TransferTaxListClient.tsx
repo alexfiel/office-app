@@ -265,6 +265,8 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                 <th className="px-6 py-4">Notarial Doc</th>
                                                 <th className="px-6 py-4">Transferee</th>
                                                 <th className="px-6 py-4">Date Computed</th>
+                                                <th className="px-6 py-4">Validity Date</th>
+                                                <th className="px-6 py-4 text-center">Status</th>
                                                 <th className="px-6 py-4 text-right">Amount Due</th>
                                                 <th className="px-6 py-4 text-center">Actions</th>
                                             </tr>
@@ -272,7 +274,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                         <tbody className="divide-y divide-gray-100 bg-white">
                                             {isLoading ? (
                                                 <tr>
-                                                    <td colSpan={6} className="text-center py-12">
+                                                    <td colSpan={8} className="text-center py-12">
                                                         <div className="flex items-center justify-center space-x-2">
                                                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                                                             <span className="text-gray-500 font-medium">Loading records...</span>
@@ -281,7 +283,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                 </tr>
                                             ) : taxes.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={6} className="text-center py-12 text-gray-500">
+                                                    <td colSpan={8} className="text-center py-12 text-gray-500">
                                                         No transfer tax computations found.
                                                     </td>
                                                 </tr>
@@ -311,6 +313,23 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                 <Clock className="w-4 h-4 mr-1.5 text-gray-400" />
                                                                 {format(new Date(tax.t_DateCompute), "MMM d, yyyy")}
                                                             </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-gray-600">
+                                                            <div className="flex items-center">
+                                                                <Clock className="w-4 h-4 mr-1.5 text-gray-400" />
+                                                                {new Date(tax.t_validity).getFullYear() >= 2099 ? "Max Interest Reached" : format(new Date(tax.t_validity), "MMM d, yyyy")}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            {tax.t_status?.toLowerCase() === "paid" ? (
+                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                                    Paid
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                                                    Unpaid
+                                                                </span>
+                                                            )}
                                                         </td>
                                                         <td className="px-6 py-4 text-right font-bold text-gray-900">
                                                             ₱{Number(tax.t_TotalAmountDue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -345,7 +364,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                     size="sm"
                                                                     className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                                                                     onClick={() => handleRecompute(tax.id)}
-                                                                    disabled={recomputingId === tax.id}
+                                                                    disabled={recomputingId === tax.id || tax.t_status?.toLowerCase() === "paid"}
                                                                     title="Recompute Penalties"
                                                                 >
                                                                     <RefreshCw className={`w-4 h-4 ${recomputingId === tax.id ? 'animate-spin' : ''}`} />
@@ -366,6 +385,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                     size="sm" 
                                                                     className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
                                                                     onClick={() => setEditingTax(tax)}
+                                                                    disabled={tax.t_status?.toLowerCase() === "paid"}
                                                                 >
                                                                     <Edit className="w-4 h-4" />
                                                                 </Button>
@@ -374,6 +394,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                     size="sm" 
                                                                     className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                                                                     onClick={() => setDeleteId(tax.id)}
+                                                                    disabled={tax.t_status?.toLowerCase() === "paid"}
                                                                 >
                                                                     <Trash2 className="w-4 h-4" />
                                                                 </Button>
@@ -415,6 +436,9 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                     <div className="absolute top-2 right-2 text-[8px] font-mono bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded shadow-sm font-bold">
                                                         {tax.t_controlNumber}
                                                     </div>
+                                                    <div className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm ${tax.t_status?.toLowerCase() === 'paid' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                        {tax.t_status?.toLowerCase() === 'paid' ? 'PAID' : 'UNPAID'}
+                                                    </div>
                                                 </div>
 
                                                 <div className="p-4 flex-1 flex flex-col">
@@ -422,9 +446,13 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                         <h3 className="font-bold text-gray-900 line-clamp-2 text-sm leading-tight mb-1" title={tax.t_transfertaxdetails[0]?.nt_transferee || "Multiple"}>
                                                             {tax.t_transfertaxdetails[0]?.nt_transferee || "Multiple"}
                                                         </h3>
+                                                        <div className="flex items-center text-xs text-gray-500 mb-1">
+                                                            <Clock className="w-3.5 h-3.5 mr-1.5" />
+                                                            Computed: {format(new Date(tax.t_DateCompute), "MMM d, yyyy")}
+                                                        </div>
                                                         <div className="flex items-center text-xs text-gray-500 mb-2">
                                                             <Clock className="w-3.5 h-3.5 mr-1.5" />
-                                                            {format(new Date(tax.t_DateCompute), "MMM d, yyyy")}
+                                                            Valid Until: {new Date(tax.t_validity).getFullYear() >= 2099 ? "Max Interest Reached" : format(new Date(tax.t_validity), "MMM d, yyyy")}
                                                         </div>
                                                         <div className="mt-3 pt-3 border-t flex justify-between items-end">
                                                             <span className="text-xs text-gray-500 font-medium">Total Amount Due</span>
@@ -472,7 +500,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                             size="sm"
                                                             className="h-8 px-2 text-emerald-600 hover:bg-emerald-50 border-emerald-200"
                                                             onClick={() => handleRecompute(tax.id)}
-                                                            disabled={recomputingId === tax.id}
+                                                            disabled={recomputingId === tax.id || tax.t_status?.toLowerCase() === "paid"}
                                                             title="Recompute Penalties"
                                                         >
                                                             <RefreshCw className={`w-4 h-4 ${recomputingId === tax.id ? 'animate-spin' : ''}`} />
@@ -493,6 +521,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                             size="sm" 
                                                             className="h-8 px-2 text-blue-600 hover:bg-blue-50 border-blue-200"
                                                             onClick={() => setEditingTax(tax)}
+                                                            disabled={tax.t_status?.toLowerCase() === "paid"}
                                                             title="Edit"
                                                         >
                                                             <Edit className="w-4 h-4" />
@@ -502,6 +531,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                             size="sm" 
                                                             className="h-8 px-2 text-red-600 hover:bg-red-50 border-red-200"
                                                             onClick={() => setDeleteId(tax.id)}
+                                                            disabled={tax.t_status?.toLowerCase() === "paid"}
                                                             title="Delete"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
