@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAllTransferTaxes, deleteTransferTax, recomputeTransferTax, getPaginatedTransferTaxes, updateNotarialDocumentAttachment } from "@/lib/actions/transfertax-actions";
+import { deleteTransferTax, recomputeTransferTax, getPaginatedTransferTaxes, updateNotarialDocumentAttachment } from "@/lib/actions/transfertax-actions";
 import { uploadFile } from "@/lib/upload/upload-action";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,12 +31,11 @@ export function TransferTaxListClient({ user }: { user: any }) {
     const router = useRouter();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [taxes, setTaxes] = useState<any[]>([]);
-    const [allTaxes, setAllTaxes] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [recomputingId, setRecomputingId] = useState<string | null>(null);
+    const [isRecomputingId, setIsRecomputingId] = useState<string | null>(null);
     const [editingTax, setEditingTax] = useState<any | null>(null);
     const [paymentTax, setPaymentTax] = useState<any | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
@@ -46,6 +45,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const ITEMS_PER_PAGE = 10;
+    const [totalItems, setTotalItems] = useState(0);
 
     // Upload state
     const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
@@ -88,13 +88,13 @@ export function TransferTaxListClient({ user }: { user: any }) {
     const loadTaxes = async () => {
         setIsLoading(true);
         try {
-            // Fetch first page quickly
-            const res = await getPaginatedTransferTaxes(1, ITEMS_PER_PAGE);
+            const res = await getPaginatedTransferTaxes(currentPage, ITEMS_PER_PAGE, searchQuery);
             if (res.error) {
                 toast.error(res.error);
             } else {
                 setTaxes(res.taxes || []);
                 setTotalPages(res.totalPages || 1);
+                setTotalItems(res.total || 0);
             }
         } catch (error) {
             console.error(error);
@@ -102,63 +102,48 @@ export function TransferTaxListClient({ user }: { user: any }) {
         } finally {
             setIsLoading(false);
         }
-
-        // Fetch all in the background for fast pagination later
-        loadAllTaxesInBackground();
     };
 
-    const loadAllTaxesInBackground = async () => {
-        setIsBackgroundLoading(true);
-        try {
-            const res = await getAllTransferTaxes();
-            if (!res.error) {
-                setAllTaxes(res.taxes || []);
-                setTotalPages(Math.ceil((res.taxes?.length || 0) / ITEMS_PER_PAGE));
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if (currentPage !== 1) {
+                setCurrentPage(1); // Setting currentPage triggers the other useEffect to loadTaxes
+            } else {
+                loadTaxes();
             }
-        } catch (error) {
-            console.error("Background fetch failed", error);
-        } finally {
-            setIsBackgroundLoading(false);
-        }
-    };
+        }, 500);
+        return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchQuery]);
 
     useEffect(() => {
         loadTaxes();
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPage]);
 
-    // Update displayed taxes when page or allTaxes changes
-    const filteredAllTaxes = useMemo(() => {
-        return allTaxes.filter((tax: any) => {
-            if (!searchQuery) return true;
-            const query = searchQuery.toLowerCase();
-            const transferee = (tax.t_transfertaxdetails?.[0]?.nt_transferee || "").toLowerCase();
-            const transferor = (tax.t_transfertaxdetails?.[0]?.nt_transferror || "").toLowerCase();
-            const controlNo = (tax.t_controlNumber || "").toLowerCase();
-            const amountDue = String(tax.t_TotalAmountDue || "").toLowerCase();
-
-            return transferee.includes(query) || 
-                   transferor.includes(query) || 
-                   controlNo.includes(query) || 
-                   amountDue.includes(query);
-        });
-    }, [allTaxes, searchQuery]);
-
-    useEffect(() => {
-        if (allTaxes.length > 0) {
-            const newTotalPages = Math.ceil(filteredAllTaxes.length / ITEMS_PER_PAGE) || 1;
-            setTotalPages(newTotalPages);
-            
-            let safeCurrentPage = currentPage;
-            if (currentPage > newTotalPages) {
-                safeCurrentPage = 1;
-                setCurrentPage(1);
+    const handleViewComputation = async (tax: any) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const validityDate = new Date(tax.t_validity);
+        
+        if (tax.t_status?.toLowerCase() !== "paid" && today > validityDate) {
+            setIsRecomputingId(tax.id);
+            try {
+                const res = await recomputeTransferTax(tax.id);
+                if (res.error) {
+                    toast.error(res.error);
+                } else {
+                    toast.success("Computation automatically updated based on current date.");
+                }
+            } catch (error) {
+                console.error("Error recomputing", error);
+            } finally {
+                setIsRecomputingId(null);
             }
-            
-            const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
-            const endIndex = startIndex + ITEMS_PER_PAGE;
-            setTaxes(filteredAllTaxes.slice(startIndex, endIndex));
         }
-    }, [currentPage, allTaxes, filteredAllTaxes]);
+        
+        router.push(`/newTransferTax/summary/${tax.t_NotarialId}`);
+    };
 
     const handleDelete = async () => {
         if (!deleteId) return;
@@ -231,7 +216,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                     className="pl-9 bg-gray-50/50"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    disabled={isBackgroundLoading}
+                                    disabled={isLoading}
                                 />
                             </div>
                             <div className="flex bg-gray-100 p-1 rounded-md ml-4 shrink-0">
@@ -291,10 +276,11 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                 taxes.map((tax: any) => (
                                                     <tr key={tax.id} className="hover:bg-gray-50/50 transition-colors">
-                                                        <td className="px-6 py-4 font-mono font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">
-                                                            <Link href={`/newTransferTax/summary/${tax.t_NotarialId}`}>
-                                                                {tax.t_controlNumber}
-                                                            </Link>
+                                                        <td className="px-6 py-4 font-mono font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer" onClick={() => handleViewComputation(tax)}>
+                                                            <div className="flex items-center gap-2">
+                                                                {isRecomputingId === tax.id && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
+                                                                <span>{tax.t_controlNumber}</span>
+                                                            </div>
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <div className="flex flex-col">
@@ -422,7 +408,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                     ) : (
                                         taxes.map((tax: any) => (
                                             <div key={tax.id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col group">
-                                                <div className="h-32 bg-gradient-to-b from-blue-50 to-white border-b relative p-4 flex flex-col items-center justify-center cursor-pointer overflow-hidden" onClick={() => router.push(`/newTransferTax/summary/${tax.t_NotarialId}`)}>
+                                                <div className="h-32 bg-gradient-to-b from-blue-50 to-white border-b relative p-4 flex flex-col items-center justify-center cursor-pointer overflow-hidden" onClick={() => handleViewComputation(tax)}>
                                                     <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px]"></div>
                                                     <div className="w-12 h-12 bg-white rounded-full shadow-sm border border-blue-100 flex items-center justify-center z-10 mb-2 group-hover:scale-110 transition-transform">
                                                         <FileText className="w-5 h-5 text-blue-600" />
@@ -467,10 +453,11 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                             variant="outline" 
                                                             size="sm" 
                                                             className="flex-1 h-8 text-xs font-medium text-blue-600 border-blue-200 hover:bg-blue-50"
-                                                            onClick={() => router.push(`/newTransferTax/summary/${tax.t_NotarialId}`)}
+                                                            onClick={() => handleViewComputation(tax)}
+                                                            disabled={isRecomputingId === tax.id}
                                                         >
-                                                            <FileText className="w-3.5 h-3.5 mr-1.5" />
-                                                            View PDF
+                                                            {isRecomputingId === tax.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileText className="w-3.5 h-3.5 mr-1" />}
+                                                            View Details
                                                         </Button>
                                                         <input 
                                                             type="file" 
@@ -546,25 +533,18 @@ export function TransferTaxListClient({ user }: { user: any }) {
                         </CardContent>
                         <CardFooter className="flex items-center justify-between px-6 py-4 border-t bg-gray-50/50">
                             <div className="text-sm text-gray-500">
-                                {isBackgroundLoading ? (
-                                    <span className="flex items-center text-blue-600">
-                                        <RefreshCw className="w-3 h-3 mr-2 animate-spin" />
-                                        Syncing all records in background...
-                                    </span>
-                                ) : (
-                                    <span>
-                                        Showing {taxes.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} to{" "}
-                                        {Math.min(currentPage * ITEMS_PER_PAGE, allTaxes.length > 0 ? filteredAllTaxes.length : totalPages * ITEMS_PER_PAGE)} of{" "}
-                                        {allTaxes.length > 0 ? filteredAllTaxes.length : totalPages * ITEMS_PER_PAGE} entries
-                                    </span>
-                                )}
+                                <span>
+                                    Showing {taxes.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} to{" "}
+                                    {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of{" "}
+                                    {totalItems} entries
+                                </span>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                    disabled={currentPage === 1 || isLoading || isBackgroundLoading}
+                                    disabled={currentPage === 1 || isLoading}
                                 >
                                     <ChevronLeft className="w-4 h-4 mr-1" />
                                     Previous
@@ -576,7 +556,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                    disabled={currentPage === totalPages || isLoading || isBackgroundLoading}
+                                    disabled={currentPage === totalPages || isLoading}
                                 >
                                     Next
                                     <ChevronRight className="w-4 h-4 ml-1" />

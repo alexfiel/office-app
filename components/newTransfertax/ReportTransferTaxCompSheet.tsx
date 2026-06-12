@@ -394,7 +394,8 @@ export function ReportTransferTaxCompSheet({
                 pdf.text(`Page ${i} of ${pageCount}`, centerX, FOLIO_HEIGHT - 10, { align: 'center' });
             }
 
-            pdf.save(`Computation_Sheet_${data.documentNumber}.pdf`);
+            const pdfBlobUrl = pdf.output('bloburl');
+            window.open(pdfBlobUrl, '_blank');
         } catch (error: any) {
             console.error("PDF Export Error:", error);
             alert(`Error generating PDF: ${error?.message || 'Unknown error'}`);

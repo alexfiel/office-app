@@ -99,13 +99,20 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
         setSelectedItem(null);
     }
 
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+    const ITEMS_PER_PAGE = 10;
+
     const fetchTaxes = async () => {
         try {
             setLoading(true);
-            const res = await fetch(`/api/transfertax`);
+            const res = await fetch(`/api/transfertax?page=${currentPage}&limit=${ITEMS_PER_PAGE}&search=${encodeURIComponent(searchTerm)}`);
             if (!res.ok) throw new Error("Failed to fetch transfer taxes");
             const result = await res.json();
-            setData(result);
+            setData(result.taxes || []);
+            setTotalPages(result.totalPages || 1);
+            setTotalItems(result.total || 0);
         } catch (error: any) {
             toast.error(error.message || "Failed to fetch list");
         } finally {
@@ -114,8 +121,21 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
     };
 
     useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if (currentPage !== 1) {
+                setCurrentPage(1); // Setting currentPage triggers the other useEffect to fetchTaxes
+            } else {
+                fetchTaxes();
+            }
+        }, 500);
+        return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchTerm]);
+
+    useEffect(() => {
         fetchTaxes();
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPage]);
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this transaction? This action cannot be undone.")) return;
@@ -129,17 +149,11 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
                 throw new Error(err.error || "Failed to delete");
             }
             toast.success("Transaction deleted successfully");
-            setData(data.filter(item => item.id !== id));
+            fetchTaxes();
         } catch (error: any) {
             toast.error(error.message);
         }
     }
-
-    const filteredData = data.filter(item =>
-        item.transferee.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.transferor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
 
     if (previewData) {
         return (
@@ -168,11 +182,11 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
 
             {loading && <p className="text-muted-foreground font-medium">Loading transactions...</p>}
 
-            {!loading && filteredData.length === 0 && (
+            {!loading && data.length === 0 && (
                 <p className="text-muted-foreground font-medium">No transactions found.</p>
             )}
 
-            {!loading && filteredData.length > 0 && (
+            {!loading && data.length > 0 && (
                 <div className="overflow-x-auto">
                     <table className="min-w-full border text-sm">
                         <thead>
@@ -195,7 +209,7 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredData.map((item) => {
+                            {data.map((item) => {
                                 const isOwnerOrAdmin = currentUser.id === item.userId || currentUser.role === "ADMIN";
                                 return (
                                     <tr key={item.id} className="border-b hover:bg-gray-50">
@@ -266,6 +280,37 @@ export default function TransferTaxList({ currentUser }: { currentUser: any }) {
                             })}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {!loading && data.length > 0 && (
+                <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+                    <div>
+                        Showing {data.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} to{" "}
+                        {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of{" "}
+                        {totalItems} entries
+                    </div>
+                    <div className="flex space-x-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={currentPage === 1 || loading}
+                        >
+                            Previous
+                        </Button>
+                        <div className="px-3 py-1 bg-gray-100 rounded text-black font-medium text-xs flex items-center">
+                            Page {currentPage} of {totalPages}
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages || loading}
+                        >
+                            Next
+                        </Button>
+                    </div>
                 </div>
             )}
 

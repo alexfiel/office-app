@@ -157,24 +157,50 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const transferTaxes = await prisma.transferTax.findMany({
-            include: {
-                notarialDocument: true,
-                details: true,
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                    }
-                }
-            },
-            orderBy: {
-                createdAt: 'desc'
-            }
-        });
+        const url = new URL(req.url);
+        const page = parseInt(url.searchParams.get("page") || "1", 10);
+        const limit = parseInt(url.searchParams.get("limit") || "10", 10);
+        const search = url.searchParams.get("search") || "";
 
-        return NextResponse.json(transferTaxes, { status: 200 });
+        const skip = (page - 1) * limit;
+
+        const whereClause: any = {};
+        if (search) {
+            whereClause.OR = [
+                { transferee: { contains: search, mode: 'insensitive' } },
+                { transferor: { contains: search, mode: 'insensitive' } },
+                { transactionType: { contains: search, mode: 'insensitive' } },
+            ];
+        }
+
+        const [transferTaxes, total] = await Promise.all([
+            prisma.transferTax.findMany({
+                where: whereClause,
+                skip,
+                take: limit,
+                include: {
+                    notarialDocument: true,
+                    details: true,
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                        }
+                    }
+                },
+                orderBy: {
+                    createdAt: 'desc'
+                }
+            }),
+            prisma.transferTax.count({ where: whereClause })
+        ]);
+
+        return NextResponse.json({
+            taxes: transferTaxes,
+            total,
+            totalPages: Math.ceil(total / limit)
+        }, { status: 200 });
 
     } catch (error: any) {
         console.error("Error fetching transfer taxes:", error);

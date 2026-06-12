@@ -374,38 +374,9 @@ export async function getTransactionsByNotarialId(notarialId: string) {
     }
 }
 
-export async function getAllTransferTaxes() {
-    try {
-        const session = await auth();
-        if (!session?.user?.id) {
-            return { error: "Unauthorized. Please log in." };
-        }
+// Removed getAllTransferTaxes to prevent heap space out of memory issues.
 
-        const taxes = await prisma.newTransferTax.findMany({
-            include: {
-                notarialDocument: true,
-                t_transfertaxdetails: {
-                    include: {
-                        realProperty: true
-                    }
-                }
-            },
-            orderBy: {
-                t_DateCompute: 'desc'
-            }
-        });
-
-        // Serialize the document to convert Prisma Decimal objects to plain strings
-        const plainTaxes = JSON.parse(JSON.stringify(taxes));
-
-        return { success: true, taxes: plainTaxes };
-    } catch (error) {
-        console.error("Error fetching all transactions:", error);
-        return { error: "Failed to fetch transactions." };
-    }
-}
-
-export async function getPaginatedTransferTaxes(page: number = 1, limit: number = 10) {
+export async function getPaginatedTransferTaxes(page: number = 1, limit: number = 10, searchQuery: string = "") {
     try {
         const session = await auth();
         if (!session?.user?.id) {
@@ -414,8 +385,26 @@ export async function getPaginatedTransferTaxes(page: number = 1, limit: number 
 
         const skip = (page - 1) * limit;
 
+        const whereClause: any = {};
+        if (searchQuery) {
+            whereClause.OR = [
+                { t_controlNumber: { contains: searchQuery, mode: 'insensitive' } },
+                {
+                    t_transfertaxdetails: {
+                        some: {
+                            OR: [
+                                { nt_transferee: { contains: searchQuery, mode: 'insensitive' } },
+                                { nt_transferror: { contains: searchQuery, mode: 'insensitive' } },
+                            ]
+                        }
+                    }
+                }
+            ];
+        }
+
         const [taxes, total] = await Promise.all([
             prisma.newTransferTax.findMany({
+                where: whereClause,
                 skip,
                 take: limit,
                 include: {
@@ -430,7 +419,7 @@ export async function getPaginatedTransferTaxes(page: number = 1, limit: number 
                     t_DateCompute: 'desc'
                 }
             }),
-            prisma.newTransferTax.count()
+            prisma.newTransferTax.count({ where: whereClause })
         ]);
 
         const plainTaxes = JSON.parse(JSON.stringify(taxes));

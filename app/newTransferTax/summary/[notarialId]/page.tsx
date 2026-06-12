@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { ReportTransferTaxCompSheet } from "@/components/newTransfertax/ReportTransferTaxCompSheet";
+import { TransferTaxPaymentDialog } from "@/components/newTransfertax/TransferTaxPaymentDialog";
 import { useSession } from "next-auth/react";
+import { Receipt } from "lucide-react";
 
 export default function NotarialDocumentSummary() {
     const { data: session } = useSession();
@@ -17,25 +19,27 @@ export default function NotarialDocumentSummary() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [data, setData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [paymentTax, setPaymentTax] = useState<any>(null);
+
+    const fetchSummary = async () => {
+        if (!params.notarialId) return;
+        try {
+            const res = await getTransactionsByNotarialId(params.notarialId as string);
+            if (res.error) {
+                toast.error(res.error);
+            } else {
+                setData(res.document);
+            }
+        } catch (error) {
+            console.error("Failed to load summary", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchSummary = async () => {
-            if (!params.notarialId) return;
-            try {
-                const res = await getTransactionsByNotarialId(params.notarialId as string);
-                if (res.error) {
-                    toast.error(res.error);
-                } else {
-                    setData(res.document);
-                }
-            } catch (error) {
-                console.error("Failed to load summary", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
         fetchSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [params.notarialId]);
 
     if (isLoading) {
@@ -116,6 +120,7 @@ export default function NotarialDocumentSummary() {
                                     <th className="px-6 py-4">Transferee</th>
                                     <th className="px-6 py-4">Properties (TD / Lot / Area)</th>
                                     <th className="px-6 py-4 text-right">Amount Due</th>
+                                    <th className="px-6 py-4 text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -152,6 +157,23 @@ export default function NotarialDocumentSummary() {
                                         <td className="px-6 py-4 text-right font-bold text-gray-900">
                                             ₱{Number(tx.t_TotalAmountDue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {tx.t_status?.toLowerCase() === "paid" ? (
+                                                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">
+                                                    PAID
+                                                </span>
+                                            ) : (
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    onClick={() => setPaymentTax(tx)}
+                                                    className="h-8 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200"
+                                                >
+                                                    <Receipt className="w-3 h-3 mr-1.5" />
+                                                    Payment
+                                                </Button>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                                 {data.newTransferTaxes.length === 0 && (
@@ -178,6 +200,16 @@ export default function NotarialDocumentSummary() {
                     </div>
                 </CardFooter>
             </Card>
+
+            <TransferTaxPaymentDialog 
+                isOpen={!!paymentTax} 
+                onOpenChange={(open) => !open && setPaymentTax(null)}
+                tax={paymentTax}
+                onSuccess={() => {
+                    setPaymentTax(null);
+                    fetchSummary();
+                }}
+            />
         </div>
     );
 }

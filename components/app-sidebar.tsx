@@ -105,10 +105,11 @@ const data = {
       icon: IconEyeDotted,
     },
     {
-      title: "Compute Transfer Tax",
-      url: "/transfertax",
-      icon: IconCalculatorFilled,
+      title: "Old Transfer Tax List",
+      url: "/viewOldTransferTaxList",
+      icon: IconEyeDotted,
     },
+
     {
       title: "Transfer Tax Computation",
       url: "/newTransferTax",
