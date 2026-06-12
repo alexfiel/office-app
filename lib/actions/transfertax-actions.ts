@@ -180,7 +180,10 @@ export async function saveTransferTaxTransaction(data: any) {
                 }
             }
 
-            const considerationValue = transactionData.transactionType === "Sale" ? Number(transactionData.considerationValue) : 0;
+            const totalMV = computationData.totalMarketValue || 1; // avoid division by zero
+            const considerationValue = transactionData.transactionType === "Sale" 
+                ? (Number(transactionData.considerationValue) * (displayValue / totalMV)) 
+                : 0;
             
             let mappedType = transactionData.transactionType.toUpperCase();
             if (mappedType === "SALE") mappedType = "DEED OF SALE";
@@ -708,5 +711,118 @@ export async function updateNotarialDocumentAttachment(notarialId: string, docum
     } catch (error) {
         console.error("Failed to update attachment", error);
         return { success: false, error: "Failed to update attachment" };
+    }
+}
+
+export async function captureTransferTaxPayment(
+    transactionId: string,
+    receiptNumber: string,
+    amount: number,
+    paymentDate: string,
+    modeOfPayment: string
+) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized. Please log in." };
+        }
+        
+        const tx = await prisma.newTransferTax.findUnique({
+            where: { id: transactionId },
+            include: { notarialDocument: true, t_transfertaxdetails: true }
+        });
+        
+        if (!tx || !tx.notarialDocument) {
+            return { error: "Transaction not found." };
+        }
+        
+        const pDate = new Date(paymentDate);
+        let isRecomputed = false;
+        
+        // Recompute if payment date > validity date
+        if (pDate > tx.t_validity) {
+            let totalSurcharge = 0;
+            let totalInterest = 0;
+            let totalAmountDue = 0;
+            let overallDaysElapsed = 0;
+            let overallValidityDate = "";
+
+            for (const detail of tx.t_transfertaxdetails) {
+                let mappedType = detail.nt_transactiontype.toUpperCase();
+                if (mappedType === "SALE") mappedType = "DEED OF SALE";
+                else if (mappedType === "EXTRAJUDICIAL SETTLEMENT") mappedType = "DEED OF EXTRAJUDICIAL SETTLEMENT";
+                else if (mappedType === "DONATION") mappedType = "DEED OF DONATION";
+                else if (mappedType === "WAIVER OF RIGHTS") mappedType = "DEED OF WAIVER OF RIGHTS";
+                else if (mappedType === "PARTITION") mappedType = "DEED OF PARTITION";
+                else if (mappedType === "ADJUDICATION") mappedType = "DEED OF ADJUDICATION";
+
+                const computed = TransferTaxCalculator.computeTotal(
+                    mappedType,
+                    Number(detail.nt_marketvalue),
+                    Number(detail.nt_considerationvalue),
+                    tx.notarialDocument.notarialDate.toISOString(),
+                    1,
+                    pDate
+                );
+
+                await prisma.newTransferTaxDetails.update({
+                    where: { id: detail.id },
+                    data: {
+                        nt_surcharge: computed.surcharge,
+                        nt_interest: computed.interest,
+                        nt_totalTransferTaxDue: computed.basicTaxDue + computed.surcharge + computed.interest
+                    }
+                });
+
+                totalSurcharge += computed.surcharge;
+                totalInterest += computed.interest;
+                totalAmountDue += (computed.basicTaxDue + computed.surcharge + computed.interest);
+                overallDaysElapsed = computed.daysElapsed;
+                overallValidityDate = computed.validityDate;
+            }
+
+            await prisma.newTransferTax.update({
+                where: { id: transactionId },
+                data: {
+                    t_DateCompute: pDate,
+                    t_TotalSurcharge: totalSurcharge,
+                    t_TotalInterest: totalInterest,
+                    t_TotalAmountDue: totalAmountDue,
+                    t_daysElapsed: overallDaysElapsed,
+                    t_validity: overallValidityDate === "MAXIMUM INTEREST REACHED" ? new Date("2099-12-31") : new Date(overallValidityDate || new Date(pDate).setDate(pDate.getDate() + 30))
+                }
+            });
+            isRecomputed = true;
+        }
+        
+        // Create the payment
+        await prisma.capturedPayment.create({
+            data: {
+                cp_receiptnumber: receiptNumber,
+                cp_amount: amount,
+                cp_paymentDate: pDate,
+                cp_remarks: "Paid via " + modeOfPayment,
+                cp_modeOfPayment: modeOfPayment,
+                cp_NewTransferTaxId: transactionId,
+                cp_UserId: session.user.id
+            }
+        });
+        
+        // Update the NewTransferTax
+        await prisma.newTransferTax.update({
+            where: { id: transactionId },
+            data: {
+                t_status: "paid",
+                t_paymentStatus: "paid"
+            }
+        });
+        
+        return { success: true, isRecomputed };
+    } catch (error: any) {
+        console.error("Error capturing payment:", error);
+        if (error.code === 'P2002') {
+             return { error: "Receipt number already exists." };
+        }
+        return { error: "Failed to capture payment." };
     }
 }

@@ -7,7 +7,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
-import { ReportTransferTaxComputation } from "@/components/newTransfertax/report-transfertax-computation";
+import { ReportTransferTaxCompSheet } from "@/components/newTransfertax/ReportTransferTaxCompSheet";
 
 export default function NotarialDocumentSummary() {
     const params = useParams();
@@ -74,7 +74,7 @@ export default function NotarialDocumentSummary() {
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         Back to Home
                     </Button>
-                    <ReportTransferTaxComputation data={data} userName="TRANSFER TAX ASSESSOR" />
+                    <ReportTransferTaxCompSheet data={data} userName="TRANSFER TAX ASSESSOR" />
                 </div>
             </div>
 

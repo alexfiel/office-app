@@ -152,6 +152,18 @@ export function TransferTaxTransaction() {
             return;
         }
 
+        if (transactionType === "Sale") {
+            const missingScope = cart.some(property => {
+                const pData = propertyEjsData[property.id];
+                return !pData || !pData.saleScope;
+            });
+            
+            if (missingScope) {
+                toast.error("Please select a Sale Scope (Whole or Portion) for all properties to proceed.");
+                return;
+            }
+        }
+
         const transactionData = {
             transferee: transferee.toUpperCase(),
             transferor: transferor.toUpperCase(),

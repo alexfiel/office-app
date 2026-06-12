@@ -8,7 +8,7 @@ import { uploadFile } from "@/lib/upload/upload-action";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Edit, Calculator, FileText, Clock, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Search, LayoutGrid, List, Paperclip, Loader2 } from "lucide-react";
+import { Trash2, Edit, Calculator, FileText, Clock, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Search, LayoutGrid, List, Paperclip, Loader2, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import {
     AlertDialog,
@@ -25,6 +25,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TransferTaxEditDialog } from "./TransferTaxEditDialog";
+import { TransferTaxPaymentDialog } from "./TransferTaxPaymentDialog";
 
 export function TransferTaxListClient({ user }: { user: any }) {
     const router = useRouter();
@@ -37,6 +38,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [recomputingId, setRecomputingId] = useState<string | null>(null);
     const [editingTax, setEditingTax] = useState<any | null>(null);
+    const [paymentTax, setPaymentTax] = useState<any | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [viewMode, setViewMode] = useState<"list" | "cards">("list");
     
@@ -348,6 +350,17 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                 >
                                                                     <RefreshCw className={`w-4 h-4 ${recomputingId === tax.id ? 'animate-spin' : ''}`} />
                                                                 </Button>
+                                                                {tax.t_status === "pending" && (
+                                                                    <Button 
+                                                                        variant="outline" 
+                                                                        size="sm" 
+                                                                        className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                                                                        onClick={() => setPaymentTax(tax)}
+                                                                        title="Capture Payment"
+                                                                    >
+                                                                        <Receipt className="w-4 h-4" />
+                                                                    </Button>
+                                                                )}
                                                                 <Button 
                                                                     variant="outline" 
                                                                     size="sm" 
@@ -464,6 +477,17 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                         >
                                                             <RefreshCw className={`w-4 h-4 ${recomputingId === tax.id ? 'animate-spin' : ''}`} />
                                                         </Button>
+                                                        {tax.t_status === "pending" && (
+                                                            <Button 
+                                                                variant="outline" 
+                                                                size="sm" 
+                                                                className="h-8 px-2 text-emerald-600 hover:bg-emerald-50 border-emerald-200"
+                                                                onClick={() => setPaymentTax(tax)}
+                                                                title="Capture Payment"
+                                                            >
+                                                                <Receipt className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
                                                         <Button 
                                                             variant="outline" 
                                                             size="sm" 
@@ -566,12 +590,23 @@ export function TransferTaxListClient({ user }: { user: any }) {
                         taxData={editingTax}
                         isAdmin={user.role === "ADMIN"}
                         onSuccess={() => {
+                            setEditingTax(null);
                             loadTaxes();
                         }}
                         onFullRevert={() => {
                             if (editingTax) {
                                 setDeleteId(editingTax.id);
                             }
+                        }}
+                    />
+
+                    <TransferTaxPaymentDialog
+                        isOpen={!!paymentTax}
+                        onOpenChange={(open) => !open && setPaymentTax(null)}
+                        tax={paymentTax}
+                        onSuccess={() => {
+                            setPaymentTax(null);
+                            loadTaxes();
                         }}
                     />
                 </div>

@@ -19,7 +19,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const LOCAL_TAX_RATE = 0.005; // 0.5%
+const LOCAL_TAX_RATE = 0.0075; // 0.75%
 const SURCHARGE_RATE = 0.25; // 25%
 const INTEREST_RATE_PER_MONTH = 0.02; // 2%
 const MAX_INTEREST_MONTHS = 36;
@@ -139,7 +139,7 @@ export function TransferTaxComputation() {
 
     const considerationValue = transactionData.transactionType === "Sale" ? transactionData.considerationValue : 0;
     const taxBase = Math.max(totalMarketValue, considerationValue);
-    const taxDue = taxBase * LOCAL_TAX_RATE;
+    const taxDue = Math.max(taxBase * LOCAL_TAX_RATE, 500);
 
     const penaltyResult = calculateTaxPenalties(taxDue, documentData.notarialDate);
     const { daysElapsed, surcharge, interest, totalAmountDue, validityDate: validityDateStr } = penaltyResult;
@@ -338,7 +338,7 @@ export function TransferTaxComputation() {
                                 </div>
 
                                 <div className="flex justify-between items-center py-2 pt-4">
-                                    <span className="text-gray-600 font-medium">Transfer Tax Due <span className="text-xs text-gray-400 ml-1">(0.5%)</span></span>
+                                    <span className="text-gray-600 font-medium">Transfer Tax Due <span className="text-xs text-gray-400 ml-1">(0.75%)</span></span>
                                     <span className="text-gray-900 font-semibold">₱{taxDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
 
