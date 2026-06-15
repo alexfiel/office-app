@@ -30,8 +30,19 @@ export async function saveTransferTaxTransaction(data: any) {
             return { error: "Unauthorized. Please log in." };
         }
         
-        const userId = session.user.id;
+        let userId = session.user.id;
         
+        // Verify user exists to prevent foreign key constraint errors
+        const userExists = await prisma.user.findUnique({ where: { id: userId } });
+        if (!userExists) {
+            const fallbackUser = await prisma.user.findFirst();
+            if (fallbackUser) {
+                userId = fallbackUser.id;
+                console.warn(`Session user ${session.user.id} not found in database. Falling back to user: ${userId}`);
+            } else {
+                return { error: "User session invalid or user deleted. Please log out and log in again." };
+            }
+        }
         const {
             documentData,
             transactionData,

@@ -79,7 +79,7 @@ export function TransferTaxComputation() {
     const totalMarketValue = cart.reduce((acc, property) => {
         const pData = transactionData.propertyEjsData?.[property.id];
         const isEjsType = ["Extrajudicial Settlement", "Donation", "Waiver of Rights"].includes(transactionData.transactionType);
-        const isPartitionType = transactionData.transactionType === "Partition";
+        const isPartitionOrExchangeType = transactionData.transactionType === "Partition" || transactionData.transactionType === "Exchange";
         const isAdjudicationType = transactionData.transactionType === "Adjudication";
         
         let displayValue = Number(property.marketValue);
@@ -93,7 +93,7 @@ export function TransferTaxComputation() {
             } else if (totalOwners > 0) {
                 displayValue = 0;
             }
-        } else if (isPartitionType && pData) {
+        } else if (isPartitionOrExchangeType && pData) {
             const suppliedArea = pData.suppliedArea || 0;
             if (suppliedArea > 0 && finalArea > 0) {
                 displayValue = (displayValue / finalArea) * suppliedArea;

@@ -52,7 +52,7 @@ export function TransferTaxTransaction() {
 
     const EJS_TYPES = ["Extrajudicial Settlement", "Donation", "Waiver of Rights"];
     const isEjsType = EJS_TYPES.includes(transactionType);
-    const isPartitionType = transactionType === "Partition";
+    const isPartitionOrExchangeType = transactionType === "Partition" || transactionType === "Exchange";
     const isAdjudicationType = transactionType === "Adjudication";
     const isSaleType = transactionType === "Sale";
 
@@ -97,7 +97,7 @@ export function TransferTaxTransaction() {
 
     // Initialize EJS Data when transaction type changes
     useEffect(() => {
-        if ((isEjsType || isPartitionType || isAdjudicationType || isSaleType) && cart.length > 0) {
+        if ((isEjsType || isPartitionOrExchangeType || isAdjudicationType || isSaleType) && cart.length > 0) {
             // eslint-disable-next-line
             setPropertyEjsData(prev => {
                 const newData = { ...prev };
@@ -121,7 +121,7 @@ export function TransferTaxTransaction() {
                 return changed ? newData : prev;
             });
         }
-    }, [isEjsType, isPartitionType, isAdjudicationType, isSaleType, cart]);
+    }, [isEjsType, isPartitionOrExchangeType, isAdjudicationType, isSaleType, cart]);
 
     // Auto-populate Transferor based on selected distinct owners
     useEffect(() => {
@@ -169,7 +169,7 @@ export function TransferTaxTransaction() {
             transferor: transferor.toUpperCase(),
             transactionType,
             considerationValue: parseFloat(considerationValue) || 0,
-            propertyEjsData: (isEjsType || isPartitionType || isAdjudicationType || isSaleType) ? propertyEjsData : undefined
+            propertyEjsData: (isEjsType || isPartitionOrExchangeType || isAdjudicationType || isSaleType) ? propertyEjsData : undefined
         };
 
         // Save data in cookies
@@ -196,7 +196,7 @@ export function TransferTaxTransaction() {
             } else if (totalOwners > 0) {
                 displayValue = 0;
             }
-        } else if (isPartitionType && pData) {
+        } else if (isPartitionOrExchangeType && pData) {
             const suppliedArea = pData.suppliedArea || 0;
             const originalArea = Number(property.area) || 1;
             if (suppliedArea > 0) {
@@ -285,7 +285,7 @@ export function TransferTaxTransaction() {
                                     } else if (totalOwners > 0) {
                                         displayValue = 0; // Or keep original? The spec implies fraction based on selected
                                     }
-                                } else if (isPartitionType && pData) {
+                                } else if (isPartitionOrExchangeType && pData) {
                                     const suppliedArea = pData.suppliedArea || 0;
                                     const originalArea = Number(property.area) || 1;
                                     if (suppliedArea > 0) {
@@ -350,7 +350,7 @@ export function TransferTaxTransaction() {
                                             </div>
                                             <div className="text-right w-full sm:w-auto mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-200">
                                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                                                    {isEjsType || isPartitionType || isAdjudicationType || isSaleType ? "Adjusted Market Value" : "Market Value"}
+                                                    {isEjsType || isPartitionOrExchangeType || isAdjudicationType || isSaleType ? "Adjusted Market Value" : "Market Value"}
                                                 </p>
                                                 <p className="font-bold text-gray-900">₱{displayValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             </div>
@@ -405,7 +405,7 @@ export function TransferTaxTransaction() {
                                             </div>
                                         )}
 
-                                        {isPartitionType && pData && (
+                                        {isPartitionOrExchangeType && pData && (
                                             <div className="mt-2 pt-4 border-t border-gray-200/60 animate-in fade-in duration-300 grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-2">
                                                     <Label htmlFor={`area-${property.id}`} className="text-sm font-medium text-gray-700">Supplied Area (sq.m.)</Label>
