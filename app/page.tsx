@@ -1,8 +1,5 @@
 import { AppSidebar } from "@/components/app-sidebar"
-import dynamic from "next/dynamic"
-
-const ChartAreaInteractive = dynamic(() => import("@/components/chart-area-interactive").then(mod => mod.ChartAreaInteractive), { ssr: false })
-const ChartBarCollections = dynamic(() => import("@/components/chart-bar-collections").then(mod => mod.ChartBarCollections), { ssr: false })
+import { ChartAreaInteractive, ChartBarCollections } from "@/components/dashboard-charts-wrapper"
 
 import { DataTable } from "@/components/data-table"
 import { SectionCards } from "@/components/section-cards"

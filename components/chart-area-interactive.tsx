@@ -142,7 +142,7 @@ const chartConfig = {
 
 export function ChartAreaInteractive({ records }: { records: any[] }) {
   const isMobile = useIsMobile()
-  const [timeRange, setTimeRange] = React.useState("90d")
+  const [timeRange, setTimeRange] = React.useState("1y")
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -151,7 +151,7 @@ export function ChartAreaInteractive({ records }: { records: any[] }) {
 
   React.useEffect(() => {
     if (isMobile) {
-      setTimeRange("7d")
+      setTimeRange("30d")
     }
   }, [isMobile])
 
@@ -180,11 +180,13 @@ export function ChartAreaInteractive({ records }: { records: any[] }) {
     return processedData.filter((item) => {
       const date = new Date(item.date)
       const now = new Date();
-      let daysToSubtract = 90
+      let daysToSubtract = 365
       if (timeRange === "30d") {
         daysToSubtract = 30
-      } else if (timeRange === "7d") {
-        daysToSubtract = 7
+      } else if (timeRange === "90d") {
+        daysToSubtract = 90
+      } else if (timeRange === "1y") {
+        daysToSubtract = 365
       }
       const startDate = new Date()
       startDate.setDate(now.getDate() - daysToSubtract)
@@ -221,9 +223,9 @@ export function ChartAreaInteractive({ records }: { records: any[] }) {
             variant="outline"
             className="hidden *:data-[slot=toggle-group-item]:!px-4 @[767px]/card:flex"
           >
-            <ToggleGroupItem value="90d">Last 3 months</ToggleGroupItem>
-            <ToggleGroupItem value="30d">Last 30 days</ToggleGroupItem>
-            <ToggleGroupItem value="7d">Last 7 days</ToggleGroupItem>
+            <ToggleGroupItem value="1y">Yearly</ToggleGroupItem>
+            <ToggleGroupItem value="90d">Quarterly</ToggleGroupItem>
+            <ToggleGroupItem value="30d">Monthly</ToggleGroupItem>
           </ToggleGroup>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger
@@ -231,17 +233,17 @@ export function ChartAreaInteractive({ records }: { records: any[] }) {
               size="sm"
               aria-label="Select a value"
             >
-              <SelectValue placeholder="Last 3 months" />
+              <SelectValue placeholder="Yearly" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
+              <SelectItem value="1y" className="rounded-lg">
+                Yearly
+              </SelectItem>
               <SelectItem value="90d" className="rounded-lg">
-                Last 3 months
+                Quarterly
               </SelectItem>
               <SelectItem value="30d" className="rounded-lg">
-                Last 30 days
-              </SelectItem>
-              <SelectItem value="7d" className="rounded-lg">
-                Last 7 days
+                Monthly
               </SelectItem>
             </SelectContent>
           </Select>

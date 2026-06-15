@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, LabelList, Cell } from "recharts"
+import { Pie, PieChart, Cell, Label, Sector } from "recharts"
 
 import {
   Card,
@@ -16,6 +16,13 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export function ChartBarCollections({ records }: { records: any[] }) {
   const [mounted, setMounted] = React.useState(false);
@@ -84,29 +91,71 @@ export function ChartBarCollections({ records }: { records: any[] }) {
     return { chartData: data, chartConfig: config, totalAmount: total };
   }, [records]);
 
+  const categories = React.useMemo(() => chartData.map(item => item.categoryKey), [chartData]);
+  const [activeCategory, setActiveCategory] = React.useState<string | undefined>(undefined);
+
+  React.useEffect(() => {
+    if (categories.length > 0 && (!activeCategory || !categories.includes(activeCategory))) {
+      setActiveCategory(categories[0]);
+    }
+  }, [categories, activeCategory]);
+
+  const activeIndex = React.useMemo(
+    () => {
+       const idx = chartData.findIndex((item) => item.categoryKey === activeCategory);
+       return idx >= 0 ? idx : 0;
+    },
+    [activeCategory, chartData]
+  )
+
   return (
     <Card className="flex flex-col @container/card h-full">
-      <CardHeader className="pb-4">
-        <CardTitle>Collections by Category</CardTitle>
-        <CardDescription>
-          Total Revenue: ₱{totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </CardDescription>
+      <CardHeader className="flex-row items-start space-y-0 pb-0">
+        <div className="grid gap-1">
+          <CardTitle>Collections by Category</CardTitle>
+          <CardDescription>
+            Total Revenue: ₱{totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </CardDescription>
+        </div>
+        <Select value={activeCategory} onValueChange={setActiveCategory}>
+          <SelectTrigger
+            className="ml-auto h-7 w-[140px] rounded-lg pl-2.5"
+            aria-label="Select a category"
+          >
+            <SelectValue placeholder="Select category" />
+          </SelectTrigger>
+          <SelectContent align="end" className="rounded-xl">
+            {categories.map((key) => {
+              const config = chartConfig[key as keyof typeof chartConfig]
+              if (!config) return null
+              return (
+                <SelectItem
+                  key={key}
+                  value={key}
+                  className="rounded-lg [&_span]:flex"
+                >
+                  <div className="flex items-center gap-2 text-xs">
+                    <span
+                      className="flex h-3 w-3 shrink-0 rounded-sm"
+                      style={{
+                        backgroundColor: `var(--color-${key})`,
+                      }}
+                    />
+                    {config?.label}
+                  </div>
+                </SelectItem>
+              )
+            })}
+          </SelectContent>
+        </Select>
       </CardHeader>
-      <CardContent className="flex-1 pb-4">
+      <CardContent className="flex-1 pb-4 flex flex-col justify-center">
         {!mounted ? null : (
           <ChartContainer
             config={chartConfig}
-            className="w-full aspect-square max-h-[300px]"
+            className="mx-auto w-full aspect-square max-h-[250px]"
           >
-            <BarChart accessibilityLayer data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis
-                dataKey="categoryName"
-                tickLine={false}
-                tickMargin={10}
-                axisLine={false}
-                tickFormatter={(value) => value.length > 15 ? value.slice(0, 15) + '...' : value}
-              />
+            <PieChart>
               <ChartTooltip 
                 cursor={false} 
                 content={
@@ -129,12 +178,60 @@ export function ChartBarCollections({ records }: { records: any[] }) {
                   />
                 } 
               />
-              <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+              <Pie
+                data={chartData}
+                dataKey="amount"
+                nameKey="categoryKey"
+                innerRadius={60}
+                strokeWidth={3}
+                activeIndex={activeIndex}
+                activeShape={({
+                  outerRadius = 0,
+                  ...props
+                }: any) => (
+                  <Sector {...props} outerRadius={outerRadius + 8} />
+                )}
+                onMouseEnter={(_, index) => {
+                  const key = chartData[index]?.categoryKey;
+                  if (key) setActiveCategory(key);
+                }}
+              >
+                <Label
+                  content={({ viewBox }) => {
+                    if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                      return (
+                        <text
+                          x={viewBox.cx}
+                          y={viewBox.cy}
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                        >
+                          <tspan
+                            x={viewBox.cx}
+                            y={(viewBox.cy || 0) - 5}
+                            className="fill-foreground text-2xl font-bold"
+                          >
+                            ₱{Number(chartData[activeIndex]?.amount || 0).toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 })}
+                          </tspan>
+                          <tspan
+                            x={viewBox.cx}
+                            y={(viewBox.cy || 0) + 18}
+                            className="fill-muted-foreground text-xs"
+                          >
+                            {chartData[activeIndex]?.categoryName?.length > 15 
+                              ? chartData[activeIndex].categoryName.substring(0, 15) + "..."
+                              : chartData[activeIndex]?.categoryName}
+                          </tspan>
+                        </text>
+                      )
+                    }
+                  }}
+                />
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.fill} />
                 ))}
-              </Bar>
-            </BarChart>
+              </Pie>
+            </PieChart>
           </ChartContainer>
         )}
       </CardContent>
