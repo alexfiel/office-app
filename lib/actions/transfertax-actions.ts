@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { TransferTaxCalculator } from "@/lib/tax-calculator";
+import { calculateTaxPenalties } from "@/lib/tax-utils";
 import { revalidatePath } from "next/cache";
 
 const parseOwners = (ownerStr: string) => {
@@ -622,7 +623,7 @@ export async function updateBasicTransferTax(transactionId: string, detailsPaylo
                 const basicTaxDue = Math.max(itemTaxBase * 0.0075, 500);
 
                 // Need to recompute penalties
-                const calc = TransferTaxCalculator.calculateBasic(basicTaxDue, notarialDateStr, dateComputeStr);
+                const calc = calculateTaxPenalties(basicTaxDue, notarialDateStr, new Date(dateComputeStr));
 
                 await prisma.newTransferTaxDetails.update({
                     where: { id: payload.id },
@@ -672,7 +673,7 @@ export async function updateBasicTransferTax(transactionId: string, detailsPaylo
                 const groupTaxBase = Math.max(groupMarketValue, groupConsideration);
                 const groupBasicTax = Math.max(groupTaxBase * 0.0075, 500);
 
-                const penalties = TransferTaxCalculator.calculateBasic(groupBasicTax, notarialDateStr, dateComputeStr);
+                const penalties = calculateTaxPenalties(groupBasicTax, notarialDateStr, new Date(dateComputeStr));
 
                 updatedTotalMarketValue += groupMarketValue;
                 updatedTotalConsideration += groupConsideration;
