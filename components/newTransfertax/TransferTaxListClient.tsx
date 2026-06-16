@@ -3,12 +3,12 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { deleteTransferTax, recomputeTransferTax, getPaginatedTransferTaxes, updateNotarialDocumentAttachment } from "@/lib/actions/transfertax-actions";
+import { deleteTransferTax, recomputeTransferTax, getPaginatedTransferTaxes, updateNotarialDocumentAttachment, voidTransferTaxTransaction } from "@/lib/actions/transfertax-actions";
 import { uploadFile } from "@/lib/upload/upload-action";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Edit, Calculator, FileText, Clock, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Search, LayoutGrid, List, Paperclip, Loader2, Receipt } from "lucide-react";
+import { Trash2, Edit, Calculator, FileText, Clock, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Search, LayoutGrid, List, Paperclip, Loader2, Receipt, Ban } from "lucide-react";
 import { toast } from "sonner";
 import {
     AlertDialog,
@@ -34,6 +34,8 @@ export function TransferTaxListClient({ user }: { user: any }) {
     const [isLoading, setIsLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [isVoiding, setIsVoiding] = useState(false);
+    const [voidId, setVoidId] = useState<string | null>(null);
     const [recomputingId, setRecomputingId] = useState<string | null>(null);
     const [isRecomputingId, setIsRecomputingId] = useState<string | null>(null);
     const [editingTax, setEditingTax] = useState<any | null>(null);
@@ -163,6 +165,25 @@ export function TransferTaxListClient({ user }: { user: any }) {
         } finally {
             setIsDeleting(false);
             setDeleteId(null);
+        }
+    };
+
+    const handleVoid = async () => {
+        if (!voidId) return;
+        setIsVoiding(true);
+        try {
+            const res = await voidTransferTaxTransaction(voidId);
+            if (res.error) {
+                toast.error(res.error);
+            } else {
+                toast.success("Transaction voided successfully. Real property owners have been reverted.");
+                loadTaxes();
+            }
+        } catch (error) {
+            toast.error("Failed to void transaction.");
+        } finally {
+            setIsVoiding(false);
+            setVoidId(null);
         }
     };
 
@@ -311,6 +332,10 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                                                     Paid
                                                                 </span>
+                                                            ) : tax.t_status?.toLowerCase() === "voided" ? (
+                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                                    Voided
+                                                                </span>
                                                             ) : (
                                                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
                                                                     Unpaid
@@ -350,7 +375,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                     size="sm"
                                                                     className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                                                                     onClick={() => handleRecompute(tax.id)}
-                                                                    disabled={recomputingId === tax.id || tax.t_status?.toLowerCase() === "paid"}
+                                                                    disabled={recomputingId === tax.id || tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
                                                                     title="Recompute Penalties"
                                                                 >
                                                                     <RefreshCw className={`w-4 h-4 ${recomputingId === tax.id ? 'animate-spin' : ''}`} />
@@ -371,16 +396,26 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                     size="sm" 
                                                                     className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
                                                                     onClick={() => setEditingTax(tax)}
-                                                                    disabled={tax.t_status?.toLowerCase() === "paid"}
+                                                                    disabled={tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
                                                                 >
                                                                     <Edit className="w-4 h-4" />
                                                                 </Button>
                                                                 <Button 
                                                                     variant="outline" 
                                                                     size="sm" 
+                                                                    className="h-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200"
+                                                                    onClick={() => setVoidId(tax.id)}
+                                                                    disabled={tax.t_status?.toLowerCase() === "voided"}
+                                                                    title="Void Transaction"
+                                                                >
+                                                                    <Ban className="w-4 h-4" />
+                                                                </Button>
+                                                                <Button 
+                                                                    variant="outline" 
+                                                                    size="sm" 
                                                                     className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                                                                     onClick={() => setDeleteId(tax.id)}
-                                                                    disabled={tax.t_status?.toLowerCase() === "paid"}
+                                                                    disabled={tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
                                                                 >
                                                                     <Trash2 className="w-4 h-4" />
                                                                 </Button>
@@ -407,7 +442,14 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                         </div>
                                     ) : (
                                         taxes.map((tax: any) => (
-                                            <div key={tax.id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col group">
+                                            <div key={tax.id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col group relative">
+                                                {tax.t_status?.toLowerCase() === 'voided' && (
+                                                    <div className="absolute inset-0 z-40 bg-gray-100/40 flex items-center justify-center pointer-events-none">
+                                                        <div className="border-4 border-red-500/80 text-red-500/80 font-black text-3xl px-6 py-2 transform -rotate-12 rounded-lg shadow-sm bg-white/90 backdrop-blur-sm select-none tracking-widest">
+                                                            VOIDED
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <div className="h-32 bg-gradient-to-b from-blue-50 to-white border-b relative p-4 flex flex-col items-center justify-center cursor-pointer overflow-hidden" onClick={() => handleViewComputation(tax)}>
                                                     <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px]"></div>
                                                     <div className="w-12 h-12 bg-white rounded-full shadow-sm border border-blue-100 flex items-center justify-center z-10 mb-2 group-hover:scale-110 transition-transform">
@@ -422,8 +464,8 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                     <div className="absolute top-2 right-2 text-[8px] font-mono bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded shadow-sm font-bold">
                                                         {tax.t_controlNumber}
                                                     </div>
-                                                    <div className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm ${tax.t_status?.toLowerCase() === 'paid' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
-                                                        {tax.t_status?.toLowerCase() === 'paid' ? 'PAID' : 'UNPAID'}
+                                                    <div className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm ${tax.t_status?.toLowerCase() === 'paid' ? 'bg-green-100 text-green-800' : tax.t_status?.toLowerCase() === 'voided' ? 'bg-gray-100 text-gray-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                        {tax.t_status?.toLowerCase() === 'paid' ? 'PAID' : tax.t_status?.toLowerCase() === 'voided' ? 'VOIDED' : 'UNPAID'}
                                                     </div>
                                                 </div>
 
@@ -487,7 +529,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                             size="sm"
                                                             className="h-8 px-2 text-emerald-600 hover:bg-emerald-50 border-emerald-200"
                                                             onClick={() => handleRecompute(tax.id)}
-                                                            disabled={recomputingId === tax.id || tax.t_status?.toLowerCase() === "paid"}
+                                                            disabled={recomputingId === tax.id || tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
                                                             title="Recompute Penalties"
                                                         >
                                                             <RefreshCw className={`w-4 h-4 ${recomputingId === tax.id ? 'animate-spin' : ''}`} />
@@ -508,7 +550,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                             size="sm" 
                                                             className="h-8 px-2 text-blue-600 hover:bg-blue-50 border-blue-200"
                                                             onClick={() => setEditingTax(tax)}
-                                                            disabled={tax.t_status?.toLowerCase() === "paid"}
+                                                            disabled={tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
                                                             title="Edit"
                                                         >
                                                             <Edit className="w-4 h-4" />
@@ -516,9 +558,19 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                         <Button 
                                                             variant="outline" 
                                                             size="sm" 
+                                                            className="h-8 px-2 text-orange-600 hover:bg-orange-50 border-orange-200"
+                                                            onClick={() => setVoidId(tax.id)}
+                                                            disabled={tax.t_status?.toLowerCase() === "voided"}
+                                                            title="Void Transaction"
+                                                        >
+                                                            <Ban className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button 
+                                                            variant="outline" 
+                                                            size="sm" 
                                                             className="h-8 px-2 text-red-600 hover:bg-red-50 border-red-200"
                                                             onClick={() => setDeleteId(tax.id)}
-                                                            disabled={tax.t_status?.toLowerCase() === "paid"}
+                                                            disabled={tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
                                                             title="Delete"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
@@ -589,6 +641,35 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                     className="bg-red-600 hover:bg-red-700"
                                 >
                                     {isDeleting ? "Deleting..." : "Yes, Delete & Revert Owner"}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+
+                    <AlertDialog open={!!voidId} onOpenChange={(open) => !open && setVoidId(null)}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="text-orange-600 flex items-center gap-2">
+                                    <Ban className="w-5 h-5" />
+                                    Confirm Void
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Are you sure you want to void this Transfer Tax Computation? 
+                                    <br /><br />
+                                    <strong>Warning:</strong> Voiding this will revert the owner names of the associated real properties back to their previous state. If there is a captured payment, its receipt number will be marked as voided. This action cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isVoiding}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleVoid();
+                                    }} 
+                                    disabled={isVoiding}
+                                    className="bg-orange-600 hover:bg-orange-700"
+                                >
+                                    {isVoiding ? "Voiding..." : "Yes, Void Transaction"}
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>

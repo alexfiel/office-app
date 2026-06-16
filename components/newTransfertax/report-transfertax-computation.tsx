@@ -264,6 +264,30 @@ export function ReportTransferTaxComputation({ data, userName }: ReportTransferT
     doc.line(20, signatureY + 11, 80, signatureY + 11);
     doc.text("Name and Signature", 20, signatureY + 15);
 
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    const hasVoided = transactions.some((tx: any) => tx.t_status?.toLowerCase() === 'voided');
+
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      if (hasVoided) {
+          doc.setFontSize(120);
+          doc.setTextColor(255, 200, 200);
+          if (typeof doc.saveGraphicsState === 'function') {
+              try {
+                  doc.saveGraphicsState();
+                  doc.setGState(new (doc as any).GState({opacity: 0.15}));
+                  doc.setTextColor(255, 0, 0);
+                  doc.text("VOIDED", 148, 105, { align: 'center', angle: 45 });
+                  doc.restoreGraphicsState();
+              } catch (e) {
+                  doc.text("VOIDED", 148, 105, { align: 'center', angle: 45 });
+              }
+          } else {
+              doc.text("VOIDED", 148, 105, { align: 'center', angle: 45 });
+          }
+      }
+    }
+
     doc.save(`Report_TransferTax_${data.documentNumber}.pdf`);
   };
 
@@ -292,7 +316,14 @@ export function ReportTransferTaxComputation({ data, userName }: ReportTransferT
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto border p-4 bg-white rounded-md mt-2 shadow-sm">
+        <div className="flex-1 overflow-auto border p-4 bg-white rounded-md mt-2 shadow-sm relative">
+          {transactions.some((tx: any) => tx.t_status?.toLowerCase() === 'voided') && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none overflow-hidden">
+              <div className="text-[120px] font-black text-red-500/15 -rotate-45 select-none whitespace-nowrap">
+                VOIDED
+              </div>
+            </div>
+          )}
           <div className="text-center mb-6">
             <h2 className="font-bold text-lg">REPORT OF TRANSFER TAX COMPUTATION</h2>
             <p className="text-sm text-gray-500">Document No: {data.documentNumber}</p>

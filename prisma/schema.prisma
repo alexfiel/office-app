@@ -577,6 +577,8 @@ model DailyConsolidatedCollection {
   @@map("daily_collections")
 }
 
+
+
 model ApiKeyModel {
   id        String   @id @default(cuid())
   key       String   @unique

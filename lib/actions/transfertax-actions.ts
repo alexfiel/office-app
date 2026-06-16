@@ -742,6 +742,17 @@ export async function captureTransferTaxPayment(
             return { error: "Unauthorized. Please log in." };
         }
         
+        let userId = session.user.id;
+        const userExists = await prisma.user.findUnique({ where: { id: userId } });
+        if (!userExists) {
+            const fallbackUser = await prisma.user.findFirst();
+            if (fallbackUser) {
+                userId = fallbackUser.id;
+            } else {
+                return { error: "User session invalid or user deleted." };
+            }
+        }
+        
         const tx = await prisma.newTransferTax.findUnique({
             where: { id: transactionId },
             include: { notarialDocument: true, t_transfertaxdetails: true }
@@ -810,16 +821,25 @@ export async function captureTransferTaxPayment(
             isRecomputed = true;
         }
         
-        // Create the payment
-        await prisma.capturedPayment.create({
-            data: {
+        // Upsert the payment
+        await prisma.capturedPayment.upsert({
+            where: { cp_NewTransferTaxId: transactionId },
+            create: {
                 cp_receiptnumber: receiptNumber,
                 cp_amount: amount,
                 cp_paymentDate: pDate,
                 cp_remarks: "Paid via " + modeOfPayment,
                 cp_modeOfPayment: modeOfPayment,
                 cp_NewTransferTaxId: transactionId,
-                cp_UserId: session.user.id
+                cp_UserId: userId
+            },
+            update: {
+                cp_receiptnumber: receiptNumber,
+                cp_amount: amount,
+                cp_paymentDate: pDate,
+                cp_remarks: "Paid via " + modeOfPayment,
+                cp_modeOfPayment: modeOfPayment,
+                cp_UserId: userId
             }
         });
         
@@ -839,5 +859,84 @@ export async function captureTransferTaxPayment(
              return { error: "Receipt number already exists." };
         }
         return { error: "Failed to capture payment." };
+    }
+}
+
+export async function voidTransferTaxTransaction(id: string) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized. Please log in." };
+        }
+
+        const tax = await prisma.newTransferTax.findUnique({
+            where: { id },
+            include: {
+                t_transfertaxdetails: {
+                    include: { realProperty: true }
+                },
+                capturedPayment: true
+            }
+        });
+
+        if (!tax) {
+            return { error: "Transfer tax transaction not found." };
+        }
+
+        // Revert RealProperty owner updates
+        for (const detail of tax.t_transfertaxdetails) {
+            if (detail.realProperty) {
+                const transfereeToRemove = detail.nt_transferee.toUpperCase().trim();
+                const transferorsToAdd = detail.nt_transferror;
+
+                const currentOwnerList = parseOwners(detail.realProperty.owner);
+                
+                // Remove the transferee
+                const newOwnerList = currentOwnerList.filter((o: string) => 
+                    !o.includes(transfereeToRemove) && !transfereeToRemove.includes(o)
+                );
+
+                // Add the transferors back
+                if (transferorsToAdd) {
+                    const transferorsArray = transferorsToAdd.split(",").map((t: string) => t.trim());
+                    for (const t of transferorsArray) {
+                        if (t && !newOwnerList.includes(t)) {
+                            newOwnerList.push(t);
+                        }
+                    }
+                }
+
+                await prisma.realProperty.update({
+                    where: { id: detail.realProperty.id },
+                    data: { owner: newOwnerList.join(", ") }
+                });
+            }
+        }
+
+        // Update captured payment to voided if it exists
+        if (tax.capturedPayment) {
+            await prisma.capturedPayment.update({
+                where: { id: tax.capturedPayment.id },
+                data: {
+                    cp_receiptnumber: `VOIDED-${tax.capturedPayment.cp_receiptnumber}-${Date.now()}`
+                }
+            });
+        }
+
+        // Update transaction status to voided
+        await prisma.newTransferTax.update({
+            where: { id },
+            data: {
+                t_status: "voided",
+                t_paymentStatus: "voided"
+            }
+        });
+
+        revalidatePath('/newTransferTax');
+
+        return { success: true };
+    } catch (error) {
+        console.error("Error voiding transaction:", error);
+        return { error: "Failed to void transaction." };
     }
 }

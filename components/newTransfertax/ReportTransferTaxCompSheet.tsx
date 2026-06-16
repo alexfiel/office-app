@@ -387,8 +387,30 @@ export function ReportTransferTaxCompSheet({
 
             // Page numbers
             const pageCount = (pdf as any).internal.getNumberOfPages();
+            const hasVoided = transactions.some((tx: any) => tx.t_status?.toLowerCase() === 'voided');
+
             for (let i = 1; i <= pageCount; i++) {
                 pdf.setPage(i);
+                
+                if (hasVoided) {
+                    pdf.setFontSize(100);
+                    pdf.setTextColor(255, 200, 200); // Light red color as fallback for opacity
+                    if (typeof pdf.saveGraphicsState === 'function') {
+                        try {
+                            pdf.saveGraphicsState();
+                            pdf.setGState(new (pdf as any).GState({opacity: 0.15}));
+                            pdf.setTextColor(255, 0, 0); // Solid red with opacity
+                            pdf.text("VOIDED", centerX, FOLIO_HEIGHT / 2 + 10, { align: 'center', angle: 45 });
+                            pdf.restoreGraphicsState();
+                        } catch (e) {
+                            // Fallback if GState fails
+                            pdf.text("VOIDED", centerX, FOLIO_HEIGHT / 2 + 10, { align: 'center', angle: 45 });
+                        }
+                    } else {
+                        pdf.text("VOIDED", centerX, FOLIO_HEIGHT / 2 + 10, { align: 'center', angle: 45 });
+                    }
+                }
+
                 pdf.setFontSize(8);
                 pdf.setTextColor(150);
                 pdf.text(`Page ${i} of ${pageCount}`, centerX, FOLIO_HEIGHT - 10, { align: 'center' });
