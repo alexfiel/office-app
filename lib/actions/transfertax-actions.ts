@@ -869,6 +869,15 @@ export async function voidTransferTaxTransaction(id: string) {
             return { error: "Unauthorized. Please log in." };
         }
 
+        const dbUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true }
+        });
+
+        if (dbUser?.role !== 'ADMIN') {
+            return { error: "Unauthorized. Only administrators can void transactions." };
+        }
+
         const tax = await prisma.newTransferTax.findUnique({
             where: { id },
             include: {
@@ -928,7 +937,9 @@ export async function voidTransferTaxTransaction(id: string) {
             where: { id },
             data: {
                 t_status: "voided",
-                t_paymentStatus: "voided"
+                t_paymentStatus: "voided",
+                t_voidedDate: new Date(),
+                t_voidedBy: session.user.name || "System"
             }
         });
 

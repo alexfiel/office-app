@@ -50,11 +50,6 @@ const data = {
       icon: IconDashboard,
     },
     {
-      title: "Accomplishment ReportX",
-      url: "/txn",
-      icon: IconListDetails,
-    },
-    {
       title: "Libreng Sakay",
       url: "/librengsakay",
       icon: IconBus,

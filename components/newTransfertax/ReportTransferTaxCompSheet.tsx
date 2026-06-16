@@ -165,7 +165,10 @@ export function ReportTransferTaxCompSheet({
 
 
                 // Group Details for NewTransfertaxDetails to create Sub Header and Sub Detail Tables
-                const details = tx.t_transfertaxdetails || [];
+                const details = [...(tx.t_transfertaxdetails || [])].sort((a: any, b: any) => {
+                    if (!a.id || !b.id) return 0;
+                    return a.id.localeCompare(b.id);
+                });
 
                 const grouped: Record<string, any[]> = {};
                 details.forEach((dt: any) => {
@@ -212,9 +215,15 @@ export function ReportTransferTaxCompSheet({
                         const cons = Number(dt.nt_considerationvalue || 0);
                         groupConsideration += cons;
 
-                        const taxDue = Number(dt.nt_transfertaxDue || dt.nt_transfertaxdue || 0);
-                        const surcharge = Number(dt.nt_surcharge || 0);
-                        const interest = Number(dt.nt_interest || 0);
+                        let taxDue = Number(dt.nt_transfertaxDue || dt.nt_transfertaxdue || 0);
+                        let surcharge = Number(dt.nt_surcharge || 0);
+                        let interest = Number(dt.nt_interest || 0);
+
+                        if (tx.t_status?.toLowerCase() === 'voided') {
+                            taxDue = 0;
+                            surcharge = 0;
+                            interest = 0;
+                        }
 
                         groupTaxDue += taxDue;
                         groupSurcharge += surcharge;
@@ -291,7 +300,18 @@ export function ReportTransferTaxCompSheet({
                 const valueX = FOLIO_WIDTH - M;
 
                 let leftY = currentY;
-                if (tx.t_status === "Paid" || tx.capturedPayment) {
+                if (tx.t_status?.toLowerCase() === 'voided') {
+                    pdf.setTextColor(192, 57, 43); // Red
+                    pdf.text(`STATUS: VOIDED`, M, leftY);
+                    leftY += 4;
+                    pdf.setTextColor(0);
+                    pdf.setFont("helvetica", "normal");
+                    const vDate = tx.t_voidedDate ? new Date(tx.t_voidedDate).toLocaleDateString() : "N/A";
+                    pdf.text(`Date Voided: ${vDate}`, M, leftY);
+                    leftY += 4;
+                    pdf.text(`Voided by: ${tx.t_voidedBy || "N/A"}`, M, leftY);
+                    pdf.setFont("helvetica", "bold");
+                } else if (tx.t_status === "Paid" || tx.capturedPayment) {
                     pdf.setTextColor(39, 174, 96); // Green
                     pdf.text(`STATUS: PAID`, M, leftY);
 
