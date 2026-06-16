@@ -117,14 +117,14 @@ export function ReportTransferTaxCompSheet({
             pdf.setFont("helvetica", "normal");
 
             pdf.text(`Document Name: ${data.documentName || ''}`, M, currentY);
-            pdf.text(`${data.documentNumber || ''}`, M + 100, currentY);
             currentY += 5;
 
             pdf.text(`Document Type: ${data.documentType || ''}`, M, currentY);
-            pdf.text(`Notarial Date: ${new Date(data.notarialDate).toLocaleDateString()}`, M + 100, currentY);
+            pdf.text(`Document No: ${data.documentNumber || ''}`, M + 100, currentY);
             currentY += 5;
 
             pdf.text(`Notarized By: ${data.notarizedBy || ''}`, M, currentY);
+            pdf.text(`Notarial Date: ${new Date(data.notarialDate).toLocaleDateString()}`, M + 100, currentY);
 
             currentY += 10;
 
