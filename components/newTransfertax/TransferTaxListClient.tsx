@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { deleteTransferTax, recomputeTransferTax, getPaginatedTransferTaxes, updateNotarialDocumentAttachment, voidTransferTaxTransaction } from "@/lib/actions/transfertax-actions";
+import { deleteTransferTax, recomputeTransferTax, getPaginatedTransferTaxes, updateNotarialDocumentAttachment, voidTransferTaxTransaction, requestTransactionOverride } from "@/lib/actions/transfertax-actions";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { uploadFile } from "@/lib/upload/upload-action";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,10 @@ export function TransferTaxListClient({ user }: { user: any }) {
     // Upload state
     const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
 
+    const [overrideAction, setOverrideAction] = useState<{ taxId: string; actionType: string } | null>(null);
+    const [overrideReason, setOverrideReason] = useState("");
+    const [isSubmittingOverride, setIsSubmittingOverride] = useState(false);
+
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, notarialId: string) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -87,6 +92,30 @@ export function TransferTaxListClient({ user }: { user: any }) {
         }
     };
 
+    const handleOverrideSubmit = async () => {
+        if (!overrideAction || !overrideReason.trim()) return;
+        setIsSubmittingOverride(true);
+        try {
+            const res = await requestTransactionOverride(
+                overrideAction.taxId,
+                "NewTransferTax",
+                overrideAction.actionType,
+                overrideReason
+            );
+            if (res.error) {
+                toast.error(res.error);
+            } else {
+                toast.success(`Override request for ${overrideAction.actionType} submitted to administrators.`);
+                setOverrideAction(null);
+                setOverrideReason("");
+            }
+        } catch (error) {
+            toast.error("Failed to submit override request.");
+        } finally {
+            setIsSubmittingOverride(false);
+        }
+    };
+
     const loadTaxes = async () => {
         setIsLoading(true);
         try {
@@ -104,6 +133,10 @@ export function TransferTaxListClient({ user }: { user: any }) {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const hasApprovedOverride = (tax: any, action: string) => {
+        return tax.approvedOverrides?.some((o: any) => o.actionType === action && o.actionupdate !== "done") || false;
     };
 
     useEffect(() => {
@@ -395,7 +428,13 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                     variant="outline" 
                                                                     size="sm" 
                                                                     className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                                                                    onClick={() => setEditingTax(tax)}
+                                                                    onClick={() => {
+                                                                        if (user.role !== "ADMIN" && !hasApprovedOverride(tax, "EDIT")) {
+                                                                            setOverrideAction({ taxId: tax.id, actionType: "EDIT" });
+                                                                        } else {
+                                                                            setEditingTax(tax);
+                                                                        }
+                                                                    }}
                                                                     disabled={tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
                                                                 >
                                                                     <Edit className="w-4 h-4" />
@@ -404,7 +443,13 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                     variant="outline" 
                                                                     size="sm" 
                                                                     className="h-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200"
-                                                                    onClick={() => setVoidId(tax.id)}
+                                                                    onClick={() => {
+                                                                        if (user.role !== "ADMIN" && !hasApprovedOverride(tax, "VOID")) {
+                                                                            setOverrideAction({ taxId: tax.id, actionType: "VOID" });
+                                                                        } else {
+                                                                            setVoidId(tax.id);
+                                                                        }
+                                                                    }}
                                                                     disabled={tax.t_status?.toLowerCase() === "voided"}
                                                                     title="Void Transaction"
                                                                 >
@@ -414,7 +459,13 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                     variant="outline" 
                                                                     size="sm" 
                                                                     className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                                                                    onClick={() => setDeleteId(tax.id)}
+                                                                    onClick={() => {
+                                                                        if (user.role !== "ADMIN" && !hasApprovedOverride(tax, "DELETE")) {
+                                                                            setOverrideAction({ taxId: tax.id, actionType: "DELETE" });
+                                                                        } else {
+                                                                            setDeleteId(tax.id);
+                                                                        }
+                                                                    }}
                                                                     disabled={tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
                                                                 >
                                                                     <Trash2 className="w-4 h-4" />
@@ -549,7 +600,13 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                             variant="outline" 
                                                             size="sm" 
                                                             className="h-8 px-2 text-blue-600 hover:bg-blue-50 border-blue-200"
-                                                            onClick={() => setEditingTax(tax)}
+                                                            onClick={() => {
+                                                                if (user.role !== "ADMIN" && !hasApprovedOverride(tax, "EDIT")) {
+                                                                    setOverrideAction({ taxId: tax.id, actionType: "EDIT" });
+                                                                } else {
+                                                                    setEditingTax(tax);
+                                                                }
+                                                            }}
                                                             disabled={tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
                                                             title="Edit"
                                                         >
@@ -559,7 +616,13 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                             variant="outline" 
                                                             size="sm" 
                                                             className="h-8 px-2 text-orange-600 hover:bg-orange-50 border-orange-200"
-                                                            onClick={() => setVoidId(tax.id)}
+                                                            onClick={() => {
+                                                                if (user.role !== "ADMIN" && !hasApprovedOverride(tax, "VOID")) {
+                                                                    setOverrideAction({ taxId: tax.id, actionType: "VOID" });
+                                                                } else {
+                                                                    setVoidId(tax.id);
+                                                                }
+                                                            }}
                                                             disabled={tax.t_status?.toLowerCase() === "voided"}
                                                             title="Void Transaction"
                                                         >
@@ -569,7 +632,13 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                             variant="outline" 
                                                             size="sm" 
                                                             className="h-8 px-2 text-red-600 hover:bg-red-50 border-red-200"
-                                                            onClick={() => setDeleteId(tax.id)}
+                                                            onClick={() => {
+                                                                if (user.role !== "ADMIN" && !hasApprovedOverride(tax, "DELETE")) {
+                                                                    setOverrideAction({ taxId: tax.id, actionType: "DELETE" });
+                                                                } else {
+                                                                    setDeleteId(tax.id);
+                                                                }
+                                                            }}
                                                             disabled={tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
                                                             title="Delete"
                                                         >
@@ -674,6 +743,36 @@ export function TransferTaxListClient({ user }: { user: any }) {
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
+
+                    <Dialog open={!!overrideAction} onOpenChange={(open) => !open && setOverrideAction(null)}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Request Administrator Override</DialogTitle>
+                                <DialogDescription>
+                                    You are not an administrator. Please provide a reason to request an override for this {overrideAction?.actionType} action.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Reason for override</label>
+                                    <Input 
+                                        placeholder="Enter reason..." 
+                                        value={overrideReason} 
+                                        onChange={(e) => setOverrideReason(e.target.value)} 
+                                    />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setOverrideAction(null)} disabled={isSubmittingOverride}>Cancel</Button>
+                                <Button 
+                                    onClick={handleOverrideSubmit} 
+                                    disabled={isSubmittingOverride || !overrideReason}
+                                >
+                                    {isSubmittingOverride ? "Submitting..." : "Submit Request"}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
 
                     <TransferTaxEditDialog 
                         open={!!editingTax} 

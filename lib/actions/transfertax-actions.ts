@@ -434,7 +434,27 @@ export async function getPaginatedTransferTaxes(page: number = 1, limit: number 
             prisma.newTransferTax.count({ where: whereClause })
         ]);
 
-        const plainTaxes = JSON.parse(JSON.stringify(taxes));
+        const txIds = taxes.map(t => t.id);
+        const overrides = await prisma.overrideRequest.findMany({
+            where: {
+                transactionId: { in: txIds },
+                requestedBy: session.user.id,
+                status: 'APPROVED'
+            }
+        });
+
+        const overridesByTx: Record<string, any[]> = {};
+        for (const req of overrides) {
+            if (!overridesByTx[req.transactionId]) overridesByTx[req.transactionId] = [];
+            overridesByTx[req.transactionId].push(req);
+        }
+
+        const taxesWithOverrides = taxes.map(tx => ({
+            ...tx,
+            approvedOverrides: overridesByTx[tx.id] || []
+        }));
+
+        const plainTaxes = JSON.parse(JSON.stringify(taxesWithOverrides));
 
         return { 
             success: true, 
@@ -453,6 +473,31 @@ export async function deleteTransferTax(id: string) {
         const session = await auth();
         if (!session?.user?.id) {
             return { error: "Unauthorized. Please log in." };
+        }
+
+        const dbUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true }
+        });
+
+        let overrideId: string | null = null;
+        if (dbUser?.role !== 'ADMIN') {
+            const override = await prisma.overrideRequest.findFirst({
+                where: { 
+                    transactionId: id, 
+                    requestedBy: session.user.id, 
+                    actionType: "DELETE", 
+                    status: "APPROVED",
+                    OR: [
+                        { actionupdate: null },
+                        { actionupdate: { not: "done" } }
+                    ]
+                }
+            });
+            if (!override) {
+                return { error: "Unauthorized. You need an approved override request to delete this transaction." };
+            }
+            overrideId = override.id;
         }
 
         const tax = await prisma.newTransferTax.findUnique({
@@ -507,6 +552,13 @@ export async function deleteTransferTax(id: string) {
         await prisma.newTransferTax.delete({
             where: { id }
         });
+
+        if (overrideId) {
+            await prisma.overrideRequest.update({
+                where: { id: overrideId },
+                data: { actionupdate: "done" }
+            });
+        }
 
         return { success: true };
     } catch (error) {
@@ -601,6 +653,31 @@ export async function updateBasicTransferTax(transactionId: string, detailsPaylo
         const session = await auth();
         if (!session?.user?.id) {
             return { error: "Unauthorized. Please log in." };
+        }
+
+        const dbUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true }
+        });
+
+        let overrideId: string | null = null;
+        if (dbUser?.role !== 'ADMIN') {
+            const override = await prisma.overrideRequest.findFirst({
+                where: { 
+                    transactionId, 
+                    requestedBy: session.user.id, 
+                    actionType: "EDIT", 
+                    status: "APPROVED",
+                    OR: [
+                        { actionupdate: null },
+                        { actionupdate: { not: "done" } }
+                    ]
+                }
+            });
+            if (!override) {
+                return { error: "Unauthorized. You need an approved override request to edit this transaction." };
+            }
+            overrideId = override.id;
         }
 
         // Fetch transaction and notarial doc to get dates
@@ -708,6 +785,13 @@ export async function updateBasicTransferTax(transactionId: string, detailsPaylo
             });
         });
 
+        if (overrideId) {
+            await prisma.overrideRequest.update({
+                where: { id: overrideId },
+                data: { actionupdate: "done" }
+            });
+        }
+
         return { success: true };
     } catch (error) {
         console.error("Error in updateBasicTransferTax:", error);
@@ -764,6 +848,7 @@ export async function captureTransferTaxPayment(
         
         const pDate = new Date(paymentDate);
         let isRecomputed = false;
+        let finalAmountToCapture = amount;
         
         // Recompute if payment date > validity date
         if (pDate > tx.t_validity) {
@@ -819,6 +904,7 @@ export async function captureTransferTaxPayment(
                 }
             });
             isRecomputed = true;
+            finalAmountToCapture = totalAmountDue;
         }
         
         // Upsert the payment
@@ -826,7 +912,7 @@ export async function captureTransferTaxPayment(
             where: { cp_NewTransferTaxId: transactionId },
             create: {
                 cp_receiptnumber: receiptNumber,
-                cp_amount: amount,
+                cp_amount: finalAmountToCapture,
                 cp_paymentDate: pDate,
                 cp_remarks: "Paid via " + modeOfPayment,
                 cp_modeOfPayment: modeOfPayment,
@@ -835,7 +921,7 @@ export async function captureTransferTaxPayment(
             },
             update: {
                 cp_receiptnumber: receiptNumber,
-                cp_amount: amount,
+                cp_amount: finalAmountToCapture,
                 cp_paymentDate: pDate,
                 cp_remarks: "Paid via " + modeOfPayment,
                 cp_modeOfPayment: modeOfPayment,
@@ -874,8 +960,24 @@ export async function voidTransferTaxTransaction(id: string) {
             select: { role: true }
         });
 
+        let overrideId: string | null = null;
         if (dbUser?.role !== 'ADMIN') {
-            return { error: "Unauthorized. Only administrators can void transactions." };
+            const override = await prisma.overrideRequest.findFirst({
+                where: { 
+                    transactionId: id, 
+                    requestedBy: session.user.id, 
+                    actionType: "VOID", 
+                    status: "APPROVED",
+                    OR: [
+                        { actionupdate: null },
+                        { actionupdate: { not: "done" } }
+                    ]
+                }
+            });
+            if (!override) {
+                return { error: "Unauthorized. You need an approved override request to void this transaction." };
+            }
+            overrideId = override.id;
         }
 
         const tax = await prisma.newTransferTax.findUnique({
@@ -943,11 +1045,120 @@ export async function voidTransferTaxTransaction(id: string) {
             }
         });
 
+        if (overrideId) {
+            await prisma.overrideRequest.update({
+                where: { id: overrideId },
+                data: { actionupdate: "done" }
+            });
+        }
+
         revalidatePath('/newTransferTax');
 
         return { success: true };
     } catch (error) {
         console.error("Error voiding transaction:", error);
         return { error: "Failed to void transaction." };
+    }
+}
+
+export async function requestTransactionOverride(transactionId: string, transactionType: string, actionType: string, reason: string) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized. Please log in." };
+        }
+
+        const newRequest = await prisma.overrideRequest.create({
+            data: {
+                transactionId,
+                transactionType,
+                actionType,
+                reason,
+                requestedBy: session.user.id
+            }
+        });
+
+        // Here we could add a notification or email hook to notify the admin user
+        return { success: true, request: newRequest };
+    } catch (error) {
+        console.error("Error creating override request:", error);
+        return { error: "Failed to create override request." };
+    }
+}
+
+export async function getPendingOverrides() {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized" };
+        }
+
+        const dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
+        if (dbUser?.role !== "ADMIN") {
+            return { error: "Only admins can view pending overrides" };
+        }
+        
+        const overrides = await prisma.overrideRequest.findMany({
+            where: { status: "PENDING" },
+            include: { user: true },
+            orderBy: { createdAt: 'desc' }
+        });
+        
+        return { success: true, overrides };
+    } catch (error) {
+        console.error("Error fetching overrides:", error);
+        return { error: "Failed to fetch overrides" };
+    }
+}
+
+export async function processOverrideRequest(requestId: string, approve: boolean) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized" };
+        }
+
+        const dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
+        if (dbUser?.role !== "ADMIN") {
+            return { error: "Only admins can process overrides" };
+        }
+
+        const request = await prisma.overrideRequest.update({
+            where: { id: requestId },
+            data: {
+                status: approve ? "APPROVED" : "REJECTED",
+                approvedBy: session.user.id
+            }
+        });
+        
+        revalidatePath('/newTransferTax');
+
+        return { success: true, request };
+    } catch (error) {
+        console.error("Error processing override:", error);
+        return { error: "Failed to process override" };
+    }
+}
+
+export async function updateOverrideAction(requestId: string, actionupdate: "done" | "cancel") {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized" };
+        }
+
+        const request = await prisma.overrideRequest.update({
+            where: { id: requestId },
+            data: {
+                actionupdate
+            }
+        });
+        
+        revalidatePath('/newTransferTax');
+
+        return { success: true, request };
+    } catch (error) {
+        console.error("Error updating override action:", error);
+        return { error: "Failed to update override action" };
     }
 }

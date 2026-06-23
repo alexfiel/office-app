@@ -40,6 +40,8 @@ model User {
   newTransferTaxes              NewTransferTax[]
   newTransferTaxDetails         NewTransferTaxDetails[]
   capturedPayments              capturedPayment[]
+  requestedOverrides            OverrideRequest[] @relation("RequestedOverrides")
+  approvedOverrides             OverrideRequest[] @relation("ApprovedOverrides")
 }
 
 model RealProperty {
@@ -593,4 +595,21 @@ enum Role {
   ISSUER
   LIQUIDATOR
   VALIDATOR
+}
+
+model OverrideRequest {
+  id              String   @id @default(cuid())
+  transactionId   String
+  transactionType String   // e.g. "TransferTax"
+  actionType      String   // e.g. "VOID", "EDIT", "DELETE"
+  reason          String
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  actionupdate    String?  // "done" or "cancel"
+  requestedBy     String
+  approvedBy      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation("RequestedOverrides", fields: [requestedBy], references: [id])
+  admin           User?    @relation("ApprovedOverrides", fields: [approvedBy], references: [id])
 }
