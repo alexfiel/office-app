@@ -1,0 +1,597 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                            String                             @id @default(cuid())
+  name                          String
+  email                         String                             @unique
+  password                      String
+  createdAt                     DateTime                           @default(now())
+  updatedAt                     DateTime                           @updatedAt
+  role                          Role                               @default(USER)
+  designation                   String
+  apiKeys                       ApiKeyModel[]
+  chainTransactions             ChainTransaction[]
+  foodVouchers                  FoodVoucher[]
+  foodVoucherAcks               FoodVoucherIssuerAcknowledgement[]
+  foodVoucherClaims             FoodVoucherRedemptionClaim[]
+  foodVoucherVendors            FoodVoucherVendor[]
+  foodVoucherVendorClaims       FoodVoucherVendorClaim[]
+  liquidations                  LibrengSakayLiquidation[]
+  trips                         LibrengSakayTrip[]
+  notarialDocuments             NotarialDocument[]
+  realProperties                RealProperty[]
+  transferTaxes                 TransferTax[]
+  transferTaxDetails            TransferTaxDetails[]
+  foodVoucherSettlements        FoodVoucherSettlement[]
+  foodVoucherSettlementDetails  FoodVoucherSettlementDetails[]
+  externalFVSettlements         ExternalFVSettlement[]
+  externalFVLiquidations        ExternalFVLiquidation[]
+  cashAdvanceVouchers           CashAdvanceVoucher[]
+  externalReportofDisbursements ExternalReportofDisbursement[]
+  collections                   Collections[]
+  dailyCollections              DailyConsolidatedCollection[]
+  newTransferTaxes              NewTransferTax[]
+  newTransferTaxDetails         NewTransferTaxDetails[]
+  capturedPayments              capturedPayment[]
+}
+
+model RealProperty {
+  id                    String                  @id @default(cuid())
+  objid                 String                  @unique
+  pin                   String
+  taxdecnumber          String
+  owner                 String
+  rputype               String
+  barangay              String
+  classcode             String
+  lotNumber             String?
+  blockNumber           String?
+  surveyno              String?
+  tctOct                String?
+  area                  Float
+  marketValue           Decimal
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  documentUrl           String?
+  userId                String
+  chainTransactions     ChainTransaction[]
+  user                  User                    @relation(fields: [userId], references: [id])
+  transferTaxDetails    TransferTaxDetails[]
+  newTransferTaxDetails NewTransferTaxDetails[]
+}
+
+model NotarialDocument {
+  id               String           @id @default(cuid())
+  documentName     String
+  documentType     String
+  documentNumber   String
+  notarialDate     DateTime
+  notarizedBy      String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  document_url     String
+  userId           String
+  user             User             @relation(fields: [userId], references: [id])
+  transferTaxes    TransferTax[]
+  newTransferTaxes NewTransferTax[]
+}
+
+model TransferTax {
+  id                 String               @id @default(cuid())
+  transferee         String
+  transferor         String
+  transactionType    String
+  considerationvalue Decimal
+  totalmarketvalue   Decimal
+  taxbase            Decimal
+  taxdue             Decimal
+  surcharge          Decimal
+  interest           Decimal
+  totalamountdue     Decimal
+  paymentstatus      String
+  transactionDate    DateTime             @default(now())
+  createdAt          DateTime             @default(now())
+  validuntil         String
+  updatedAt          DateTime             @updatedAt
+  notarialDocumentId String
+  userId             String
+  dayselapsed        Int                  @default(0)
+  chainTransactions  ChainTransaction[]
+  notarialDocument   NotarialDocument     @relation(fields: [notarialDocumentId], references: [id])
+  user               User                 @relation(fields: [userId], references: [id])
+  details            TransferTaxDetails[]
+}
+
+model TransferTaxDetails {
+  id             String       @id @default(cuid())
+  taxdecnumber   String
+  lotNumber      String
+  owner          String
+  marketValue    Decimal
+  area           Float
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  transferTaxId  String
+  realPropertyId String
+  userId         String
+  realProperty   RealProperty @relation(fields: [realPropertyId], references: [id])
+  transferTax    TransferTax  @relation(fields: [transferTaxId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+}
+
+model NewTransferTax {
+  id                        String   @id @default(cuid())
+  t_controlNumber           String   @unique
+  t_TotalMarketValue        Decimal  @default(0.00)
+  t_TotalConsiderationValue Decimal  @default(0.00)
+  t_TaxBase                 Decimal  @default(0.00)
+  t_TotalSurcharge          Decimal  @default(0.00)
+  t_TotalInterest           Decimal  @default(0.00)
+  t_TotalAmountDue          Decimal  @default(0.00)
+  t_NotarialId              String
+  t_DateCompute             DateTime
+  t_validity                DateTime
+  t_daysElapsed             Int      @default(0)
+  t_status                  String   @default("pending")
+  t_paymentStatus           String   @default("unpaid")
+  t_paymentReference        String   @unique
+  t_remarks                 String
+  t_userId                  String
+  t_voidedDate              DateTime?
+  t_voidedBy                String?
+
+  t_transfertaxdetails NewTransferTaxDetails[] @relation("transferTaxDetails")
+
+  // Relations
+  notarialDocument NotarialDocument @relation(fields: [t_NotarialId], references: [id])
+  user             User             @relation(fields: [t_userId], references: [id])
+
+  // 1-to-1 relationship with capturedPayment requires a ? to signify an optional single child
+  capturedPayment capturedPayment?
+}
+
+model NewTransferTaxDetails {
+  id                     String  @id @default(cuid())
+  nt_transferee          String
+  nt_transferror         String
+  nt_transactiontype     String
+  nt_taxdecnumber        String
+  nt_lotnumber           String
+  nt_area                Float
+  nt_marketvalue         Decimal
+  nt_considerationvalue  Decimal @default(0.00)
+  nt_taxbase             Decimal @default(0.00)
+  nt_transfertaxDue      Decimal @default(0.00)
+  nt_surcharge           Decimal @default(0.00)
+  nt_interest            Decimal @default(0.00)
+  nt_totalTransferTaxDue Decimal @default(0.00)
+  //relations
+  nt_transfertaxid       String
+  nt_userid              String
+  nt_realpropertyid      String
+
+  transferTax  NewTransferTax @relation("transferTaxDetails", fields: [nt_transfertaxid], references: [id])
+  user         User           @relation(fields: [nt_userid], references: [id])
+  realProperty RealProperty   @relation(fields: [nt_realpropertyid], references: [id])
+}
+
+model capturedPayment {
+  id               String   @id @default(cuid())
+  cp_receiptnumber String   @unique
+  cp_amount        Decimal
+  cp_paymentDate   DateTime
+  cp_remarks       String
+  cp_modeOfPayment String
+
+  //relations
+  // To enforce a 1-to-1 relationship, the foreign key must be marked @unique
+  cp_NewTransferTaxId String @unique
+  cp_UserId           String
+
+  newTransferTax NewTransferTax @relation(fields: [cp_NewTransferTaxId], references: [id])
+  user           User           @relation(fields: [cp_UserId], references: [id])
+}
+
+model ChainTransaction {
+  id             String        @id @default(cuid())
+  userId         String
+  transferTaxId  String
+  basicTaxDue    Float
+  createdAt      DateTime      @default(now())
+  deceasedOwner  String
+  deceasedShare  Float
+  heirs          String
+  taxBase        Float
+  realPropertyId String?
+  realProperty   RealProperty? @relation(fields: [realPropertyId], references: [id])
+  transferTax    TransferTax   @relation(fields: [transferTaxId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+}
+
+model OfficeSignature {
+  id           String   @id @default(cuid())
+  name         String
+  designation  String
+  signatureUrl String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model LibrengSakayRoute {
+  id        String             @id @default(cuid())
+  code      String
+  routeName String
+  fare      Float
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  trips     LibrengSakayTrip[]
+}
+
+model LibrengSakayTrip {
+  id                 String                    @id @default(cuid())
+  departureDate      DateTime
+  driverName         String
+  vehiclePlateNumber String
+  numberofPax        Int
+  fare               Float
+  amount             Float
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  routeId            String
+  userId             String
+  liquidations       LibrengSakayLiquidation[]
+  route              LibrengSakayRoute         @relation(fields: [routeId], references: [id])
+  user               User                      @relation(fields: [userId], references: [id])
+}
+
+model LibrengSakayLiquidation {
+  id                 String           @id @default(cuid())
+  departureDate      DateTime
+  paymentDate        DateTime
+  arnumber           String
+  driverName         String
+  vehiclePlateNumber String
+  numberofPax        Int
+  fare               Float
+  amount             Float
+  preparedby         String
+  approvedby         String
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  tripId             String
+  userId             String
+  trip               LibrengSakayTrip @relation(fields: [tripId], references: [id])
+  user               User             @relation(fields: [userId], references: [id])
+}
+
+model LibrengSakayBudget {
+  id          String   @id @default(cuid())
+  year        Int
+  month       Int?
+  totalBudget Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FoodVoucher {
+  id                String                              @id @default(cuid())
+  voucherCode       String
+  date              DateTime
+  amount            Float
+  createdAt         DateTime                            @default(now())
+  updatedAt         DateTime                            @updatedAt
+  userId            String
+  vendorId          String?
+  user              User                                @relation(fields: [userId], references: [id])
+  vendor            FoodVoucherVendor?                  @relation(fields: [vendorId], references: [id])
+  redemptionDetails FoodVoucherRedemptionClaimDetails[]
+}
+
+model FoodVoucherVendor {
+  id               String                       @id @default(cuid())
+  vendorName       String
+  market           String
+  stallNo          String
+  userId           String
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+  foodVouchers     FoodVoucher[]
+  redemptionClaims FoodVoucherRedemptionClaim[]
+  user             User                         @relation(fields: [userId], references: [id])
+}
+
+model FoodVoucherRedemptionClaim {
+  id              String                              @id @default(cuid())
+  redemptionCode  String                              @unique
+  vendorId        String
+  totalAmount     Float
+  date            DateTime
+  status          String                              @default("PENDING")
+  createdAt       DateTime                            @default(now())
+  updatedAt       DateTime                            @updatedAt
+  userId          String
+  acknowledgement FoodVoucherIssuerAcknowledgement?
+  user            User                                @relation(fields: [userId], references: [id])
+  vendor          FoodVoucherVendor                   @relation(fields: [vendorId], references: [id])
+  details         FoodVoucherRedemptionClaimDetails[]
+}
+
+model FoodVoucherRedemptionClaimDetails {
+  id                String                     @id @default(cuid())
+  redemptionClaimId String
+  foodVoucherId     String
+  amount            Float
+  foodVoucher       FoodVoucher                @relation(fields: [foodVoucherId], references: [id])
+  redemptionClaim   FoodVoucherRedemptionClaim @relation(fields: [redemptionClaimId], references: [id])
+}
+
+model FoodVoucherIssuerAcknowledgement {
+  id                String                      @id @default(cuid())
+  date              DateTime                    @default(now())
+  userId            String
+  acknowledged      Boolean                     @default(false)
+  ackDate           DateTime?
+  ackBy             String?
+  createdAt         DateTime                    @default(now())
+  arNumber          String                      @unique
+  redemptionClaimId String?                     @unique
+  vendorClaimId     String?                     @unique
+  settlementId      String?
+  redemptionClaim   FoodVoucherRedemptionClaim? @relation(fields: [redemptionClaimId], references: [id])
+  user              User                        @relation(fields: [userId], references: [id])
+  vendorClaim       FoodVoucherVendorClaim?     @relation(fields: [vendorClaimId], references: [id])
+  settlement        FoodVoucherSettlement?      @relation(fields: [settlementId], references: [id])
+}
+
+model FoodVoucherVendorClaim {
+  id                   String                            @id @default(cuid())
+  market               String
+  stallNo              String
+  vendorName           String
+  claimControlNo       String
+  totalAmount          Float
+  userId               String
+  createdAt            DateTime                          @default(now())
+  updatedAt            DateTime                          @updatedAt
+  status               String                            @default("PENDING")
+  verifiedVoucherCodes String[]                          @default([])
+  acknowledgement      FoodVoucherIssuerAcknowledgement?
+  user                 User                              @relation(fields: [userId], references: [id])
+}
+
+model FoodVoucherSettlement {
+  id       String   @id @default(cuid())
+  amount   Float
+  arNumber String   @unique
+  datePaid DateTime @default(now())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+
+  acknowledgements FoodVoucherIssuerAcknowledgement[]
+  details          FoodVoucherSettlementDetails[]
+}
+
+model FoodVoucherSettlementDetails {
+  id           String                @id @default(cuid())
+  settlementId String
+  vendorName   String
+  arNumber     String
+  amount       Float
+  market       String
+  stallNo      String
+  datePaid     DateTime              @default(now())
+  userId       String
+  user         User                  @relation(fields: [userId], references: [id])
+  settlement   FoodVoucherSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+}
+
+model ExternalFVSettlement {
+  id         String @id @default(cuid())
+  arNo       String @unique @map("ar_no")
+  batchNo    String @map("batch_no")
+  vendorName String @map("vendor_name")
+  status     String @default("forLiquidation")
+
+  // Summary Data (For your standard printout)
+  totalTransactions Int      @map("total_transactions")
+  totalAmount       Decimal  @map("total_amount") @db.Decimal(10, 2)
+  datePaid          DateTime @default(now()) @map("date_paid")
+
+  // Metadata from CSV
+  market  String?
+  stallNo String? @map("stall_no")
+
+  // The link to the audit trail
+  transactions ExternalFVTransaction[]
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  liquidationId String?                @map("liquidation_id")
+  liquidation   ExternalFVLiquidation? @relation(fields: [liquidationId], references: [id])
+
+  @@map("external_fv_settlements")
+}
+
+model ExternalFVTransaction {
+  id          String   @id @default(cuid())
+  voucherCode String   @map("voucher_code")
+  beneficiary String // <--- Stored here for the Auditor
+  amount      Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @map("created_at")
+
+  // Link to the parent summary
+  settlementId String               @map("settlement_id")
+  settlement   ExternalFVSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  @@map("external_fv_transactions")
+}
+
+model ExternalFVLiquidation {
+  id            String   @id @default(cuid())
+  liquidationNo String   @unique @map("liquidation_no")
+  totalAmount   Decimal  @map("total_amount") @db.Decimal(10, 2)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  settlements ExternalFVSettlement[]
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  cashAdvanceVoucherId String?             @map("cash_advance_voucher_id")
+  cashAdvanceVoucher   CashAdvanceVoucher? @relation(fields: [cashAdvanceVoucherId], references: [id])
+
+  reportOfDisbursementId String?                       @map("report_of_disbursement_id")
+  reportOfDisbursement   ExternalReportofDisbursement? @relation(fields: [reportOfDisbursementId], references: [id])
+
+  @@map("external_fv_liquidations")
+}
+
+model CashAdvanceVoucher {
+  id              String   @id @default(cuid())
+  referenceNumber String   @unique @map("reference_number")
+  amount          Decimal  @db.Decimal(10, 2)
+  balance         Decimal  @db.Decimal(10, 2)
+  date            DateTime @default(now())
+  payee           String
+  particulars     String?
+  status          String   @default("PENDING")
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  disbursementReports ExternalReportofDisbursement[]
+  liquidations        ExternalFVLiquidation[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("cash_advance_vouchers")
+}
+
+model ExternalReportofDisbursement {
+  id           String   @id @default(cuid())
+  reportNumber String   @unique @map("report_number")
+  date         DateTime @default(now())
+  totalAmount  Decimal  @map("total_amount") @db.Decimal(10, 2)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  cashAdvanceVoucherId String?             @map("cash_advance_voucher_id")
+  cashAdvanceVoucher   CashAdvanceVoucher? @relation(fields: [cashAdvanceVoucherId], references: [id])
+
+  liquidations ExternalFVLiquidation[]
+  details      ExternalReportofDisbursementDetails[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("external_report_of_disbursement")
+}
+
+model ExternalReportofDisbursementDetails {
+  id                             String                       @id @default(cuid())
+  externalReportofDisbursementId String                       @map("external_report_of_disbursement_id")
+  externalReportofDisbursement   ExternalReportofDisbursement @relation(fields: [externalReportofDisbursementId], references: [id])
+  barangay                       String                       @map("barangay")
+  liquidationNo                  String?                      @map("liquidation_no")
+  liquidationDate                DateTime?                    @map("liquidation_date")
+  numberOfVouchers               Int                          @map("number_of_vouchers")
+  totalVoucherAmount             Decimal                      @map("total_voucher_amount") @db.Decimal(10, 2)
+}
+
+model FundType {
+  id                   String               @id @default(cuid())
+  name                 String
+  code                 String
+  collectionCategories CollectionCategory[]
+}
+
+model CollectionGroup {
+  id                   String               @id @default(cuid())
+  name                 String
+  collectionCategories CollectionCategory[]
+}
+
+model CollectionCategory {
+  id                String           @id @default(cuid())
+  code              String
+  name              String
+  fundTypeId        String
+  fundType          FundType         @relation(fields: [fundTypeId], references: [id])
+  collectionItems   CollectionItem[]
+  collectionGroupId String?
+  collectionGroup   CollectionGroup? @relation(fields: [collectionGroupId], references: [id])
+}
+
+model Collections {
+  id                String                       @id @default(cuid())
+  controlNo         String                       @unique @map("control_no")
+  date              DateTime                     @default(now())
+  amount            Decimal                      @db.Decimal(15, 2)
+  totalAmount       Decimal                      @db.Decimal(15, 2)
+  collectionItems   CollectionItem[]
+  userId            String
+  user              User                         @relation(fields: [userId], references: [id])
+  dailyCollectionId String?                      @map("daily_collection_id")
+  dailyCollection   DailyConsolidatedCollection? @relation(fields: [dailyCollectionId], references: [id])
+  createdAt         DateTime                     @default(now()) @map("created_at")
+  updatedAt         DateTime                     @updatedAt @map("updated_at")
+}
+
+model CollectionItem {
+  id                   String             @id @default(cuid())
+  collectionId         String
+  collection           Collections        @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  collectionCategoryId String
+  collectionCategory   CollectionCategory @relation(fields: [collectionCategoryId], references: [id])
+  amount               Decimal            @db.Decimal(15, 2)
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+}
+
+model DailyConsolidatedCollection {
+  id                String   @id @default(cuid())
+  controlNo         String   @unique @map("control_no")
+  collectionitemids String[]
+  date              DateTime @default(now())
+  totalAmount       Decimal  @db.Decimal(15, 2)
+  totalDeposits     Decimal  @db.Decimal(15, 2)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  collections Collections[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("daily_collections")
+}
+
+model ApiKeyModel {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  USER
+  ADMIN
+  ISSUER
+  LIQUIDATOR
+  VALIDATOR
+}
+
