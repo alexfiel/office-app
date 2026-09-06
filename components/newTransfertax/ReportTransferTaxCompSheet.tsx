@@ -1,8 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import {
-    Printer,
     Loader2,
     FileText
 } from 'lucide-react';
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { TransferTaxCalculator } from '@/lib/tax-calculator';
+import { getActiveHeadOfOfficeSignatory } from '@/lib/actions/signatory-actions';
 
 const loadBase64Image = async (url: string) => {
     const response = await fetch(url);
@@ -24,18 +25,39 @@ const loadBase64Image = async (url: string) => {
 interface ReportTransferTaxComputationProps {
     data: any;
     userName: string;
+    preparedBy?: string;
+    approver?: {
+        name: string;
+        designation: string;
+        office?: string | null;
+        signatureUrl?: string | null;
+    };
 }
 
 export function ReportTransferTaxCompSheet({
     data,
-    userName
+    userName,
+    preparedBy,
+    approver
 }: ReportTransferTaxComputationProps) {
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [base64Logo, setBase64Logo] = useState<string>('');
     const [base64CityLogo, setBase64CityLogo] = useState<string>('');
+    const [activeApprover, setActiveApprover] = useState<{
+        name: string;
+        designation: string;
+        office?: string | null;
+        signatureUrl?: string | null;
+    }>(approver || {
+        name: "HUBERT M. INAS, CPA, BCLTE",
+        designation: "City Treasurer",
+        office: "Office of the City Treasurer",
+        signatureUrl: "",
+    });
+    const [base64ApproverSig, setBase64ApproverSig] = useState<string>('');
 
     useEffect(() => {
-        const loadImages = async () => {
+        const loadImagesAndSignatory = async () => {
             try {
                 const logoUrl = '/cto_logo.png';
                 const base64 = await loadBase64Image(logoUrl);
@@ -45,11 +67,35 @@ export function ReportTransferTaxCompSheet({
                 const cityBase64 = await loadBase64Image(cityLogoUrl);
                 setBase64CityLogo(cityBase64);
             } catch (error) {
-                console.error('Error loading images:', error);
+                console.error('Error loading logos:', error);
+            }
+
+            try {
+                let currentSig = approver;
+                if (!currentSig) {
+                    const res = await getActiveHeadOfOfficeSignatory();
+                    if (res.success && res.data) {
+                        currentSig = res.data;
+                        setActiveApprover(res.data);
+                    }
+                } else {
+                    setActiveApprover(currentSig);
+                }
+
+                if (currentSig?.signatureUrl) {
+                    try {
+                        const sigB64 = await loadBase64Image(currentSig.signatureUrl);
+                        setBase64ApproverSig(sigB64);
+                    } catch (err) {
+                        console.warn('Error loading approver signature image:', err);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching active Head of Office signatory:', error);
             }
         };
-        loadImages();
-    }, []);
+        loadImagesAndSignatory();
+    }, [approver]);
 
     const downloadAsPDF = async () => {
         setIsGeneratingPdf(true);
@@ -386,13 +432,51 @@ export function ReportTransferTaxCompSheet({
             const leftSignatureX = M + 15;
             const rightSignatureX = centerX + 15;
 
-            pdf.text("Prepared by:", leftSignatureX, currentY);
+            pdf.text("Computed by:", leftSignatureX, currentY);
             pdf.text("Approved by:", rightSignatureX, currentY);
+
+            // Check if approver signature image is available
+            let sigImg = base64ApproverSig;
+            if (!sigImg && activeApprover?.signatureUrl) {
+                try {
+                    sigImg = await loadBase64Image(activeApprover.signatureUrl);
+                } catch (e) {
+                    console.warn("Could not load approver signature image:", e);
+                }
+            }
+
+            if (sigImg) {
+                try {
+                    // Position signature image above the name line
+                    pdf.addImage(sigImg, 'PNG', rightSignatureX + 10, currentY + 1, 30, 12);
+                } catch (e) {
+                    console.warn("Could not render approver signature image:", e);
+                }
+            }
+
+            // User who created/computed the computation
+            const creatorName =
+                preparedBy ||
+                data?.newTransferTaxes?.find((tx: any) => tx.user?.name)?.user?.name ||
+                data?.newTransferTaxes?.[0]?.user?.name ||
+                data?.user?.name ||
+                data?.computedBy ||
+                data?.preparedBy ||
+                userName ||
+                "Authorized Personnel";
+
+            const creatorDesignation =
+                data?.newTransferTaxes?.find((tx: any) => tx.user?.designation)?.user?.designation ||
+                data?.newTransferTaxes?.[0]?.user?.designation ||
+                data?.user?.designation ||
+                "Authorized Personnel";
 
             currentY += 15;
             pdf.setFont("helvetica", "bold");
-            pdf.text(userName.toUpperCase(), leftSignatureX + 20, currentY, { align: "center" });
-            pdf.text("HUBERT M. INAS, CPA, BCLTE", rightSignatureX + 25, currentY, { align: "center" });
+            pdf.text(creatorName.toUpperCase(), leftSignatureX + 20, currentY, { align: "center" });
+
+            const approverName = (activeApprover?.name || "HUBERT M. INAS, CPA, BCLTE").toUpperCase();
+            pdf.text(approverName, rightSignatureX + 25, currentY, { align: "center" });
 
             currentY += 2;
             pdf.setFont("helvetica", "normal");
@@ -402,27 +486,43 @@ export function ReportTransferTaxCompSheet({
 
             currentY += 4;
             pdf.setFontSize(8);
-            pdf.text("Authorized Personnel", leftSignatureX + 20, currentY, { align: "center" });
-            pdf.text("City Treasurer", rightSignatureX + 25, currentY, { align: "center" });
+            pdf.text(creatorDesignation, leftSignatureX + 20, currentY, { align: "center" });
 
-            // Page numbers
+            const approverDesignation = activeApprover?.designation || "City Treasurer";
+            pdf.text(approverDesignation, rightSignatureX + 25, currentY, { align: "center" });
+
+            // Page numbers and footer
             const pageCount = (pdf as any).internal.getNumberOfPages();
             const hasVoided = transactions.some((tx: any) => tx.t_status?.toLowerCase() === 'voided');
 
+            const now = new Date();
+            const printDate = now.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+            const printTime = now.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            });
+            const printDateTime = `${printDate} ${printTime}`;
+
             for (let i = 1; i <= pageCount; i++) {
                 pdf.setPage(i);
-                
+
                 if (hasVoided) {
                     pdf.setFontSize(100);
                     pdf.setTextColor(255, 200, 200); // Light red color as fallback for opacity
                     if (typeof pdf.saveGraphicsState === 'function') {
                         try {
                             pdf.saveGraphicsState();
-                            pdf.setGState(new (pdf as any).GState({opacity: 0.15}));
+                            pdf.setGState(new (pdf as any).GState({ opacity: 0.15 }));
                             pdf.setTextColor(255, 0, 0); // Solid red with opacity
                             pdf.text("VOIDED", centerX, FOLIO_HEIGHT / 2 + 10, { align: 'center', angle: 45 });
                             pdf.restoreGraphicsState();
-                        } catch (e) {
+                        } catch {
                             // Fallback if GState fails
                             pdf.text("VOIDED", centerX, FOLIO_HEIGHT / 2 + 10, { align: 'center', angle: 45 });
                         }
@@ -432,8 +532,9 @@ export function ReportTransferTaxCompSheet({
                 }
 
                 pdf.setFontSize(8);
-                pdf.setTextColor(150);
-                pdf.text(`Page ${i} of ${pageCount}`, centerX, FOLIO_HEIGHT - 10, { align: 'center' });
+                pdf.setTextColor(130);
+                pdf.text(`Printed by: ${userName} | ${printDateTime}`, M, FOLIO_HEIGHT - 10);
+                pdf.text(`Page ${i} of ${pageCount}`, FOLIO_WIDTH - M, FOLIO_HEIGHT - 10, { align: 'right' });
             }
 
             const pdfBlobUrl = pdf.output('bloburl');

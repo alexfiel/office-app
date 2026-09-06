@@ -8,7 +8,9 @@ import {
   IconDotsVertical,
   IconLogout,
   IconNotification,
+  IconSignature,
   IconUserCircle,
+  IconUsers,
 } from "@tabler/icons-react"
 
 import {
@@ -96,12 +98,20 @@ export function NavUser({
                 </Link>
               </DropdownMenuItem>
               {user.role === "ADMIN" && (
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/users">
-                    <IconCreditCard />
-                    Manage Users
-                  </Link>
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/users">
+                      <IconUsers />
+                      Manage Users
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/signatories">
+                      <IconSignature />
+                      Head of Office Signatories
+                    </Link>
+                  </DropdownMenuItem>
+                </>
               )}
               <DropdownMenuItem>
                 <IconNotification />

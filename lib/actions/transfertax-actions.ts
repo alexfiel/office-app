@@ -356,8 +356,24 @@ export async function getTransactionsByNotarialId(notarialId: string) {
         const document = await prisma.notarialDocument.findUnique({
             where: { id: notarialId },
             include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        designation: true,
+                    }
+                },
                 newTransferTaxes: {
                     include: {
+                        user: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true,
+                                designation: true,
+                            }
+                        },
                         t_transfertaxdetails: {
                             include: {
                                 realProperty: true

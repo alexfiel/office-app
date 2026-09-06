@@ -25,6 +25,7 @@ import {
   IconBuildingSkyscraper,
   IconBus,
   IconReceipt,
+  IconSignature,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -124,6 +125,18 @@ const data = {
       icon: IconSettings,
     },
   ],
+  admin: [
+    {
+      title: "User Management",
+      url: "/admin/users",
+      icon: IconUsers,
+    },
+    {
+      title: "Head of Office Signatories",
+      url: "/admin/signatories",
+      icon: IconSignature,
+    },
+  ],
 
 }
 
@@ -149,6 +162,9 @@ export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sideb
         <NavMain items={data.navMain} label="General" />
         <NavMain items={data.cashier} label="Cashier Division" />
         <NavDocuments items={data.transfertax} />
+        {user?.role === "ADMIN" && (
+          <NavMain items={data.admin} label="Administration" />
+        )}
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
