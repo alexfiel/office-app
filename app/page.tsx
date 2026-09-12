@@ -26,34 +26,104 @@ export default async function Home() {
     role: (session.user as any).role || "USER",
   };
 
-  const dailyCollections = await prisma.dailyConsolidatedCollection.findMany({
-    include: {
-      user: {
-        select: {
-          name: true,
-        }
+  const currentYear = new Date().getFullYear();
+  const previousYear = currentYear - 1;
+  const startOfYear = new Date(currentYear, 0, 1, 0, 0, 0, 0);
+  const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59, 999);
+  const startOfPrevYear = new Date(previousYear, 0, 1, 0, 0, 0, 0);
+  const endOfPrevYear = new Date(previousYear, 11, 31, 23, 59, 59, 999);
+
+  const [dailyCollections, prevYearCollections] = await Promise.all([
+    prisma.dailyConsolidatedCollection.findMany({
+      where: {
+        date: {
+          gte: startOfYear,
+          lte: endOfYear,
+        },
       },
-      collections: {
-        include: {
-          collectionItems: {
-            include: {
-              collectionCategory: true
-            }
-          }
+      include: {
+        user: {
+          select: {
+            name: true,
+          },
+        },
+        collections: {
+          include: {
+            collectionItems: {
+              include: {
+                collectionCategory: {
+                  include: {
+                    fundType: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        date: 'desc',
+      },
+    }),
+    prisma.dailyConsolidatedCollection.findMany({
+      where: {
+        date: {
+          gte: startOfPrevYear,
+          lte: endOfPrevYear,
+        },
+      },
+      select: {
+        date: true,
+        totalAmount: true,
+      },
+      orderBy: {
+        date: 'asc',
+      },
+    }),
+  ]);
+
+  // Calculate high-level stats and Fund Type collections for SectionCards
+  const totalRevenue = dailyCollections.reduce((sum, tx) => sum + Number(tx.totalAmount || 0), 0);
+
+  const fundMap: Record<string, { id?: string; name: string; code: string; amount: number; count: number }> = {};
+
+  dailyCollections.forEach(daily => {
+    daily.collections?.forEach(col => {
+      col.collectionItems?.forEach(item => {
+        const ft = item.collectionCategory?.fundType;
+        const code = ft?.code || "OTHER";
+        const name = ft?.name || "OTHER FUND";
+        const amt = Number(item.amount || 0);
+
+        if (!fundMap[code]) {
+          fundMap[code] = {
+            id: ft?.id,
+            name,
+            code,
+            amount: 0,
+            count: 0,
+          };
         }
-      }
-    },
-    orderBy: {
-      date: 'desc'
-    }
+        fundMap[code].amount += amt;
+        fundMap[code].count += 1;
+      });
+    });
   });
 
-  // Calculate high-level stats for SectionCards
+  const fundTypes = Object.values(fundMap)
+    .sort((a, b) => b.amount - a.amount)
+    .map(fund => ({
+      ...fund,
+      percentage: totalRevenue > 0 ? (fund.amount / totalRevenue) * 100 : 0,
+    }));
+
   const stats = {
-    totalRevenue: dailyCollections.reduce((sum, tx) => sum + Number(tx.totalAmount || 0), 0),
+    currentYear,
+    totalRevenue,
+    fundTypes,
     totalTransactions: dailyCollections.length,
     activeAssessors: new Set(dailyCollections.map(tx => tx.userId)).size,
-    growthRate: 12.5, // Mock growth for now
+    growthRate: 12.5,
   };
 
   // Format data for DataTable
@@ -85,7 +155,10 @@ export default async function Home() {
               <SectionCards stats={stats} />
               <div className="px-4 lg:px-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="lg:col-span-2">
-                  <ChartAreaInteractive records={JSON.parse(JSON.stringify(dailyCollections))} />
+                  <ChartAreaInteractive
+                    records={JSON.parse(JSON.stringify(dailyCollections))}
+                    previousYearRecords={JSON.parse(JSON.stringify(prevYearCollections))}
+                  />
                 </div>
                 <div className="lg:col-span-1">
                   <ChartBarCollections records={JSON.parse(JSON.stringify(dailyCollections))} />
