@@ -33,7 +33,7 @@ export default async function Home() {
   const startOfPrevYear = new Date(previousYear, 0, 1, 0, 0, 0, 0);
   const endOfPrevYear = new Date(previousYear, 11, 31, 23, 59, 59, 999);
 
-  const [dailyCollections, prevYearCollections] = await Promise.all([
+  const [dailyCollections, prevYearCollections, transferTaxes] = await Promise.all([
     prisma.dailyConsolidatedCollection.findMany({
       where: {
         date: {
@@ -78,6 +78,27 @@ export default async function Home() {
       },
       orderBy: {
         date: 'asc',
+      },
+    }),
+    prisma.newTransferTax.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            designation: true,
+          },
+        },
+        notarialDocument: true,
+        t_transfertaxdetails: {
+          include: {
+            realProperty: true,
+          },
+        },
+      },
+      orderBy: {
+        t_DateCompute: 'desc',
       },
     }),
   ]);
@@ -126,16 +147,78 @@ export default async function Home() {
     growthRate: 12.5,
   };
 
-  // Format data for DataTable
-  const tableData = dailyCollections.map((tx, index) => ({
-    id: index + 1,
-    header: tx.controlNo,
-    type: "Daily Collection",
-    status: "Consolidated",
-    target: Number(tx.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-    limit: Number(tx.totalDeposits || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-    reviewer: tx.user?.name || "Unknown",
-  }));
+  // Format Transfer Tax records for DataTable
+  const transferTaxData = transferTaxes.map((tx, index) => {
+    const detail0 = tx.t_transfertaxdetails?.[0];
+    const transferees = Array.from(
+      new Set(
+        (tx.t_transfertaxdetails || [])
+          .map((d) => d.nt_transferee?.trim())
+          .filter(Boolean)
+      )
+    );
+    const transferors = Array.from(
+      new Set(
+        (tx.t_transfertaxdetails || [])
+          .map((d) => d.nt_transferror?.trim())
+          .filter(Boolean)
+      )
+    );
+    const transferee =
+      transferees.length > 1
+        ? `${transferees[0]} (+${transferees.length - 1} more)`
+        : transferees[0] || detail0?.nt_transferee || "N/A";
+    const transferor =
+      transferors.length > 1
+        ? `${transferors[0]} (+${transferors.length - 1} more)`
+        : transferors[0] || detail0?.nt_transferror || "N/A";
+
+    return {
+      id: index + 1,
+      taxId: tx.id,
+      controlNo: tx.t_controlNumber,
+      transferee,
+      transferor,
+      allTransferees: transferees,
+      allTransferors: transferors,
+      transactionType: detail0?.nt_transactiontype || "Transfer Tax",
+      notarialDoc: tx.notarialDocument?.documentName || "Notarial Document",
+      notarialDocNumber: tx.notarialDocument?.documentNumber || "N/A",
+      notarialDocUrl: tx.notarialDocument?.document_url || null,
+      notarizedBy: tx.notarialDocument?.notarizedBy || null,
+      notarialId: tx.t_NotarialId,
+      dateComputed: tx.t_DateCompute ? tx.t_DateCompute.toISOString() : new Date().toISOString(),
+      validityDate: tx.t_validity ? tx.t_validity.toISOString() : null,
+      daysElapsed: tx.t_daysElapsed || 0,
+      status: (tx.t_status || "pending").toLowerCase(),
+      paymentStatus: (tx.t_paymentStatus || "unpaid").toLowerCase(),
+      amountDue: Number(tx.t_TotalAmountDue || 0),
+      marketValue: Number(tx.t_TotalMarketValue || 0),
+      taxBase: Number(tx.t_TaxBase || 0),
+      surcharge: Number(tx.t_TotalSurcharge || 0),
+      interest: Number(tx.t_TotalInterest || 0),
+      assessor: tx.user?.name || "Assessor",
+      assessorEmail: tx.user?.email || "",
+      assessorDesignation: tx.user?.designation || "Assessor",
+      propertiesCount: tx.t_transfertaxdetails?.length || 0,
+      details: (tx.t_transfertaxdetails || []).map((d) => ({
+        id: d.id,
+        transferee: d.nt_transferee,
+        transferor: d.nt_transferror,
+        transactionType: d.nt_transactiontype,
+        taxDecNo: d.nt_taxdecnumber,
+        lotNo: d.nt_lotnumber,
+        area: Number(d.nt_area || 0),
+        marketValue: Number(d.nt_marketvalue || 0),
+        considerationValue: Number(d.nt_considerationvalue || 0),
+        taxBase: Number(d.nt_taxbase || 0),
+        transferTaxDue: Number(d.nt_transfertaxDue || 0),
+        surcharge: Number(d.nt_surcharge || 0),
+        interest: Number(d.nt_interest || 0),
+        totalDue: Number(d.nt_totalTransferTaxDue || 0),
+      })),
+    };
+  });
 
   return (
     <SidebarProvider
@@ -164,7 +247,7 @@ export default async function Home() {
                   <ChartBarCollections records={JSON.parse(JSON.stringify(dailyCollections))} />
                 </div>
               </div>
-              <DataTable data={tableData} />
+              <DataTable data={transferTaxData} />
             </div>
           </div>
         </div>

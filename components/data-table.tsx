@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   closestCenter,
   DndContext,
@@ -21,18 +23,29 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
+  IconArrowUpRight,
+  IconBan,
+  IconCalculator,
+  IconCalendar,
   IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
   IconCircleCheckFilled,
+  IconClock,
+  IconCopy,
   IconDotsVertical,
+  IconExternalLink,
+  IconEye,
+  IconFilter,
   IconGripVertical,
   IconLayoutColumns,
-  IconLoader,
-  IconPlus,
-  IconTrendingUp,
+  IconPaperclip,
+  IconReceipt2,
+  IconSearch,
+  IconUsers,
+  IconX,
 } from "@tabler/icons-react"
 import {
   flexRender,
@@ -49,7 +62,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import { format } from "date-fns"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -57,11 +70,12 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart"
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Drawer,
@@ -78,7 +92,6 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -99,24 +112,59 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+export const transferTaxDetailSchema = z.object({
+  id: z.string(),
+  transferee: z.string().optional().nullable(),
+  transferor: z.string().optional().nullable(),
+  transactionType: z.string().optional().nullable(),
+  taxDecNo: z.string().optional().nullable(),
+  lotNo: z.string().optional().nullable(),
+  area: z.number().optional().nullable(),
+  marketValue: z.number().optional().nullable(),
+  considerationValue: z.number().optional().nullable(),
+  taxBase: z.number().optional().nullable(),
+  transferTaxDue: z.number().optional().nullable(),
+  surcharge: z.number().optional().nullable(),
+  interest: z.number().optional().nullable(),
+  totalDue: z.number().optional().nullable(),
+})
 
 export const schema = z.object({
   id: z.number(),
-  header: z.string(), // Transferee
-  type: z.string(),   // Transaction Type
-  status: z.string(), // Payment Status
-  target: z.string(), // Amount Due
-  limit: z.string(),  // Market Value
-  reviewer: z.string(), // Assessor
+  taxId: z.string().optional(),
+  controlNo: z.string(),
+  transferee: z.string(),
+  transferor: z.string(),
+  allTransferees: z.array(z.string()).optional(),
+  allTransferors: z.array(z.string()).optional(),
+  transactionType: z.string(),
+  notarialDoc: z.string(),
+  notarialDocNumber: z.string(),
+  notarialDocUrl: z.string().nullable().optional(),
+  notarizedBy: z.string().nullable().optional(),
+  notarialId: z.string().optional(),
+  dateComputed: z.string(),
+  validityDate: z.string().nullable().optional(),
+  daysElapsed: z.number().optional(),
+  status: z.string(),
+  paymentStatus: z.string().optional(),
+  amountDue: z.number(),
+  marketValue: z.number().optional(),
+  taxBase: z.number().optional(),
+  surcharge: z.number().optional(),
+  interest: z.number().optional(),
+  assessor: z.string(),
+  assessorEmail: z.string().optional(),
+  assessorDesignation: z.string().optional(),
+  propertiesCount: z.number().optional(),
+  details: z.array(transferTaxDetailSchema).optional(),
 })
 
-// Create a separate component for the drag handle
+export type TransferTaxRow = z.infer<typeof schema>
+
+// Drag Handle Component
 function DragHandle({ id }: { id: number }) {
   const { attributes, listeners } = useSortable({
     id,
@@ -130,13 +178,14 @@ function DragHandle({ id }: { id: number }) {
       size="icon"
       className="text-muted-foreground size-7 hover:bg-transparent"
     >
-      <IconGripVertical className="text-muted-foreground size-3" />
+      <IconGripVertical className="text-muted-foreground size-3.5" />
       <span className="sr-only">Drag to reorder</span>
     </Button>
   )
 }
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
+// Columns definition
+const columns: ColumnDef<TransferTaxRow>[] = [
   {
     id: "drag",
     header: () => null,
@@ -169,149 +218,231 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "header",
-    header: "Transferee",
+    accessorKey: "controlNo",
+    header: "Control No.",
+    cell: ({ row }) => {
+      const notarialId = row.original.notarialId
+      return (
+        <div className="flex items-center gap-1.5">
+          {notarialId ? (
+            <Link
+              href={`/newTransferTax/summary/${notarialId}`}
+              className="font-mono text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400"
+              title="View Computation Sheet"
+            >
+              {row.original.controlNo}
+            </Link>
+          ) : (
+            <span className="font-mono text-xs font-semibold">
+              {row.original.controlNo}
+            </span>
+          )}
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: "transferee",
+    header: "Transferee / Transferor",
     cell: ({ row }) => {
       return <TableCellViewer item={row.original} />
     },
     enableHiding: false,
   },
   {
-    accessorKey: "type",
+    accessorKey: "transactionType",
     header: "Transaction Type",
-    cell: ({ row }) => (
-      <div className="w-48">
-        <Badge variant="outline" className="text-muted-foreground px-1.5 uppercase text-[10px]">
-          {row.original.type}
+    cell: ({ row }) => {
+      const type = row.original.transactionType || "Transfer Tax"
+      return (
+        <Badge
+          variant="outline"
+          className="text-[11px] font-medium uppercase tracking-wider px-2 py-0.5 whitespace-nowrap bg-muted/40"
+        >
+          {type}
         </Badge>
-      </div>
-    ),
+      )
+    },
+  },
+  {
+    accessorKey: "notarialDoc",
+    header: "Notarial Document",
+    cell: ({ row }) => {
+      return (
+        <div className="max-w-[200px] truncate">
+          <div className="font-medium text-xs truncate flex items-center gap-1">
+            <span className="truncate">{row.original.notarialDoc}</span>
+            {row.original.notarialDocUrl && (
+              <a
+                href={row.original.notarialDocUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-500 hover:text-blue-700 inline-flex shrink-0"
+                title="View PDF Attachment"
+              >
+                <IconPaperclip className="size-3.5" />
+              </a>
+            )}
+          </div>
+          <div className="text-[10px] text-muted-foreground truncate">
+            {row.original.notarialDocNumber}
+          </div>
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: "dateComputed",
+    header: "Date Computed",
+    cell: ({ row }) => {
+      const dateVal = row.original.dateComputed
+      let formattedDate = "N/A"
+      try {
+        formattedDate = format(new Date(dateVal), "MMM d, yyyy")
+      } catch {
+        formattedDate = dateVal
+      }
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+          <IconClock className="size-3.5 text-muted-foreground/70" />
+          <span>{formattedDate}</span>
+        </div>
+      )
+    },
   },
   {
     accessorKey: "status",
     header: "Status",
-    cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
-        {row.original.status === "Done" ? (
-          <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
-        ) : (
-          <IconLoader />
-        )}
-        {row.original.status}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: "target",
-    header: () => <div className="w-full text-right">Amount Due</div>,
-    cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-target`} className="sr-only">
-          Target
-        </Label>
-        <Input
-          className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
-          defaultValue={row.original.target}
-          id={`${row.original.id}-target`}
-        />
-      </form>
-    ),
-  },
-  {
-    accessorKey: "limit",
-    header: () => <div className="w-full text-right">Market Value</div>,
-    cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
-          Limit
-        </Label>
-        <Input
-          className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
-          defaultValue={row.original.limit}
-          id={`${row.original.id}-limit`}
-        />
-      </form>
-    ),
-  },
-  {
-    accessorKey: "reviewer",
-    header: "Assessor",
     cell: ({ row }) => {
-      const isAssigned = row.original.reviewer !== "Assign reviewer"
+      const status = (row.original.status || "pending").toLowerCase()
+      const paymentStatus = (row.original.paymentStatus || "").toLowerCase()
+      const isPaid = status === "paid" || paymentStatus === "paid"
+      const isVoided = status === "voided" || paymentStatus === "voided"
 
-      if (isAssigned) {
-        return row.original.reviewer
+      if (isPaid) {
+        return (
+          <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-xs px-2 py-0.5 font-medium flex items-center gap-1 w-fit">
+            <IconCircleCheckFilled className="size-3 text-emerald-500" />
+            Paid
+          </Badge>
+        )
+      }
+
+      if (isVoided) {
+        return (
+          <Badge className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 text-xs px-2 py-0.5 font-medium flex items-center gap-1 w-fit">
+            <IconBan className="size-3 text-rose-500" />
+            Voided
+          </Badge>
+        )
       }
 
       return (
-        <>
-          <Label htmlFor={`${row.original.id}-reviewer`} className="sr-only">
-            Reviewer
-          </Label>
-          <Select>
-            <SelectTrigger
-              className="w-38 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
-              size="sm"
-              id={`${row.original.id}-reviewer`}
-            >
-              <SelectValue placeholder="Assign reviewer" />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-              <SelectItem value="Jamik Tashpulatov">
-                Jamik Tashpulatov
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </>
+        <Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 text-xs px-2 py-0.5 font-medium flex items-center gap-1 w-fit">
+          <IconClock className="size-3 text-amber-500" />
+          Unpaid
+        </Badge>
+      )
+    },
+  },
+  {
+    accessorKey: "amountDue",
+    header: () => <div className="w-full text-right">Amount Due</div>,
+    cell: ({ row }) => {
+      const amt = Number(row.original.amountDue || 0)
+      return (
+        <div className="text-right font-mono font-bold text-xs tabular-nums text-foreground">
+          ₱{amt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: "taxBase",
+    header: () => <div className="w-full text-right">Tax Base</div>,
+    cell: ({ row }) => {
+      const base = Number(row.original.taxBase || row.original.marketValue || 0)
+      return (
+        <div className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+          ₱{base.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: "assessor",
+    header: "Assessor",
+    cell: ({ row }) => {
+      const name = row.original.assessor || "Assessor"
+      const designation = row.original.assessorDesignation || "Assessor"
+      return (
+        <div className="max-w-[150px] truncate">
+          <div className="text-xs font-medium truncate">{name}</div>
+          <div className="text-[10px] text-muted-foreground truncate">{designation}</div>
+        </div>
       )
     },
   },
   {
     id: "actions",
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-            size="icon"
-          >
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuItem>Make a copy</DropdownMenuItem>
-          <DropdownMenuItem>Favorite</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
+    cell: ({ row }) => {
+      const item = row.original
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+              size="icon"
+            >
+              <IconDotsVertical className="size-4" />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {item.notarialId && (
+              <DropdownMenuItem asChild>
+                <Link
+                  href={`/newTransferTax/summary/${item.notarialId}`}
+                  className="cursor-pointer flex items-center"
+                >
+                  <IconExternalLink className="mr-2 size-4 text-blue-500" />
+                  Computation Sheet
+                </Link>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onClick={() => {
+                navigator.clipboard.writeText(item.controlNo)
+                toast.success(`Copied ${item.controlNo} to clipboard`)
+              }}
+              className="cursor-pointer"
+            >
+              <IconCopy className="mr-2 size-4 text-muted-foreground" />
+              Copy Control No.
+            </DropdownMenuItem>
+            {item.notarialDocUrl && (
+              <DropdownMenuItem asChild>
+                <a
+                  href={item.notarialDocUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="cursor-pointer flex items-center"
+                >
+                  <IconPaperclip className="mr-2 size-4 text-muted-foreground" />
+                  View PDF Document
+                </a>
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    },
   },
 ]
 
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
+// Draggable Row
+function DraggableRow({ row }: { row: Row<TransferTaxRow> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   })
@@ -336,23 +467,27 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
   )
 }
 
+// Main DataTable component with 3 Cards UI
 export function DataTable({
   data: initialData,
 }: {
-  data: z.infer<typeof schema>[]
+  data: TransferTaxRow[]
 }) {
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 10,
   })
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const [activeTab, setActiveTab] = React.useState("all")
+  const [selectedUserMonth, setSelectedUserMonth] = React.useState<string>("all")
+  const [applyMonthToTable, setApplyMonthToTable] = React.useState<boolean>(false)
+
   const sortableId = React.useId()
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
@@ -360,13 +495,208 @@ export function DataTable({
     useSensor(KeyboardSensor, {})
   )
 
+  // Synchronize when initialData changes
+  React.useEffect(() => {
+    setData(initialData)
+  }, [initialData])
+
+  // Extract available months from data
+  const availableMonths = React.useMemo(() => {
+    const monthsMap: Record<string, { key: string; label: string; date: Date }> = {}
+    data.forEach((item) => {
+      if (!item.dateComputed) return
+      try {
+        const d = new Date(item.dateComputed)
+        if (!isNaN(d.getTime())) {
+          const key = format(d, "yyyy-MM")
+          if (!monthsMap[key]) {
+            monthsMap[key] = {
+              key,
+              label: format(d, "MMMM yyyy"),
+              date: d,
+            }
+          }
+        }
+      } catch {
+        // ignore invalid date
+      }
+    })
+
+    return Object.values(monthsMap).sort(
+      (a, b) => b.date.getTime() - a.date.getTime()
+    )
+  }, [data])
+
+  // Compute 3 Cards Statistics
+  const summaryStats = React.useMemo(() => {
+    const totalCount = data.length
+
+    const paidTaxes = data.filter(
+      (t) => t.status === "paid" || t.paymentStatus === "paid"
+    )
+    const voidedTaxes = data.filter(
+      (t) => t.status === "voided" || t.paymentStatus === "voided"
+    )
+    const unpaidTaxes = data.filter(
+      (t) =>
+        t.status !== "paid" &&
+        t.paymentStatus !== "paid" &&
+        t.status !== "voided" &&
+        t.paymentStatus !== "voided"
+    )
+
+    const paidCount = paidTaxes.length
+    const paidAmount = paidTaxes.reduce(
+      (sum, t) => sum + Number(t.amountDue || 0),
+      0
+    )
+
+    const unpaidCount = unpaidTaxes.length
+    const unpaidAmount = unpaidTaxes.reduce(
+      (sum, t) => sum + Number(t.amountDue || 0),
+      0
+    )
+
+    const voidedCount = voidedTaxes.length
+    const voidedAmount = voidedTaxes.reduce(
+      (sum, t) => sum + Number(t.amountDue || 0),
+      0
+    )
+
+    const totalAmount = data.reduce(
+      (sum, t) => sum + Number(t.amountDue || 0),
+      0
+    )
+    const activeTotalAmount = paidAmount + unpaidAmount
+
+    return {
+      totalCount,
+      paidCount,
+      paidAmount,
+      unpaidCount,
+      unpaidAmount,
+      voidedCount,
+      voidedAmount,
+      totalAmount,
+      activeTotalAmount,
+    }
+  }, [data])
+
+  // Compute User Statistics based on selected month filter
+  const userStats = React.useMemo(() => {
+    const monthData =
+      selectedUserMonth === "all"
+        ? data
+        : data.filter((t) => {
+            if (!t.dateComputed) return false
+            try {
+              return format(new Date(t.dateComputed), "yyyy-MM") === selectedUserMonth
+            } catch {
+              return false
+            }
+          })
+
+    const periodTotalCount = monthData.length
+    const periodTotalAmount = monthData.reduce(
+      (sum, t) => sum + Number(t.amountDue || 0),
+      0
+    )
+
+    const userMap: Record<
+      string,
+      { name: string; designation: string; count: number; totalAmount: number }
+    > = {}
+
+    monthData.forEach((t) => {
+      const userName = t.assessor || "Unknown Assessor"
+      if (!userMap[userName]) {
+        userMap[userName] = {
+          name: userName,
+          designation: t.assessorDesignation || "Assessor",
+          count: 0,
+          totalAmount: 0,
+        }
+      }
+      userMap[userName].count += 1
+      userMap[userName].totalAmount += Number(t.amountDue || 0)
+    })
+
+    const userBreakdown = Object.values(userMap).sort(
+      (a, b) => b.count - a.count
+    )
+
+    const selectedMonthObj = availableMonths.find((m) => m.key === selectedUserMonth)
+    const selectedMonthLabel = selectedMonthObj ? selectedMonthObj.label : "All-Time"
+
+    return {
+      monthData,
+      periodTotalCount,
+      periodTotalAmount,
+      userBreakdown,
+      activeStaffCount: userBreakdown.length,
+      selectedMonthLabel,
+    }
+  }, [data, selectedUserMonth, availableMonths])
+
+  // Filter data according to active tab, search query, and optional month filter
+  const filteredData = React.useMemo(() => {
+    let result = data
+
+    // Optional sync with card month filter
+    if (applyMonthToTable && selectedUserMonth !== "all") {
+      result = result.filter((t) => {
+        if (!t.dateComputed) return false
+        try {
+          return format(new Date(t.dateComputed), "yyyy-MM") === selectedUserMonth
+        } catch {
+          return false
+        }
+      })
+    }
+
+    // Tab filter
+    if (activeTab === "paid") {
+      result = result.filter(
+        (t) => t.status === "paid" || t.paymentStatus === "paid"
+      )
+    } else if (activeTab === "unpaid") {
+      result = result.filter(
+        (t) =>
+          t.status !== "paid" &&
+          t.paymentStatus !== "paid" &&
+          t.status !== "voided" &&
+          t.paymentStatus !== "voided"
+      )
+    } else if (activeTab === "voided") {
+      result = result.filter(
+        (t) => t.status === "voided" || t.paymentStatus === "voided"
+      )
+    }
+
+    // Search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(
+        (t) =>
+          t.controlNo.toLowerCase().includes(q) ||
+          t.transferee.toLowerCase().includes(q) ||
+          t.transferor.toLowerCase().includes(q) ||
+          t.transactionType.toLowerCase().includes(q) ||
+          t.notarialDoc.toLowerCase().includes(q) ||
+          t.assessor.toLowerCase().includes(q)
+      )
+    }
+
+    return result
+  }, [data, activeTab, searchQuery, applyMonthToTable, selectedUserMonth])
+
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
-    [data]
+    () => filteredData?.map(({ id }) => id) || [],
+    [filteredData]
   )
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     state: {
       sorting,
@@ -393,412 +723,853 @@ export function DataTable({
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (active && over && active.id !== over.id) {
-      setData((data) => {
-        const oldIndex = dataIds.indexOf(active.id)
-        const newIndex = dataIds.indexOf(over.id)
-        return arrayMove(data, oldIndex, newIndex)
+      setData((prevData) => {
+        const oldIndex = prevData.findIndex((d) => d.id === active.id)
+        const newIndex = prevData.findIndex((d) => d.id === over.id)
+        if (oldIndex === -1 || newIndex === -1) return prevData
+        return arrayMove(prevData, oldIndex, newIndex)
       })
     }
   }
 
   return (
-    <Tabs
-      defaultValue="outline"
-      className="w-full flex-col justify-start gap-6"
-    >
-      <div className="flex items-center justify-between px-4 lg:px-6">
-        <Label htmlFor="view-selector" className="sr-only">
-          View
-        </Label>
-        <Select defaultValue="outline">
-          <SelectTrigger
-            className="flex w-fit @4xl/main:hidden"
-            size="sm"
-            id="view-selector"
-          >
-            <SelectValue placeholder="Select a view" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="outline">Outline</SelectItem>
-            <SelectItem value="past-performance">Past Performance</SelectItem>
-            <SelectItem value="key-personnel">Key Personnel</SelectItem>
-            <SelectItem value="focus-documents">Focus Documents</SelectItem>
-          </SelectContent>
-        </Select>
-        <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-          <TabsTrigger value="outline">Outline</TabsTrigger>
-          <TabsTrigger value="past-performance">
-            Past Performance <Badge variant="secondary">3</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="key-personnel">
-            Key Personnel <Badge variant="secondary">2</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger>
-        </TabsList>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconLayoutColumns />
-                <span className="hidden lg:inline">Customize Columns</span>
-                <span className="lg:hidden">Columns</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {table
-                .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
-                )
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
-                  )
+    <div className="flex flex-col gap-6">
+      {/* 3 CARDS UI */}
+      <div className="px-4 lg:px-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 1st Card: Total number of Transfer Tax Computation */}
+        <Card className="relative overflow-hidden border bg-gradient-to-br from-card via-card to-blue-500/5 shadow-sm hover:shadow-md transition-all">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <div>
+              <CardTitle className="text-sm font-semibold tracking-tight text-foreground">
+                Total Transfer Tax Computations
+              </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                All assessed transactions
+              </CardDescription>
+            </div>
+            <div className="flex size-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+              <IconCalculator className="size-5" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold tracking-tight font-mono text-foreground">
+                {summaryStats.totalCount}
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                Total Computations
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2 border-t text-xs">
+              <Badge
+                variant="outline"
+                className="text-[11px] font-normal border-blue-500/30 text-blue-600 dark:text-blue-400 bg-blue-500/5"
+              >
+                {summaryStats.paidCount + summaryStats.unpaidCount} Active
+              </Badge>
+              {summaryStats.voidedCount > 0 && (
+                <Badge
+                  variant="outline"
+                  className="text-[11px] font-normal border-muted text-muted-foreground"
+                >
+                  {summaryStats.voidedCount} Voided
+                </Badge>
+              )}
+              <span className="ml-auto font-mono text-[11px] text-muted-foreground">
+                ₱{summaryStats.totalAmount.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
                 })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" size="sm">
-            <IconPlus />
-            <span className="hidden lg:inline">Add Section</span>
-          </Button>
-        </div>
-      </div>
-      <TabsContent
-        value="outline"
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
-      >
-        <div className="overflow-hidden rounded-lg border">
-          <DndContext
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleDragEnd}
-            sensors={sensors}
-            id={sortableId}
-          >
-            <Table>
-              <TableHeader className="bg-muted sticky top-0 z-10">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id} colSpan={header.colSpan}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      )
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody className="**:data-[slot=table-cell]:first:w-8">
-                {table.getRowModel().rows?.length ? (
-                  <SortableContext
-                    items={dataIds}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {table.getRowModel().rows.map((row) => (
-                      <DraggableRow key={row.id} row={row} />
-                    ))}
-                  </SortableContext>
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      No results.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </DndContext>
-        </div>
-        <div className="flex items-center justify-between px-4">
-          <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-            {table.getFilteredSelectedRowModel().rows.length} of{" "}
-            {table.getFilteredRowModel().rows.length} row(s) selected.
-          </div>
-          <div className="flex w-full items-center gap-8 lg:w-fit">
-            <div className="hidden items-center gap-2 lg:flex">
-              <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                Rows per page
-              </Label>
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 2nd Card: Paid vs Unpaid Computation counts and amounts */}
+        <Card className="relative overflow-hidden border bg-gradient-to-br from-card via-card to-emerald-500/5 shadow-sm hover:shadow-md transition-all">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <div>
+              <CardTitle className="text-sm font-semibold tracking-tight text-foreground">
+                Paid vs. Unpaid Computations
+              </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                Status breakdown & collections
+              </CardDescription>
+            </div>
+            <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <IconReceipt2 className="size-5" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-2">
+            <div className="grid grid-cols-2 gap-3 divide-x divide-border">
+              {/* Paid */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-emerald-500" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    Paid ({summaryStats.paidCount})
+                  </span>
+                </div>
+                <div className="text-base font-bold font-mono tracking-tight text-emerald-700 dark:text-emerald-300">
+                  ₱{summaryStats.paidAmount.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {summaryStats.totalCount > 0
+                    ? ((summaryStats.paidCount / summaryStats.totalCount) * 100).toFixed(0)
+                    : 0}
+                  % of total count
+                </div>
+              </div>
+
+              {/* Unpaid */}
+              <div className="pl-3 space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-amber-500" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                    Unpaid ({summaryStats.unpaidCount})
+                  </span>
+                </div>
+                <div className="text-base font-bold font-mono tracking-tight text-amber-700 dark:text-amber-300">
+                  ₱{summaryStats.unpaidAmount.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {summaryStats.totalCount > 0
+                    ? ((summaryStats.unpaidCount / summaryStats.totalCount) * 100).toFixed(0)
+                    : 0}
+                  % pending payment
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+              <span>Collection Realization:</span>
+              <span className="font-semibold text-foreground">
+                {summaryStats.activeTotalAmount > 0
+                  ? `${((summaryStats.paidAmount / summaryStats.activeTotalAmount) * 100).toFixed(1)}%`
+                  : "0.0%"}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 3rd Card: Total Computed by User */}
+        <Card className="relative overflow-hidden border bg-gradient-to-br from-card via-card to-purple-500/5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+          <CardHeader className="flex flex-row items-start justify-between pb-2 space-y-0 gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <CardTitle className="text-sm font-semibold tracking-tight text-foreground truncate">
+                  Total Computed by User
+                </CardTitle>
+              </div>
+              <CardDescription className="text-xs text-muted-foreground mt-0.5 truncate">
+                {selectedUserMonth === "all"
+                  ? "All-time staff workload & volume"
+                  : `Workload in ${userStats.selectedMonthLabel}`}
+              </CardDescription>
+            </div>
+
+            {/* Filter by Month Select Dropdown */}
+            <div className="flex items-center gap-1.5 shrink-0">
               <Select
-                value={`${table.getState().pagination.pageSize}`}
-                onValueChange={(value) => {
-                  table.setPageSize(Number(value))
+                value={selectedUserMonth}
+                onValueChange={(val) => {
+                  setSelectedUserMonth(val)
                 }}
               >
-                <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                  <SelectValue
-                    placeholder={table.getState().pagination.pageSize}
-                  />
+                <SelectTrigger
+                  size="sm"
+                  className="h-7 text-xs px-2 py-0 min-w-[115px] bg-background/80 border-purple-500/20 hover:border-purple-500/40 focus:ring-purple-500/20"
+                >
+                  <IconCalendar className="size-3 text-purple-600 dark:text-purple-400 mr-1 shrink-0" />
+                  <SelectValue placeholder="Select month" />
                 </SelectTrigger>
-                <SelectContent side="top">
-                  {[10, 20, 30, 40, 50].map((pageSize) => (
-                    <SelectItem key={pageSize} value={`${pageSize}`}>
-                      {pageSize}
+                <SelectContent align="end" className="text-xs">
+                  <SelectItem value="all" className="text-xs font-medium">
+                    All Months
+                  </SelectItem>
+                  {availableMonths.map((m) => (
+                    <SelectItem key={m.key} value={m.key} className="text-xs">
+                      {m.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex w-fit items-center justify-center text-sm font-medium">
-              Page {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount()}
+          </CardHeader>
+
+          <CardContent className="space-y-3 pt-2 flex-1 flex flex-col justify-between">
+            {/* Top Key Metrics for the Period */}
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold tracking-tight font-mono text-foreground">
+                  {userStats.periodTotalCount}
+                </span>
+                <span className="text-xs text-muted-foreground font-medium">
+                  {selectedUserMonth === "all" ? "Total Comps" : "Monthly Comps"}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="font-mono text-xs font-semibold text-purple-700 dark:text-purple-300">
+                  ₱{userStats.periodTotalAmount.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+                <div className="text-[10px] text-muted-foreground">
+                  Total Assessed
+                </div>
+              </div>
             </div>
-            <div className="ml-auto flex items-center gap-2 lg:ml-0">
-              <Button
+
+            {/* User Breakdown List */}
+            {userStats.userBreakdown.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground bg-muted/20 my-auto">
+                No assessor activity in {userStats.selectedMonthLabel}
+              </div>
+            ) : (
+              <div className="max-h-[110px] overflow-y-auto space-y-2 pr-1 divide-y divide-border/40">
+                {userStats.userBreakdown.map((u, idx) => {
+                  const initials = u.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase()
+                  const sharePct =
+                    userStats.periodTotalCount > 0
+                      ? Math.round((u.count / userStats.periodTotalCount) * 100)
+                      : 0
+
+                  return (
+                    <div
+                      key={idx}
+                      className="pt-1.5 first:pt-0 space-y-1 group"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold text-[10px]">
+                            {initials}
+                          </div>
+                          <div className="truncate">
+                            <div className="font-medium text-foreground truncate flex items-center gap-1.5">
+                              <span>{u.name}</span>
+                              {idx === 0 && userStats.userBreakdown.length > 1 && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] px-1 py-0 h-4 border-purple-500/30 text-purple-600 dark:text-purple-400 bg-purple-500/5"
+                                >
+                                  Top
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground truncate">
+                              {u.designation}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0 ml-2">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Badge
+                              variant="secondary"
+                              className="font-mono text-[11px] px-1.5 py-0 h-5"
+                            >
+                              {u.count} {u.count === 1 ? "comp." : "comps."}
+                            </Badge>
+                            <span className="text-[10px] font-medium text-muted-foreground w-8 text-right">
+                              {sharePct}%
+                            </span>
+                          </div>
+                          <div className="text-[10px] font-mono text-muted-foreground mt-0.5">
+                            ₱{u.totalAmount.toLocaleString("en-US", {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Visual Progress Bar for Workload Share */}
+                      <div className="w-full bg-muted/60 rounded-full h-1 overflow-hidden">
+                        <div
+                          className="bg-purple-600 dark:bg-purple-400 h-full rounded-full transition-all duration-300"
+                          style={{ width: `${Math.max(4, sharePct)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Footer with Staff Count & Apply to Table Toggle */}
+            <div className="pt-2 border-t flex items-center justify-between text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <span>Active Staff:</span>
+                <span className="font-semibold text-foreground font-mono">
+                  {userStats.activeStaffCount}{" "}
+                  {userStats.activeStaffCount === 1 ? "Assessor" : "Assessors"}
+                </span>
+              </div>
+
+              {selectedUserMonth !== "all" && (
+                <Button
+                  type="button"
+                  variant={applyMonthToTable ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setApplyMonthToTable((prev) => !prev)}
+                  className={`h-6 text-[10px] px-2 gap-1 rounded-md transition-all ${
+                    applyMonthToTable
+                      ? "bg-purple-600 hover:bg-purple-700 text-white"
+                      : "border-purple-500/30 hover:bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                  }`}
+                  title={
+                    applyMonthToTable
+                      ? "Remove month filter from table"
+                      : "Filter table records by this month"
+                  }
+                >
+                  <IconFilter className="size-2.5" />
+                  <span>{applyMonthToTable ? "Table Filtered" : "Filter Table"}</span>
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* TABLE TABS & CONTROLS */}
+      <Tabs
+        value={activeTab}
+        onValueChange={(val) => {
+          setActiveTab(val)
+          table.setPageIndex(0)
+        }}
+        className="w-full flex-col justify-start gap-4"
+      >
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 px-4 lg:px-6">
+          <TabsList className="**:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 flex w-fit">
+            <TabsTrigger value="all" className="gap-1.5">
+              All Computations
+              <Badge variant="secondary">{summaryStats.totalCount}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="paid" className="gap-1.5">
+              Paid
+              <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                {summaryStats.paidCount}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="unpaid" className="gap-1.5">
+              Unpaid
+              <Badge variant="secondary" className="bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                {summaryStats.unpaidCount}
+              </Badge>
+            </TabsTrigger>
+            {summaryStats.voidedCount > 0 && (
+              <TabsTrigger value="voided" className="gap-1.5">
+                Voided
+                <Badge variant="secondary">{summaryStats.voidedCount}</Badge>
+              </TabsTrigger>
+            )}
+          </TabsList>
+
+          <div className="flex items-center gap-2">
+            {/* Active Month Filter Badge (when synced with table) */}
+            {applyMonthToTable && selectedUserMonth !== "all" && (
+              <Badge
                 variant="outline"
-                className="hidden h-8 w-8 p-0 lg:flex"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
+                className="h-8 gap-1.5 px-2.5 text-xs border-purple-500/30 bg-purple-500/10 text-purple-700 dark:text-purple-300 font-medium shrink-0"
               >
-                <span className="sr-only">Go to first page</span>
-                <IconChevronsLeft />
-              </Button>
-              <Button
-                variant="outline"
-                className="size-8"
-                size="icon"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <span className="sr-only">Go to previous page</span>
-                <IconChevronLeft />
-              </Button>
-              <Button
-                variant="outline"
-                className="size-8"
-                size="icon"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">Go to next page</span>
-                <IconChevronRight />
-              </Button>
-              <Button
-                variant="outline"
-                className="hidden size-8 lg:flex"
-                size="icon"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">Go to last page</span>
-                <IconChevronsRight />
-              </Button>
+                <IconCalendar className="size-3.5 text-purple-600 dark:text-purple-400" />
+                <span>{userStats.selectedMonthLabel}</span>
+                <button
+                  type="button"
+                  onClick={() => setApplyMonthToTable(false)}
+                  className="ml-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                  title="Remove month filter from table"
+                >
+                  <IconX className="size-3" />
+                </button>
+              </Badge>
+            )}
+
+            {/* Search Input */}
+            <div className="relative w-full md:w-64">
+              <IconSearch className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search transferee, control no..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
+
+            {/* Column Customizer */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs">
+                  <IconLayoutColumns className="size-3.5 mr-1" />
+                  <span className="hidden lg:inline">Columns</span>
+                  <IconChevronDown className="size-3.5 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {table
+                  .getAllColumns()
+                  .filter(
+                    (column) =>
+                      typeof column.accessorFn !== "undefined" &&
+                      column.getCanHide()
+                  )
+                  .map((column) => {
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        className="capitalize text-xs"
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) =>
+                          column.toggleVisibility(!!value)
+                        }
+                      >
+                        {column.id}
+                      </DropdownMenuCheckboxItem>
+                    )
+                  })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Direct Link to New Transfer Tax */}
+            <Button asChild size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white">
+              <Link href="/newTransferTax">
+                <IconArrowUpRight className="size-3.5 mr-1" />
+                New Computation
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        {/* TABLE CONTENT */}
+        <div className="px-4 lg:px-6">
+          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <DndContext
+              collisionDetection={closestCenter}
+              modifiers={[restrictToVerticalAxis]}
+              onDragEnd={handleDragEnd}
+              sensors={sensors}
+              id={sortableId}
+            >
+              <Table>
+                <TableHeader className="bg-muted/60 sticky top-0 z-10">
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => {
+                        return (
+                          <TableHead
+                            key={header.id}
+                            colSpan={header.colSpan}
+                            className="text-xs font-semibold uppercase tracking-wider py-3"
+                          >
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext()
+                                )}
+                          </TableHead>
+                        )
+                      })}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody className="divide-y">
+                  {table.getRowModel().rows?.length ? (
+                    <SortableContext
+                      items={dataIds}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {table.getRowModel().rows.map((row) => (
+                        <DraggableRow key={row.id} row={row} />
+                      ))}
+                    </SortableContext>
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={columns.length}
+                        className="h-28 text-center text-muted-foreground text-sm"
+                      >
+                        No transfer tax records found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </DndContext>
+          </div>
+
+          {/* PAGINATION & FOOTER */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 py-3 px-2">
+            <div className="text-muted-foreground text-xs">
+              Showing{" "}
+              <span className="font-semibold text-foreground">
+                {filteredData.length > 0
+                  ? table.getState().pagination.pageIndex *
+                      table.getState().pagination.pageSize +
+                    1
+                  : 0}
+              </span>{" "}
+              to{" "}
+              <span className="font-semibold text-foreground">
+                {Math.min(
+                  (table.getState().pagination.pageIndex + 1) *
+                    table.getState().pagination.pageSize,
+                  filteredData.length
+                )}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-foreground">
+                {filteredData.length}
+              </span>{" "}
+              entries
+              {table.getFilteredSelectedRowModel().rows.length > 0 && (
+                <span className="ml-2 font-medium text-blue-600 dark:text-blue-400">
+                  ({table.getFilteredSelectedRowModel().rows.length} selected)
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="rows-per-page" className="text-xs text-muted-foreground">
+                  Rows:
+                </Label>
+                <Select
+                  value={`${table.getState().pagination.pageSize}`}
+                  onValueChange={(value) => {
+                    table.setPageSize(Number(value))
+                  }}
+                >
+                  <SelectTrigger size="sm" className="w-16 h-7 text-xs" id="rows-per-page">
+                    <SelectValue
+                      placeholder={table.getState().pagination.pageSize}
+                    />
+                  </SelectTrigger>
+                  <SelectContent side="top">
+                    {[10, 20, 30, 50].map((pageSize) => (
+                      <SelectItem key={pageSize} value={`${pageSize}`} className="text-xs">
+                        {pageSize}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="text-xs text-muted-foreground">
+                Page {table.getState().pagination.pageIndex + 1} of{" "}
+                {Math.max(1, table.getPageCount())}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  className="size-7 p-0"
+                  onClick={() => table.setPageIndex(0)}
+                  disabled={!table.getCanPreviousPage()}
+                  title="First page"
+                >
+                  <IconChevronsLeft className="size-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="size-7 p-0"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                  title="Previous page"
+                >
+                  <IconChevronLeft className="size-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="size-7 p-0"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                  title="Next page"
+                >
+                  <IconChevronRight className="size-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="size-7 p-0"
+                  onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                  disabled={!table.getCanNextPage()}
+                  title="Last page"
+                >
+                  <IconChevronsRight className="size-3.5" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </TabsContent>
-      <TabsContent
-        value="past-performance"
-        className="flex flex-col px-4 lg:px-6"
-      >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent value="key-personnel" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent
-        value="focus-documents"
-        className="flex flex-col px-4 lg:px-6"
-      >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-    </Tabs>
+      </Tabs>
+    </div>
   )
 }
 
-const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
-]
-
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "var(--primary)",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "var(--primary)",
-  },
-} satisfies ChartConfig
-
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
+// Detailed Drawer Component for Row inspection
+function TableCellViewer({ item }: { item: TransferTaxRow }) {
   const isMobile = useIsMobile()
+  const router = useRouter()
+
+  const formattedDate = React.useMemo(() => {
+    try {
+      return format(new Date(item.dateComputed), "MMMM d, yyyy h:mm a")
+    } catch {
+      return item.dateComputed
+    }
+  }, [item.dateComputed])
+
+  const formattedValidity = React.useMemo(() => {
+    if (!item.validityDate) return "N/A"
+    try {
+      const vDate = new Date(item.validityDate)
+      if (vDate.getFullYear() >= 2099) return "Maximum Interest Reached"
+      return format(vDate, "MMMM d, yyyy")
+    } catch {
+      return item.validityDate
+    }
+  }, [item.validityDate])
+
+  const isPaid = item.status === "paid" || item.paymentStatus === "paid"
+  const isVoided = item.status === "voided" || item.paymentStatus === "voided"
 
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
       <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground w-fit px-0 text-left">
-          {item.header}
-        </Button>
+        <div className="cursor-pointer group">
+          <div className="font-semibold text-xs text-foreground group-hover:text-blue-600 transition-colors flex items-center gap-1.5">
+            <span className="truncate max-w-[220px]">{item.transferee}</span>
+            <IconEye className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          <div className="text-[11px] text-muted-foreground truncate max-w-[220px]">
+            From: {item.transferor}
+          </div>
+        </div>
       </DrawerTrigger>
-      <DrawerContent>
-        <DrawerHeader className="gap-1">
-          <DrawerTitle>{item.header}</DrawerTitle>
-          <DrawerDescription>
-            Transaction Details and Summary
+      <DrawerContent className="sm:max-w-lg">
+        <DrawerHeader className="gap-1 border-b pb-4">
+          <div className="flex items-center justify-between">
+            <Badge
+              variant="outline"
+              className="font-mono text-xs px-2 py-0.5 border-blue-500/30 text-blue-600 dark:text-blue-400 bg-blue-500/5"
+            >
+              {item.controlNo}
+            </Badge>
+            {isPaid ? (
+              <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs px-2 py-0.5">
+                Paid
+              </Badge>
+            ) : isVoided ? (
+              <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-xs px-2 py-0.5">
+                Voided
+              </Badge>
+            ) : (
+              <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs px-2 py-0.5">
+                Unpaid
+              </Badge>
+            )}
+          </div>
+          <DrawerTitle className="text-lg font-bold mt-2 truncate">
+            {item.transferee}
+          </DrawerTitle>
+          <DrawerDescription className="text-xs">
+            Transfer Tax Computation Details & Assessment Summary
           </DrawerDescription>
         </DrawerHeader>
-        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-          {!isMobile && (
-            <>
-              <ChartContainer config={chartConfig}>
-                <AreaChart
-                  accessibilityLayer
-                  data={chartData}
-                  margin={{
-                    left: 0,
-                    right: 10,
-                  }}
-                >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => value.slice(0, 3)}
-                    hide
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent indicator="dot" />}
-                  />
-                  <Area
-                    dataKey="mobile"
-                    type="natural"
-                    fill="var(--color-mobile)"
-                    fillOpacity={0.6}
-                    stroke="var(--color-mobile)"
-                    stackId="a"
-                  />
-                  <Area
-                    dataKey="desktop"
-                    type="natural"
-                    fill="var(--color-desktop)"
-                    fillOpacity={0.4}
-                    stroke="var(--color-desktop)"
-                    stackId="a"
-                  />
-                </AreaChart>
-              </ChartContainer>
-              <Separator />
-              <div className="grid gap-2">
-                <div className="flex gap-2 leading-none font-medium">
-                  Trending up by 5.2% this month{" "}
-                  <IconTrendingUp className="size-4" />
-                </div>
-                <div className="text-muted-foreground">
-                  Showing total visitors for the last 6 months. This is just
-                  some random text to test the layout. It spans multiple lines
-                  and should wrap around.
+
+        <div className="flex flex-col gap-4 overflow-y-auto p-4 text-sm max-h-[calc(100vh-220px)]">
+          {/* Financial Breakdown Card */}
+          <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
+            <div className="flex items-baseline justify-between border-b pb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Total Amount Due
+              </span>
+              <span className="text-2xl font-bold font-mono text-foreground">
+                ₱{Number(item.amountDue || 0).toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground">Tax Base:</span>
+                <div className="font-mono font-semibold">
+                  ₱{Number(item.taxBase || 0).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </div>
               </div>
+              <div>
+                <span className="text-muted-foreground">Market Value:</span>
+                <div className="font-mono font-semibold">
+                  ₱{Number(item.marketValue || 0).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Surcharge (25%):</span>
+                <div className="font-mono text-amber-600 dark:text-amber-400">
+                  ₱{Number(item.surcharge || 0).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Interest:</span>
+                <div className="font-mono text-amber-600 dark:text-amber-400">
+                  ₱{Number(item.interest || 0).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Transaction Metadata */}
+          <div className="space-y-3 text-xs">
+            <div className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+              Assessment Information
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 rounded-lg border p-3 bg-card">
+              <div>
+                <div className="text-muted-foreground">Transaction Type</div>
+                <div className="font-medium mt-0.5">{item.transactionType}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Computed Date</div>
+                <div className="font-medium mt-0.5">{formattedDate}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Validity Date</div>
+                <div className="font-medium mt-0.5">{formattedValidity}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Assessor</div>
+                <div className="font-medium mt-0.5">{item.assessor}</div>
+              </div>
+            </div>
+
+            {/* Parties */}
+            <div className="space-y-2 rounded-lg border p-3 bg-card">
+              <div>
+                <div className="text-muted-foreground">Transferee(s)</div>
+                <div className="font-semibold text-foreground mt-0.5">
+                  {item.transferee}
+                </div>
+              </div>
               <Separator />
-            </>
-          )}
-          <form className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="header">Header</Label>
-              <Input id="header" defaultValue={item.header} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="type">Type</Label>
-                <Select defaultValue={item.type}>
-                  <SelectTrigger id="type" className="w-full">
-                    <SelectValue placeholder="Select a type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Table of Contents">
-                      Table of Contents
-                    </SelectItem>
-                    <SelectItem value="Executive Summary">
-                      Executive Summary
-                    </SelectItem>
-                    <SelectItem value="Technical Approach">
-                      Technical Approach
-                    </SelectItem>
-                    <SelectItem value="Design">Design</SelectItem>
-                    <SelectItem value="Capabilities">Capabilities</SelectItem>
-                    <SelectItem value="Focus Documents">
-                      Focus Documents
-                    </SelectItem>
-                    <SelectItem value="Narrative">Narrative</SelectItem>
-                    <SelectItem value="Cover Page">Cover Page</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="status">Status</Label>
-                <Select defaultValue={item.status}>
-                  <SelectTrigger id="status" className="w-full">
-                    <SelectValue placeholder="Select a status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Done">Done</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Not Started">Not Started</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div>
+                <div className="text-muted-foreground">Transferor(s)</div>
+                <div className="font-medium text-foreground mt-0.5">
+                  {item.transferor}
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="target">Target</Label>
-                <Input id="target" defaultValue={item.target} />
+
+            {/* Notarial Document */}
+            <div className="space-y-2 rounded-lg border p-3 bg-card">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">{item.notarialDoc}</span>
+                {item.notarialDocUrl && (
+                  <a
+                    href={item.notarialDocUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"
+                  >
+                    <IconPaperclip className="size-3" />
+                    Attachment
+                  </a>
+                )}
               </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="limit">Limit</Label>
-                <Input id="limit" defaultValue={item.limit} />
+              <div className="text-muted-foreground text-[11px]">
+                {item.notarialDocNumber}
               </div>
+              {item.notarizedBy && (
+                <div className="text-[11px] text-muted-foreground">
+                  Notarized by: <span className="font-medium text-foreground">{item.notarizedBy}</span>
+                </div>
+              )}
             </div>
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="reviewer">Reviewer</Label>
-              <Select defaultValue={item.reviewer}>
-                <SelectTrigger id="reviewer" className="w-full">
-                  <SelectValue placeholder="Select a reviewer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-                  <SelectItem value="Jamik Tashpulatov">
-                    Jamik Tashpulatov
-                  </SelectItem>
-                  <SelectItem value="Emily Whalen">Emily Whalen</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </form>
+
+            {/* Properties Attached */}
+            {item.details && item.details.length > 0 && (
+              <div className="space-y-2">
+                <div className="font-semibold text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                  <span>Attached Properties ({item.details.length})</span>
+                </div>
+                <div className="space-y-2 max-h-[160px] overflow-y-auto">
+                  {item.details.map((prop, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-lg border p-2.5 bg-card text-[11px] space-y-1"
+                    >
+                      <div className="flex items-center justify-between font-medium">
+                        <span>Tax Dec: {prop.taxDecNo || "N/A"}</span>
+                        <span className="font-mono font-bold text-foreground">
+                          ₱{Number(prop.totalDue || 0).toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span>Lot: {prop.lotNo || "N/A"}</span>
+                        <span>Area: {prop.area || 0} sqm</span>
+                      </div>
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span>Market Value:</span>
+                        <span className="font-mono">
+                          ₱{Number(prop.marketValue || 0).toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-        <DrawerFooter>
-          <Button>Submit</Button>
+
+        <DrawerFooter className="border-t pt-3">
+          {item.notarialId && (
+            <Button
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => router.push(`/newTransferTax/summary/${item.notarialId}`)}
+            >
+              <IconExternalLink className="mr-2 size-4" />
+              View Full Computation Sheet
+            </Button>
+          )}
           <DrawerClose asChild>
-            <Button variant="outline">Done</Button>
+            <Button variant="outline">Close</Button>
           </DrawerClose>
         </DrawerFooter>
       </DrawerContent>
