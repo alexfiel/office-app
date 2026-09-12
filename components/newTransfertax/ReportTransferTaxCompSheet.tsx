@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { TransferTaxCalculator } from '@/lib/tax-calculator';
+import { calculateTaxPenalties } from '@/lib/tax-utils';
 import { getActiveHeadOfOfficeSignatory } from '@/lib/actions/signatory-actions';
 
 const loadBase64Image = async (url: string) => {
@@ -249,9 +249,6 @@ export function ReportTransferTaxCompSheet({
 
                     let groupTotalMarketValue = 0;
                     let groupConsideration = 0;
-                    let groupTaxDue = 0;
-                    let groupSurcharge = 0;
-                    let groupInterest = 0;
 
                     // Sub Detail Table
                     const bodyRows = groupDetails.map((dt: any) => {
@@ -260,20 +257,6 @@ export function ReportTransferTaxCompSheet({
 
                         const cons = Number(dt.nt_considerationvalue || 0);
                         groupConsideration += cons;
-
-                        let taxDue = Number(dt.nt_transfertaxDue || dt.nt_transfertaxdue || 0);
-                        let surcharge = Number(dt.nt_surcharge || 0);
-                        let interest = Number(dt.nt_interest || 0);
-
-                        if (tx.t_status?.toLowerCase() === 'voided') {
-                            taxDue = 0;
-                            surcharge = 0;
-                            interest = 0;
-                        }
-
-                        groupTaxDue += taxDue;
-                        groupSurcharge += surcharge;
-                        groupInterest += interest;
 
                         return [
                             dt.nt_taxdecnumber || "N/A",
@@ -289,14 +272,17 @@ export function ReportTransferTaxCompSheet({
                         ];
                     });
 
-                    // Next Row (Summary Row)
-                    const transactionType = groupDetails[0]?.nt_transactiontype || "";
-                    const groupTaxBase = TransferTaxCalculator.computeBase(
-                        transactionType,
-                        groupTotalMarketValue,
-                        groupConsideration
-                    );
-                    const groupSubTotal = groupTaxDue + groupSurcharge + groupInterest;
+                    // Next Row (Summary Row) - Tax base is total market value or consideration, whichever is higher
+                    const groupTaxBase = Math.max(groupTotalMarketValue, groupConsideration);
+                    const isVoided = tx.t_status?.toLowerCase() === 'voided';
+                    const groupTaxDue = isVoided ? 0 : (groupTaxBase * 0.0075);
+                    const notarialDateStr = data.notarialDate ? new Date(data.notarialDate).toISOString() : "";
+                    const penalties = isVoided
+                        ? { surcharge: 0, interest: 0, totalAmountDue: 0 }
+                        : calculateTaxPenalties(groupTaxDue, notarialDateStr, new Date(tx.t_DateCompute));
+                    const groupSurcharge = penalties.surcharge;
+                    const groupInterest = penalties.interest;
+                    const groupSubTotal = isVoided ? 0 : (groupTaxDue + groupSurcharge + groupInterest);
 
                     txTotalTaxDue += groupTaxDue;
                     txTotalSurcharge += groupSurcharge;
@@ -307,13 +293,13 @@ export function ReportTransferTaxCompSheet({
                         "TOTAL:",
                         "",
                         "",
-                        groupTotalMarketValue.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                        groupConsideration.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                        groupTaxBase.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                        groupTaxDue.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                        groupSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                        groupInterest.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                        groupSubTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })
+                        groupTotalMarketValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                        groupConsideration.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                        groupTaxBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                        groupTaxDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                        groupSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                        groupInterest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                        groupSubTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                     ]);
 
                     autoTable(pdf, {
@@ -384,20 +370,20 @@ export function ReportTransferTaxCompSheet({
 
                 pdf.setTextColor(0);
                 pdf.text("Total Tax Due:", labelX, currentY);
-                pdf.text(`Php ${txTotalTaxDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
+                pdf.text(`Php ${txTotalTaxDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
                 currentY += 4;
 
                 pdf.text("Total Surcharge:", labelX, currentY);
-                pdf.text(`Php ${txTotalSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
+                pdf.text(`Php ${txTotalSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
                 currentY += 4;
 
                 pdf.text("Total Interest:", labelX, currentY);
-                pdf.text(`Php ${txTotalInterest.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
+                pdf.text(`Php ${txTotalInterest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
                 currentY += 4;
 
                 pdf.setFontSize(9);
                 pdf.text("Grand Total Tax Due:", labelX, currentY);
-                pdf.text(`Php ${txGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
+                pdf.text(`Php ${txGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
 
                 // Ensure currentY is pushed down enough if leftY went further down
                 currentY = Math.max(currentY, leftY) + 10;
@@ -423,7 +409,7 @@ export function ReportTransferTaxCompSheet({
             pdf.setFontSize(11);
             pdf.setFont("helvetica", "bold");
             pdf.text("GRAND TOTAL:", FOLIO_WIDTH - M - 75, currentY + 0.5);
-            pdf.text(`PHP ${globalGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, FOLIO_WIDTH - M - 5, currentY + 0.5, { align: "right" });
+            pdf.text(`PHP ${globalGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, FOLIO_WIDTH - M - 5, currentY + 0.5, { align: "right" });
 
             currentY += 35;
             pdf.setFontSize(9);
