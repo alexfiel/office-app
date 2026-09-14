@@ -11,15 +11,50 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { calculateTaxPenalties } from '@/lib/tax-utils';
 import { getActiveHeadOfOfficeSignatory } from '@/lib/actions/signatory-actions';
+import { TAX_RATES, MIN_TAX_DUE } from '@/constants/taxRates';
 
-const loadBase64Image = async (url: string) => {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
+const formatCurrency = (val: number | string | null | undefined): string => {
+    const num = Number(val) || 0;
+    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const formatDate = (val: any): string => {
+    if (!val) return "N/A";
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return "N/A";
+    return d.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
     });
+};
+
+const formatValidityDate = (val: any): string => {
+    if (!val) return "N/A";
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    if (d.getFullYear() >= 2099) return "MAXIMUM INTEREST REACHED";
+    return d.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+};
+
+const loadBase64Image = async (url: string): Promise<string> => {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) return '';
+        const blob = await response.blob();
+        return new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve((reader.result as string) || '');
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(blob);
+        });
+    } catch {
+        return '';
+    }
 };
 
 interface ReportTransferTaxComputationProps {
@@ -32,13 +67,19 @@ interface ReportTransferTaxComputationProps {
         office?: string | null;
         signatureUrl?: string | null;
     };
+    className?: string;
+    variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+    buttonText?: string;
 }
 
 export function ReportTransferTaxCompSheet({
     data,
     userName,
     preparedBy,
-    approver
+    approver,
+    className,
+    variant,
+    buttonText
 }: ReportTransferTaxComputationProps) {
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [base64Logo, setBase64Logo] = useState<string>('');
@@ -57,18 +98,18 @@ export function ReportTransferTaxCompSheet({
     const [base64ApproverSig, setBase64ApproverSig] = useState<string>('');
 
     useEffect(() => {
-        const loadImagesAndSignatory = async () => {
-            try {
-                const logoUrl = '/cto_logo.png';
-                const base64 = await loadBase64Image(logoUrl);
-                setBase64Logo(base64);
+        let isMounted = true;
 
-                const cityLogoUrl = '/Tagbilaran-City-Seal-Logo-rev.png';
-                const cityBase64 = await loadBase64Image(cityLogoUrl);
-                setBase64CityLogo(cityBase64);
-            } catch (error) {
-                console.error('Error loading logos:', error);
-            }
+        const loadImagesAndSignatory = async () => {
+            // Load logos concurrently without blocking each other
+            Promise.allSettled([
+                loadBase64Image('/cto_logo.png'),
+                loadBase64Image('/Tagbilaran-City-Seal-Logo-rev.png')
+            ]).then(([logoRes, cityLogoRes]) => {
+                if (!isMounted) return;
+                if (logoRes.status === 'fulfilled' && logoRes.value) setBase64Logo(logoRes.value);
+                if (cityLogoRes.status === 'fulfilled' && cityLogoRes.value) setBase64CityLogo(cityLogoRes.value);
+            });
 
             try {
                 let currentSig = approver;
@@ -76,31 +117,48 @@ export function ReportTransferTaxCompSheet({
                     const res = await getActiveHeadOfOfficeSignatory();
                     if (res.success && res.data) {
                         currentSig = res.data;
-                        setActiveApprover(res.data);
                     }
-                } else {
-                    setActiveApprover(currentSig);
                 }
-
-                if (currentSig?.signatureUrl) {
-                    try {
+                if (isMounted && currentSig) {
+                    setActiveApprover(currentSig);
+                    if (currentSig.signatureUrl) {
                         const sigB64 = await loadBase64Image(currentSig.signatureUrl);
-                        setBase64ApproverSig(sigB64);
-                    } catch (err) {
-                        console.warn('Error loading approver signature image:', err);
+                        if (isMounted && sigB64) {
+                            setBase64ApproverSig(sigB64);
+                        }
                     }
                 }
             } catch (error) {
                 console.error('Error fetching active Head of Office signatory:', error);
             }
         };
+
         loadImagesAndSignatory();
+
+        return () => {
+            isMounted = false;
+        };
     }, [approver]);
 
     const downloadAsPDF = async () => {
         setIsGeneratingPdf(true);
         try {
-            // Folio dimensions in mm
+            // Fallback load images if user clicked immediately before useEffect completed
+            let ctoLogo = base64Logo;
+            let citySeal = base64CityLogo;
+            let approverSig = base64ApproverSig;
+
+            if (!ctoLogo) {
+                ctoLogo = await loadBase64Image('/cto_logo.png');
+            }
+            if (!citySeal) {
+                citySeal = await loadBase64Image('/Tagbilaran-City-Seal-Logo-rev.png');
+            }
+            if (!approverSig && activeApprover?.signatureUrl) {
+                approverSig = await loadBase64Image(activeApprover.signatureUrl);
+            }
+
+            // Folio dimensions in mm (8.5 x 13 inches)
             const FOLIO_WIDTH = 215.9;
             const FOLIO_HEIGHT = 330.2;
             const M = 12.7; // 0.5 inch margin
@@ -116,13 +174,21 @@ export function ReportTransferTaxCompSheet({
             let currentY = M + 10;
 
             // Draw Logo Left
-            if (base64Logo) {
-                pdf.addImage(base64Logo, 'PNG', 15, currentY - 5, 20, 20);
+            if (ctoLogo) {
+                try {
+                    pdf.addImage(ctoLogo, 'PNG', 15, currentY - 5, 20, 20);
+                } catch (e) {
+                    console.warn('Could not add CTO logo to PDF:', e);
+                }
             }
 
             // Draw Logo Right
-            if (base64CityLogo) {
-                pdf.addImage(base64CityLogo, 'PNG', FOLIO_WIDTH - 35, currentY - 5, 20, 20);
+            if (citySeal) {
+                try {
+                    pdf.addImage(citySeal, 'PNG', FOLIO_WIDTH - 35, currentY - 5, 20, 20);
+                } catch (e) {
+                    console.warn('Could not add City Seal logo to PDF:', e);
+                }
             }
 
             // Draw Header
@@ -170,7 +236,7 @@ export function ReportTransferTaxCompSheet({
             currentY += 5;
 
             pdf.text(`Notarized By: ${data.notarizedBy || ''}`, M, currentY);
-            pdf.text(`Notarial Date: ${new Date(data.notarialDate).toLocaleDateString()}`, M + 100, currentY);
+            pdf.text(`Notarial Date: ${formatDate(data.notarialDate)}`, M + 100, currentY);
 
             currentY += 10;
 
@@ -179,11 +245,13 @@ export function ReportTransferTaxCompSheet({
             let globalGrandTotal = 0;
 
             transactions.forEach((tx: any, index: number) => {
-                // Check page break
-                if (currentY > FOLIO_HEIGHT - 60) {
+                // Check page break before starting a transaction
+                if (currentY > FOLIO_HEIGHT - 65) {
                     pdf.addPage();
                     currentY = M + 10;
                 }
+
+                const isVoided = tx.t_status?.toLowerCase() === 'voided';
 
                 // Header for NewTransferTax
                 pdf.setFontSize(10);
@@ -191,24 +259,18 @@ export function ReportTransferTaxCompSheet({
                 pdf.setTextColor(255, 255, 255);
                 pdf.setFillColor(41, 128, 185); // Blue header for transaction
                 pdf.rect(M, currentY - 4, safeWidth, 6, "F");
-                pdf.text(`CONTROL NO: ${tx.t_controlNumber}`, M + 2, currentY + 0.5);
+                pdf.text(`CONTROL NO: ${tx.t_controlNumber || 'N/A'}`, M + 2, currentY + 0.5);
 
                 currentY += 7;
                 pdf.setTextColor(0);
                 pdf.setFontSize(8);
                 pdf.setFont("helvetica", "normal");
 
-                pdf.text(`Date Computed: ${new Date(tx.t_DateCompute).toLocaleDateString()}`, M, currentY);
-
-                const valDate = new Date(tx.t_validity);
-                const valStr = valDate.getFullYear() >= 2099 ? "MAXIMUM INTEREST REACHED" : valDate.toLocaleDateString();
-                pdf.text(`Validity Date: ${valStr}`, M + 60, currentY);
-
-                pdf.text(`Days Elapsed: ${tx.t_daysElapsed}`, M + 140, currentY);
+                pdf.text(`Date Computed: ${formatDate(tx.t_DateCompute)}`, M, currentY);
+                pdf.text(`Validity Date: ${formatValidityDate(tx.t_validity)}`, M + 60, currentY);
+                pdf.text(`Days Elapsed: ${tx.t_daysElapsed ?? 0}`, M + 140, currentY);
 
                 currentY += 4;
-
-
 
                 // Group Details for NewTransfertaxDetails to create Sub Header and Sub Detail Tables
                 const details = [...(tx.t_transfertaxdetails || [])].sort((a: any, b: any) => {
@@ -218,7 +280,10 @@ export function ReportTransferTaxCompSheet({
 
                 const grouped: Record<string, any[]> = {};
                 details.forEach((dt: any) => {
-                    const key = `${dt.nt_transferror}|${dt.nt_transferee}|${dt.nt_transactiontype}`;
+                    const transferor = (dt.nt_transferror || '').trim();
+                    const transferee = (dt.nt_transferee || '').trim();
+                    const txType = (dt.nt_transactiontype || '').trim();
+                    const key = `${transferor}|${transferee}|${txType}`;
                     if (!grouped[key]) grouped[key] = [];
                     grouped[key].push(dt);
                 });
@@ -227,16 +292,23 @@ export function ReportTransferTaxCompSheet({
                 let txTotalSurcharge = 0;
                 let txTotalInterest = 0;
                 let txGrandTotal = 0;
+                let txHasMinimumTaxApplied = false;
 
                 Object.values(grouped).forEach((groupDetails: any) => {
                     const firstDt = groupDetails[0];
+
+                    // Check page break before sub-header table
+                    if (currentY > FOLIO_HEIGHT - 50) {
+                        pdf.addPage();
+                        currentY = M + 10;
+                    }
 
                     // Sub Header Table
                     autoTable(pdf, {
                         startY: currentY,
                         margin: { left: M, right: M },
                         headStyles: { fillColor: [240, 240, 240], textColor: 0, fontSize: 7, halign: 'center', fontStyle: 'bold' },
-                        bodyStyles: { fontSize: 10, halign: 'center' },
+                        bodyStyles: { fontSize: 9, halign: 'center' },
                         head: [["Transferor", "Transferee", "Transaction Type"]],
                         body: [[
                             firstDt.nt_transferror || "N/A",
@@ -248,21 +320,18 @@ export function ReportTransferTaxCompSheet({
                     currentY = (pdf as any).lastAutoTable.finalY + 2;
 
                     let groupTotalMarketValue = 0;
-                    let groupConsideration = 0;
 
                     // Sub Detail Table
                     const bodyRows = groupDetails.map((dt: any) => {
                         const mv = Number(dt.nt_marketvalue || 0);
                         groupTotalMarketValue += mv;
-
-                        const cons = Number(dt.nt_considerationvalue || 0);
-                        groupConsideration += cons;
+                        const areaVal = Number(dt.nt_area || 0);
 
                         return [
                             dt.nt_taxdecnumber || "N/A",
                             dt.nt_lotnumber || "N/A",
-                            dt.nt_area || 0,
-                            mv.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                            areaVal > 0 ? areaVal.toLocaleString('en-US') : "0",
+                            formatCurrency(mv),
                             "", // Consideration
                             "", // Tax Base
                             "", // Tax Due
@@ -272,14 +341,41 @@ export function ReportTransferTaxCompSheet({
                         ];
                     });
 
+                    // Safeguard against unapportioned duplicate consideration in legacy records
+                    const groupDetailsCons = groupDetails.map((dt: any) => Number(dt.nt_considerationvalue || 0));
+                    const sumCons = groupDetailsCons.reduce((sum: number, c: number) => sum + c, 0);
+                    const maxCons = Math.max(...groupDetailsCons, 0);
+                    const txStoredCons = Number(tx.t_TotalConsiderationValue || 0);
+
+                    let groupConsideration = 0;
+                    if (txStoredCons > 0 && Math.abs(sumCons - txStoredCons) < 1) {
+                        // Already apportioned across rows
+                        groupConsideration = sumCons;
+                    } else if (txStoredCons > 0 && Math.abs(maxCons - txStoredCons) < 1) {
+                        // Stored full consideration on each detail row
+                        groupConsideration = maxCons;
+                    } else if (txStoredCons > 0) {
+                        groupConsideration = txStoredCons;
+                    } else {
+                        groupConsideration = sumCons > 0 ? sumCons : maxCons;
+                    }
+
                     // Next Row (Summary Row) - Tax base is total market value or consideration, whichever is higher
                     const groupTaxBase = Math.max(groupTotalMarketValue, groupConsideration);
-                    const isVoided = tx.t_status?.toLowerCase() === 'voided';
-                    const groupTaxDue = isVoided ? 0 : (groupTaxBase * 0.0075);
+
+                    // Enforce statutory minimum tax due of Php 500.00 unless voided
+                    const rawCalculatedTax = groupTaxBase * TAX_RATES;
+                    const groupTaxDue = isVoided ? 0 : Math.max(rawCalculatedTax, MIN_TAX_DUE);
+
+                    if (!isVoided && rawCalculatedTax < MIN_TAX_DUE) {
+                        txHasMinimumTaxApplied = true;
+                    }
+
                     const notarialDateStr = data.notarialDate ? new Date(data.notarialDate).toISOString() : "";
                     const penalties = isVoided
                         ? { surcharge: 0, interest: 0, totalAmountDue: 0 }
                         : calculateTaxPenalties(groupTaxDue, notarialDateStr, new Date(tx.t_DateCompute));
+
                     const groupSurcharge = penalties.surcharge;
                     const groupInterest = penalties.interest;
                     const groupSubTotal = isVoided ? 0 : (groupTaxDue + groupSurcharge + groupInterest);
@@ -293,21 +389,23 @@ export function ReportTransferTaxCompSheet({
                         "TOTAL:",
                         "",
                         "",
-                        groupTotalMarketValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                        groupConsideration.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                        groupTaxBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                        groupTaxDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                        groupSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                        groupInterest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                        groupSubTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                        formatCurrency(groupTotalMarketValue),
+                        formatCurrency(groupConsideration),
+                        formatCurrency(groupTaxBase),
+                        formatCurrency(groupTaxDue),
+                        formatCurrency(groupSurcharge),
+                        formatCurrency(groupInterest),
+                        formatCurrency(groupSubTotal)
                     ]);
 
                     autoTable(pdf, {
                         startY: currentY,
                         margin: { left: M, right: M },
-                        headStyles: { fillColor: [250, 250, 250], textColor: 0, fontSize: 6, halign: 'center', fontStyle: 'bold' },
-                        bodyStyles: { fontSize: 8 },
+                        headStyles: { fillColor: [248, 249, 250], textColor: 0, fontSize: 6.5, halign: 'center', fontStyle: 'bold' },
+                        bodyStyles: { fontSize: 7.5 },
                         columnStyles: {
+                            0: { halign: 'left' },
+                            1: { halign: 'left' },
                             2: { halign: 'center' },
                             3: { halign: 'right' },
                             4: { halign: 'right' },
@@ -317,12 +415,24 @@ export function ReportTransferTaxCompSheet({
                             8: { halign: 'right' },
                             9: { halign: 'right', fontStyle: 'bold' }
                         },
+                        didParseCell: (hookData) => {
+                            if (hookData.section === 'body' && hookData.row.index === bodyRows.length - 1) {
+                                hookData.cell.styles.fontStyle = 'bold';
+                                hookData.cell.styles.fillColor = [240, 244, 248];
+                            }
+                        },
                         head: [["TD No", "Lot No", "Area", "Market Value", "Consideration", "Tax Base", "Tax Due", "Surcharge", "Interest", "Sub Total"]],
                         body: bodyRows,
                         theme: 'grid',
                     });
-                    currentY = (pdf as any).lastAutoTable.finalY + 5;
+                    currentY = (pdf as any).lastAutoTable.finalY + 4;
                 });
+
+                // Check page break before Transaction Totals
+                if (currentY > FOLIO_HEIGHT - 45) {
+                    pdf.addPage();
+                    currentY = M + 10;
+                }
 
                 // Transaction Totals
                 pdf.setFontSize(8);
@@ -332,13 +442,13 @@ export function ReportTransferTaxCompSheet({
                 const valueX = FOLIO_WIDTH - M;
 
                 let leftY = currentY;
-                if (tx.t_status?.toLowerCase() === 'voided') {
+                if (isVoided) {
                     pdf.setTextColor(192, 57, 43); // Red
                     pdf.text(`STATUS: VOIDED`, M, leftY);
                     leftY += 4;
                     pdf.setTextColor(0);
                     pdf.setFont("helvetica", "normal");
-                    const vDate = tx.t_voidedDate ? new Date(tx.t_voidedDate).toLocaleDateString() : "N/A";
+                    const vDate = tx.t_voidedDate ? formatDate(tx.t_voidedDate) : "N/A";
                     pdf.text(`Date Voided: ${vDate}`, M, leftY);
                     leftY += 4;
                     pdf.text(`Voided by: ${tx.t_voidedBy || "N/A"}`, M, leftY);
@@ -353,10 +463,10 @@ export function ReportTransferTaxCompSheet({
                         leftY += 4;
                         pdf.text(`Receipt No: ${tx.capturedPayment.cp_receiptnumber || "N/A"}`, M, leftY);
                         leftY += 4;
-                        const pAmount = Number(tx.capturedPayment.cp_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                        const pAmount = formatCurrency(tx.capturedPayment.cp_amount);
                         pdf.text(`Amount: Php ${pAmount}`, M, leftY);
                         leftY += 4;
-                        const pDate = tx.capturedPayment.cp_paymentDate ? new Date(tx.capturedPayment.cp_paymentDate).toLocaleDateString() : "N/A";
+                        const pDate = tx.capturedPayment.cp_paymentDate ? formatDate(tx.capturedPayment.cp_paymentDate) : "N/A";
                         pdf.text(`Date Paid: ${pDate}`, M, leftY);
                         leftY += 4;
                         pdf.text(`Mode: ${tx.capturedPayment.cp_modeOfPayment || "N/A"}`, M, leftY);
@@ -368,50 +478,64 @@ export function ReportTransferTaxCompSheet({
                     pdf.setTextColor(0);
                 }
 
+                // If minimum tax applied, show clear note on the left side
+                if (txHasMinimumTaxApplied && !isVoided) {
+                    pdf.setFont("helvetica", "italic");
+                    pdf.setFontSize(7.5);
+                    pdf.setTextColor(100);
+                    pdf.text(`* Minimum Basic Tax Due of Php ${MIN_TAX_DUE.toFixed(2)} applied per City Ordinance.`, M, leftY + 4);
+                    leftY += 4;
+                    pdf.setTextColor(0);
+                    pdf.setFont("helvetica", "bold");
+                    pdf.setFontSize(8);
+                }
+
                 pdf.setTextColor(0);
                 pdf.text("Total Tax Due:", labelX, currentY);
-                pdf.text(`Php ${txTotalTaxDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
+                pdf.text(`Php ${formatCurrency(txTotalTaxDue)}`, valueX, currentY, { align: "right" });
                 currentY += 4;
 
                 pdf.text("Total Surcharge:", labelX, currentY);
-                pdf.text(`Php ${txTotalSurcharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
+                pdf.text(`Php ${formatCurrency(txTotalSurcharge)}`, valueX, currentY, { align: "right" });
                 currentY += 4;
 
                 pdf.text("Total Interest:", labelX, currentY);
-                pdf.text(`Php ${txTotalInterest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
+                pdf.text(`Php ${formatCurrency(txTotalInterest)}`, valueX, currentY, { align: "right" });
                 currentY += 4;
 
                 pdf.setFontSize(9);
                 pdf.text("Grand Total Tax Due:", labelX, currentY);
-                pdf.text(`Php ${txGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, valueX, currentY, { align: "right" });
+                pdf.text(`Php ${formatCurrency(txGrandTotal)}`, valueX, currentY, { align: "right" });
 
                 // Ensure currentY is pushed down enough if leftY went further down
-                currentY = Math.max(currentY, leftY) + 10;
+                currentY = Math.max(currentY, leftY) + 8;
 
                 // Add a line separator if not the last transaction
                 if (index < transactions.length - 1) {
-                    pdf.setDrawColor(200, 200, 200);
-                    pdf.line(M, currentY - 5, FOLIO_WIDTH - M, currentY - 5);
+                    pdf.setDrawColor(210, 210, 210);
+                    pdf.line(M, currentY - 4, FOLIO_WIDTH - M, currentY - 4);
                 }
 
                 globalGrandTotal += txGrandTotal;
             });
 
-            if (currentY > FOLIO_HEIGHT - 60) {
+            // Ensure sufficient space for Grand Total banner + signatures
+            if (currentY > FOLIO_HEIGHT - 65) {
                 pdf.addPage();
-                currentY = M + 20;
+                currentY = M + 15;
             }
 
-            currentY += 5;
+            currentY += 4;
             pdf.setFillColor(230, 240, 250);
-            pdf.rect(FOLIO_WIDTH - M - 80, currentY - 6, 80, 10, "F");
+            pdf.rect(FOLIO_WIDTH - M - 85, currentY - 6, 85, 10, "F");
 
-            pdf.setFontSize(11);
+            pdf.setFontSize(10);
             pdf.setFont("helvetica", "bold");
-            pdf.text("GRAND TOTAL:", FOLIO_WIDTH - M - 75, currentY + 0.5);
-            pdf.text(`PHP ${globalGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, FOLIO_WIDTH - M - 5, currentY + 0.5, { align: "right" });
+            pdf.setTextColor(0);
+            pdf.text("GRAND TOTAL:", FOLIO_WIDTH - M - 80, currentY + 0.5);
+            pdf.text(`PHP ${formatCurrency(globalGrandTotal)}`, FOLIO_WIDTH - M - 4, currentY + 0.5, { align: "right" });
 
-            currentY += 35;
+            currentY += 28;
             pdf.setFontSize(9);
             pdf.setFont("helvetica", "normal");
 
@@ -421,20 +545,10 @@ export function ReportTransferTaxCompSheet({
             pdf.text("Computed by:", leftSignatureX, currentY);
             pdf.text("Approved by:", rightSignatureX, currentY);
 
-            // Check if approver signature image is available
-            let sigImg = base64ApproverSig;
-            if (!sigImg && activeApprover?.signatureUrl) {
+            // Approver signature image
+            if (approverSig) {
                 try {
-                    sigImg = await loadBase64Image(activeApprover.signatureUrl);
-                } catch (e) {
-                    console.warn("Could not load approver signature image:", e);
-                }
-            }
-
-            if (sigImg) {
-                try {
-                    // Position signature image above the name line
-                    pdf.addImage(sigImg, 'PNG', rightSignatureX + 10, currentY + 1, 30, 12);
+                    pdf.addImage(approverSig, 'PNG', rightSignatureX + 10, currentY + 1, 30, 12);
                 } catch (e) {
                     console.warn("Could not render approver signature image:", e);
                 }
@@ -479,28 +593,25 @@ export function ReportTransferTaxCompSheet({
 
             // Page numbers and footer
             const pageCount = (pdf as any).internal.getNumberOfPages();
-            const hasVoided = transactions.some((tx: any) => tx.t_status?.toLowerCase() === 'voided');
+            const allVoided = transactions.length > 0 && transactions.every((tx: any) => tx.t_status?.toLowerCase() === 'voided');
 
             const now = new Date();
-            const printDate = now.toLocaleDateString('en-US', {
+            const printDateTime = now.toLocaleString('en-US', {
                 year: 'numeric',
                 month: 'short',
-                day: 'numeric'
-            });
-            const printTime = now.toLocaleTimeString('en-US', {
+                day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
                 hour12: true
             });
-            const printDateTime = `${printDate} ${printTime}`;
 
             for (let i = 1; i <= pageCount; i++) {
                 pdf.setPage(i);
 
-                if (hasVoided) {
+                if (allVoided) {
                     pdf.setFontSize(100);
-                    pdf.setTextColor(255, 200, 200); // Light red color as fallback for opacity
+                    pdf.setTextColor(255, 200, 200); // Light red fallback
                     if (typeof pdf.saveGraphicsState === 'function') {
                         try {
                             pdf.saveGraphicsState();
@@ -509,7 +620,6 @@ export function ReportTransferTaxCompSheet({
                             pdf.text("VOIDED", centerX, FOLIO_HEIGHT / 2 + 10, { align: 'center', angle: 45 });
                             pdf.restoreGraphicsState();
                         } catch {
-                            // Fallback if GState fails
                             pdf.text("VOIDED", centerX, FOLIO_HEIGHT / 2 + 10, { align: 'center', angle: 45 });
                         }
                     } else {
@@ -537,14 +647,15 @@ export function ReportTransferTaxCompSheet({
         <Button
             onClick={downloadAsPDF}
             disabled={isGeneratingPdf || !data}
-            className="bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-all"
+            variant={variant || "default"}
+            className={className || "bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-all"}
         >
             {isGeneratingPdf ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
                 <FileText className="w-4 h-4 mr-2" />
             )}
-            {isGeneratingPdf ? 'Generating...' : 'Generate Report'}
+            {isGeneratingPdf ? 'Generating...' : (buttonText || 'Generate Report')}
         </Button>
     );
 }
