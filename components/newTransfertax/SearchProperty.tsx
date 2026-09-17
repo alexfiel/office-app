@@ -9,6 +9,8 @@ import { Search, ArrowRight, ArrowLeft, Building2, Plus, Trash2 } from "lucide-r
 import { toast } from "sonner";
 import { RealPropertyInfo } from "@/lib/types/property";
 
+import { transferTaxStorage } from "@/lib/transfertax-storage";
+
 export function SearchProperty() {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
@@ -48,13 +50,17 @@ export function SearchProperty() {
         }
     }, []);
 
+    // Debounce search query
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (searchQuery) {
+            if (searchQuery.trim()) {
                 setPage(1);
                 fetchProperties(searchQuery, 1, limit);
+            } else {
+                setSearchResults([]);
+                setHasSearched(false);
             }
-        }, 500);
+        }, 300);
 
         return () => clearTimeout(timer);
     }, [searchQuery, limit, fetchProperties]);
@@ -65,24 +71,13 @@ export function SearchProperty() {
         }
     }, [page, limit, fetchProperties, searchQuery]);
 
-    // Initialize cart from cookie
+    // Initialize cart from storage
     useEffect(() => {
-        try {
-            const match = document.cookie.match(new RegExp('(^| )rpt-cart=([^;]+)'));
-            if (match) {
-                const storedCart = JSON.parse(decodeURIComponent(match[2]));
-                if (Array.isArray(storedCart) && storedCart.length > 0) {
-                    setCart(storedCart);
-                }
-            }
-        } catch (e) {
-            console.error("Failed to parse cart cookie", e);
+        const storedCart = transferTaxStorage.getCart();
+        if (storedCart && storedCart.length > 0) {
+            setCart(storedCart);
         }
     }, []);
-
-    const saveCartToCookies = (newCart: RealPropertyInfo[]) => {
-        document.cookie = `rpt-cart=${encodeURIComponent(JSON.stringify(newCart))}; path=/`;
-    };
 
     const addToCart = (property: RealPropertyInfo) => {
         if (cart.some(p => p.id === property.id)) {
@@ -91,14 +86,14 @@ export function SearchProperty() {
         }
         const newCart = [...cart, property];
         setCart(newCart);
-        saveCartToCookies(newCart);
+        transferTaxStorage.setCart(newCart);
         toast.success(`Added ${property.taxdecnumber} to cart`);
     };
 
     const removeFromCart = (propertyId: string) => {
         const newCart = cart.filter(p => p.id !== propertyId);
         setCart(newCart);
-        saveCartToCookies(newCart);
+        transferTaxStorage.setCart(newCart);
         toast.info("Removed property from cart");
     };
 

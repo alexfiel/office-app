@@ -11,6 +11,7 @@ import { Calculator, ArrowRight, ArrowLeft, Building2, UserCircle2, CheckSquare 
 import { toast } from "sonner";
 import { RealPropertyInfo } from "@/lib/types/property";
 import { Checkbox } from "@/components/ui/checkbox";
+import { transferTaxStorage } from "@/lib/transfertax-storage";
 
 const parseOwners = (ownerStr: string) => {
     if (!ownerStr) return [];
@@ -56,42 +57,26 @@ export function TransferTaxTransaction() {
     const isAdjudicationType = transactionType === "Adjudication";
     const isSaleType = transactionType === "Sale";
 
-    // Load data from cookies
+    // Load data from storage
     useEffect(() => {
-        try {
-            // Load Cart
-            const cartMatch = document.cookie.match(new RegExp('(^| )rpt-cart=([^;]+)'));
-            if (cartMatch) {
-                const storedCart = JSON.parse(decodeURIComponent(cartMatch[2]));
-                if (Array.isArray(storedCart) && storedCart.length > 0) {
-                    // eslint-disable-next-line
-                    setCart(storedCart);
-                } else {
-                    toast.error("No properties selected. Redirecting to search.");
-                    router.push("/newTransferTax/search-property");
-                }
-            } else {
-                toast.error("No properties selected. Redirecting to search.");
-                router.push("/newTransferTax/search-property");
-            }
+        const storedCart = transferTaxStorage.getCart();
+        if (storedCart && storedCart.length > 0) {
+            // eslint-disable-next-line
+            setCart(storedCart);
+        } else {
+            toast.error("No properties selected. Redirecting to search.");
+            router.push("/newTransferTax/search-property");
+            return;
+        }
 
-            // Load saved transaction data if coming back from step 4
-            const txMatch = document.cookie.match(new RegExp('(^| )transferTaxTransaction=([^;]+)'));
-            if (txMatch) {
-                const txData = JSON.parse(decodeURIComponent(txMatch[2]));
-
-                if (txData.transferee) setTransferee(txData.transferee);
-
-                if (txData.transferor) setTransferor(txData.transferor);
-
-                if (txData.transactionType) setTransactionType(txData.transactionType);
-
-                if (txData.considerationValue) setConsiderationValue(txData.considerationValue.toString());
-
-                if (txData.propertyEjsData) setPropertyEjsData(txData.propertyEjsData);
-            }
-        } catch (e) {
-            console.error("Failed to parse cookies", e);
+        // Load saved transaction data if coming back from step 4
+        const txData = transferTaxStorage.getTransaction();
+        if (txData) {
+            if (txData.transferee) setTransferee(txData.transferee);
+            if (txData.transferor) setTransferor(txData.transferor);
+            if (txData.transactionType) setTransactionType(txData.transactionType);
+            if (txData.considerationValue) setConsiderationValue(txData.considerationValue.toString());
+            if (txData.propertyEjsData) setPropertyEjsData(txData.propertyEjsData);
         }
     }, [router]);
 
@@ -172,8 +157,8 @@ export function TransferTaxTransaction() {
             propertyEjsData: (isEjsType || isPartitionOrExchangeType || isAdjudicationType || isSaleType) ? propertyEjsData : undefined
         };
 
-        // Save data in cookies
-        document.cookie = `transferTaxTransaction=${encodeURIComponent(JSON.stringify(transactionData))}; path=/`;
+        // Save data to storage
+        transferTaxStorage.setTransaction(transactionData);
 
         console.log("Transaction details saved:", transactionData);
         // Navigate to Step 4 (Computation / Review)

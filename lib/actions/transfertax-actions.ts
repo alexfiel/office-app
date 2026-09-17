@@ -484,6 +484,119 @@ export async function getPaginatedTransferTaxes(page: number = 1, limit: number 
     }
 }
 
+// Helper to cleanly revert RealProperty changes (owner, area, market value, portion properties)
+async function revertRealPropertyChanges(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    txPrisma: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    details: any[]
+) {
+    // 1. Group details by realProperty ID so multi-step transactions (e.g. EJS then Sale on the same parcel)
+    // are processed holistically rather than clobbering each other
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const propertyGroups: Record<string, any[]> = {};
+    for (const dt of details) {
+        if (dt.realProperty?.id) {
+            if (!propertyGroups[dt.realProperty.id]) {
+                propertyGroups[dt.realProperty.id] = [];
+            }
+            propertyGroups[dt.realProperty.id].push(dt);
+        }
+    }
+
+    for (const [propId, groupDetails] of Object.entries(propertyGroups)) {
+        const parentProperty = await txPrisma.realProperty.findUnique({
+            where: { id: propId }
+        });
+
+        if (!parentProperty) continue;
+
+        // Earliest detail in the transaction sequence represents the starting state before this document
+        const earliestDetail = groupDetails[0];
+        const latestDetail = groupDetails[groupDetails.length - 1];
+
+        // All transferees introduced by this transaction
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const transferees = groupDetails
+            .map((d: any) => (d.nt_transferee || "").trim().toUpperCase())
+            .filter(Boolean);
+
+        const currentOwnerUpper = parentProperty.owner.toUpperCase().trim();
+        const latestTransfereeUpper = (latestDetail.nt_transferee || "").toUpperCase().trim();
+        const originalTransferor = (earliestDetail.nt_transferror || "").trim();
+
+        let finalRevertedOwner = parentProperty.owner;
+
+        // If the current property owner matches the latest transferee or one of the transferees from this transaction
+        if (currentOwnerUpper === latestTransfereeUpper || transferees.some((t: string) => t === currentOwnerUpper || currentOwnerUpper.includes(t))) {
+            // Revert directly to the initial transferor
+            if (originalTransferor) {
+                finalRevertedOwner = originalTransferor;
+            }
+        } else if (originalTransferor) {
+            // Mixed or partial ownership: filter out the transferees from this transaction and restore the transferor(s)
+            const currentOwnerList = parseOwners(parentProperty.owner);
+            const filteredOwners = currentOwnerList.filter((o: string) => 
+                !transferees.some((t: string) => o.includes(t) || t.includes(o))
+            );
+
+            const transferorsToAdd = parseOwners(originalTransferor);
+            for (const t of transferorsToAdd) {
+                if (t && !filteredOwners.includes(t)) {
+                    filteredOwners.push(t);
+                }
+            }
+
+            finalRevertedOwner = filteredOwners.length > 0 ? filteredOwners.join(", ") : originalTransferor;
+        }
+
+        // Check for any created portion properties referencing this parent property
+        const portionProps = await txPrisma.realProperty.findMany({
+            where: {
+                objid: { startsWith: `${parentProperty.objid}-PORTION-` },
+                taxdecnumber: parentProperty.taxdecnumber
+            }
+        });
+
+        let restoredAreaIncrement = 0;
+        let restoredMvIncrement = 0;
+
+        for (const portion of portionProps) {
+            // Match portion to any detail in this transaction (by area or owner)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const matchingDetail = groupDetails.find((d: any) => 
+                Math.abs(Number(d.nt_area) - Number(portion.area)) < 0.01 ||
+                transferees.some((t: string) => (portion.owner || "").toUpperCase().includes(t))
+            );
+
+            if (matchingDetail) {
+                restoredAreaIncrement += Number(portion.area);
+                restoredMvIncrement += Number(portion.marketValue);
+
+                // Delete the created portion property
+                await txPrisma.realProperty.delete({
+                    where: { id: portion.id }
+                });
+            }
+        }
+
+        // Update the original parent property (restore owner, area, and market value)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updateData: any = { owner: finalRevertedOwner };
+        if (restoredAreaIncrement > 0) {
+            updateData.area = { increment: restoredAreaIncrement };
+        }
+        if (restoredMvIncrement > 0) {
+            updateData.marketValue = { increment: restoredMvIncrement };
+        }
+
+        await txPrisma.realProperty.update({
+            where: { id: propId },
+            data: updateData
+        });
+    }
+}
+
 export async function deleteTransferTax(id: string) {
     try {
         const session = await auth();
@@ -521,7 +634,8 @@ export async function deleteTransferTax(id: string) {
             include: {
                 t_transfertaxdetails: {
                     include: { realProperty: true }
-                }
+                },
+                capturedPayment: true
             }
         });
 
@@ -529,52 +643,38 @@ export async function deleteTransferTax(id: string) {
             return { error: "Transfer tax transaction not found." };
         }
 
-        // Revert RealProperty owner updates
-        for (const detail of tax.t_transfertaxdetails) {
-            if (detail.realProperty) {
-                const transfereeToRemove = detail.nt_transferee.toUpperCase().trim();
-                const transferorsToAdd = detail.nt_transferror;
+        await prisma.$transaction(async (txPrisma) => {
+            // 1. Revert RealProperty updates and delete any spawned portion properties
+            await revertRealPropertyChanges(txPrisma, tax.t_transfertaxdetails);
 
-                const currentOwnerList = parseOwners(detail.realProperty.owner);
-                
-                // Remove the transferee
-                const newOwnerList = currentOwnerList.filter(o => 
-                    !o.includes(transfereeToRemove) && !transfereeToRemove.includes(o)
-                );
-
-                // Add the transferors back
-                if (transferorsToAdd) {
-                    const transferorsArray = transferorsToAdd.split(",").map((t: string) => t.trim());
-                    for (const t of transferorsArray) {
-                        if (t && !newOwnerList.includes(t)) {
-                            newOwnerList.push(t);
-                        }
-                    }
-                }
-
-                await prisma.realProperty.update({
-                    where: { id: detail.realProperty.id },
-                    data: { owner: newOwnerList.join(", ") }
+            // 2. Delete captured payment if present to avoid foreign key violation
+            if (tax.capturedPayment) {
+                await txPrisma.capturedPayment.delete({
+                    where: { id: tax.capturedPayment.id }
                 });
             }
-        }
 
-        // Delete Details
-        await prisma.newTransferTaxDetails.deleteMany({
-            where: { nt_transfertaxid: id }
-        });
-
-        // Delete Master
-        await prisma.newTransferTax.delete({
-            where: { id }
-        });
-
-        if (overrideId) {
-            await prisma.overrideRequest.update({
-                where: { id: overrideId },
-                data: { actionupdate: "done" }
+            // 3. Delete Details
+            await txPrisma.newTransferTaxDetails.deleteMany({
+                where: { nt_transfertaxid: id }
             });
-        }
+
+            // 4. Delete Master
+            await txPrisma.newTransferTax.delete({
+                where: { id }
+            });
+
+            // 5. Update override request if present
+            if (overrideId) {
+                await txPrisma.overrideRequest.update({
+                    where: { id: overrideId },
+                    data: { actionupdate: "done" }
+                });
+            }
+        });
+
+        revalidatePath('/newTransferTax');
+        revalidatePath('/transfertax');
 
         return { success: true };
     } catch (error) {
@@ -1010,65 +1110,42 @@ export async function voidTransferTaxTransaction(id: string) {
             return { error: "Transfer tax transaction not found." };
         }
 
-        // Revert RealProperty owner updates
-        for (const detail of tax.t_transfertaxdetails) {
-            if (detail.realProperty) {
-                const transfereeToRemove = detail.nt_transferee.toUpperCase().trim();
-                const transferorsToAdd = detail.nt_transferror;
+        await prisma.$transaction(async (txPrisma) => {
+            // 1. Revert RealProperty updates and delete any spawned portion properties
+            await revertRealPropertyChanges(txPrisma, tax.t_transfertaxdetails);
 
-                const currentOwnerList = parseOwners(detail.realProperty.owner);
-                
-                // Remove the transferee
-                const newOwnerList = currentOwnerList.filter((o: string) => 
-                    !o.includes(transfereeToRemove) && !transfereeToRemove.includes(o)
-                );
-
-                // Add the transferors back
-                if (transferorsToAdd) {
-                    const transferorsArray = transferorsToAdd.split(",").map((t: string) => t.trim());
-                    for (const t of transferorsArray) {
-                        if (t && !newOwnerList.includes(t)) {
-                            newOwnerList.push(t);
-                        }
+            // 2. Update captured payment to voided if it exists
+            if (tax.capturedPayment) {
+                await txPrisma.capturedPayment.update({
+                    where: { id: tax.capturedPayment.id },
+                    data: {
+                        cp_receiptnumber: `VOIDED-${tax.capturedPayment.cp_receiptnumber}-${Date.now()}`
                     }
-                }
-
-                await prisma.realProperty.update({
-                    where: { id: detail.realProperty.id },
-                    data: { owner: newOwnerList.join(", ") }
                 });
             }
-        }
 
-        // Update captured payment to voided if it exists
-        if (tax.capturedPayment) {
-            await prisma.capturedPayment.update({
-                where: { id: tax.capturedPayment.id },
+            // 3. Update transaction status to voided
+            await txPrisma.newTransferTax.update({
+                where: { id },
                 data: {
-                    cp_receiptnumber: `VOIDED-${tax.capturedPayment.cp_receiptnumber}-${Date.now()}`
+                    t_status: "voided",
+                    t_paymentStatus: "voided",
+                    t_voidedDate: new Date(),
+                    t_voidedBy: session?.user?.name || "System"
                 }
             });
-        }
 
-        // Update transaction status to voided
-        await prisma.newTransferTax.update({
-            where: { id },
-            data: {
-                t_status: "voided",
-                t_paymentStatus: "voided",
-                t_voidedDate: new Date(),
-                t_voidedBy: session.user.name || "System"
+            // 4. Update override request if present
+            if (overrideId) {
+                await txPrisma.overrideRequest.update({
+                    where: { id: overrideId },
+                    data: { actionupdate: "done" }
+                });
             }
         });
 
-        if (overrideId) {
-            await prisma.overrideRequest.update({
-                where: { id: overrideId },
-                data: { actionupdate: "done" }
-            });
-        }
-
         revalidatePath('/newTransferTax');
+        revalidatePath('/transfertax');
 
         return { success: true };
     } catch (error) {

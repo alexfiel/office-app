@@ -5,6 +5,7 @@ import { getTransactionsByNotarialId } from "@/lib/actions/transfertax-actions";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, FileText, MapPin } from "lucide-react";
+import { transferTaxStorage } from "@/lib/transfertax-storage";
 
 export function SavedTransactionsCart() {
     const [open, setOpen] = useState(false);
@@ -12,30 +13,21 @@ export function SavedTransactionsCart() {
     const [transactions, setTransactions] = useState<any[]>([]);
     const [documentId, setDocumentId] = useState<string | null>(null);
 
-    // Initial check for cookie on mount
+    // Initial check for document storage on mount
     useEffect(() => {
-        const checkCookie = () => {
-            try {
-                const match = document.cookie.match(new RegExp('(^| )transferTaxDocument=([^;]+)'));
-                if (match) {
-                    const storedData = JSON.parse(decodeURIComponent(match[2]));
-                    if (storedData.id) {
-                        setDocumentId(storedData.id);
-                    } else {
-                        setDocumentId(null);
-                    }
-                } else {
-                    setDocumentId(null);
-                }
-            } catch (e) {
-                console.error("Failed to parse transferTaxDocument cookie", e);
+        const checkStorage = () => {
+            const storedData = transferTaxStorage.getDocument();
+            if (storedData && storedData.id) {
+                setDocumentId(storedData.id);
+            } else {
+                setDocumentId(null);
             }
         };
         
-        checkCookie();
+        checkStorage();
         
-        // Setup a small interval to check if cookie updates when continuing another transaction
-        const interval = setInterval(checkCookie, 2000);
+        // Setup a small interval to check if storage updates when continuing another transaction
+        const interval = setInterval(checkStorage, 2000);
         return () => clearInterval(interval);
     }, []);
 

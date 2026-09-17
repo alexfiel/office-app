@@ -10,6 +10,7 @@ import { UploadCloud, FileText, X, File, ArrowRight } from "lucide-react";
 import { uploadFile } from "@/lib/upload/upload-action";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { transferTaxStorage } from "@/lib/transfertax-storage";
 
 const PdfPreview = dynamic(() => import("./PdfPreview"), {
     ssr: false,
@@ -34,36 +35,30 @@ export function NotarialDocument() {
     const [notarizedBy, setNotarizedBy] = useState("");
     const [recoveredFileName, setRecoveredFileName] = useState("");
 
-    // Recover data from cookies
+    // Recover data from storage
     useEffect(() => {
-        try {
-            const match = document.cookie.match(new RegExp('(^| )transferTaxDocument=([^;]+)'));
-            if (match) {
-                const storedData = JSON.parse(decodeURIComponent(match[2]));
-                
-                if (storedData.documentName) setDocumentName(storedData.documentName);
-                if (storedData.documentType) setDocumentType(storedData.documentType);
-                if (storedData.notarialDate) setNotarialDate(storedData.notarialDate);
-                if (storedData.notarizedBy) setNotarizedBy(storedData.notarizedBy);
-                if (storedData.documentUrl) setPreviewUrl(storedData.documentUrl);
-                if (storedData.fileName) setRecoveredFileName(storedData.fileName);
-                
-                if (storedData.documentNumber) {
-                    if (storedData.documentType === "Court") {
-                        const caseMatch = storedData.documentNumber.match(/Case No\. (.*)/);
-                        if (caseMatch) setCaseNo(caseMatch[1]);
-                    } else {
-                        const docMatch = storedData.documentNumber.match(/Doc No\. (.*?); Page No\. (.*?); Book No\. (.*)/);
-                        if (docMatch) {
-                            setDocNo(docMatch[1]);
-                            setPageNo(docMatch[2]);
-                            setBookNo(docMatch[3]);
-                        }
+        const storedData = transferTaxStorage.getDocument();
+        if (storedData) {
+            if (storedData.documentName) setDocumentName(storedData.documentName);
+            if (storedData.documentType) setDocumentType(storedData.documentType);
+            if (storedData.notarialDate) setNotarialDate(storedData.notarialDate);
+            if (storedData.notarizedBy) setNotarizedBy(storedData.notarizedBy);
+            if (storedData.documentUrl) setPreviewUrl(storedData.documentUrl);
+            if (storedData.fileName) setRecoveredFileName(storedData.fileName);
+            
+            if (storedData.documentNumber) {
+                if (storedData.documentType === "Court") {
+                    const caseMatch = storedData.documentNumber.match(/Case No\. (.*)/);
+                    if (caseMatch) setCaseNo(caseMatch[1]);
+                } else {
+                    const docMatch = storedData.documentNumber.match(/Doc No\. (.*?); Page No\. (.*?); Book No\. (.*)/);
+                    if (docMatch) {
+                        setDocNo(docMatch[1]);
+                        setPageNo(docMatch[2]);
+                        setBookNo(docMatch[3]);
                     }
                 }
             }
-        } catch (e) {
-            console.error("Failed to parse transferTaxDocument cookie", e);
         }
     }, []);
 
@@ -158,8 +153,8 @@ export function NotarialDocument() {
                     fileName: selectedFile ? selectedFile.name : recoveredFileName
                 };
 
-                // Save data in cookies
-                document.cookie = `transferTaxDocument=${encodeURIComponent(JSON.stringify(documentData))}; path=/`; // session cookie
+                // Save data in storage
+                transferTaxStorage.setDocument(documentData);
                 
                 console.log("Document uploaded and data saved to cookies:", documentData);
                 router.push("/newTransferTax/search-property");
@@ -313,7 +308,7 @@ export function NotarialDocument() {
                             <div className="space-y-2">
                                 <Label htmlFor="documentType" className="text-sm font-medium text-gray-700">Document Type</Label>
                                 <Select value={documentType} onValueChange={setDocumentType}>
-                                    <SelectTrigger id="documentType" className="bg-gray-50/50 focus:bg-white shadow-sm w-full">
+                                    <SelectTrigger id="documentType" className="bg-gray-50/50 focus:bg-white shadow-sm w-full" suppressHydrationWarning>
                                         <SelectValue placeholder="Select Document Type" />
                                     </SelectTrigger>
                                     <SelectContent>

@@ -12,13 +12,23 @@ import autoTable from 'jspdf-autotable';
 import { calculateTaxPenalties } from '@/lib/tax-utils';
 import { getActiveHeadOfOfficeSignatory } from '@/lib/actions/signatory-actions';
 import { TAX_RATES, MIN_TAX_DUE } from '@/constants/taxRates';
+import type { NewTransferTaxDetails } from '@prisma/client';
 
-const formatCurrency = (val: number | string | null | undefined): string => {
+export type TransferTaxDetailItem = NewTransferTaxDetails & {
+    realProperty?: {
+        taxdecnumber?: string | null;
+        lotnumber?: string | null;
+        area?: number | null;
+    } | null;
+    [key: string]: any;
+};
+
+export const formatCurrency = (val: number | string | null | undefined): string => {
     const num = Number(val) || 0;
     return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-const formatDate = (val: any): string => {
+export const formatDate = (val: any): string => {
     if (!val) return "N/A";
     const d = new Date(val);
     if (isNaN(d.getTime())) return "N/A";
@@ -29,7 +39,7 @@ const formatDate = (val: any): string => {
     });
 };
 
-const formatValidityDate = (val: any): string => {
+export const formatValidityDate = (val: any): string => {
     if (!val) return "N/A";
     const d = new Date(val);
     if (isNaN(d.getTime())) return String(val);
@@ -40,6 +50,174 @@ const formatValidityDate = (val: any): string => {
         day: 'numeric'
     });
 };
+
+export interface ProcessedTransactionGroup {
+    key: string;
+    transferor: string;
+    transferee: string;
+    transactionType: string;
+    firstDt: TransferTaxDetailItem;
+    groupDetails: TransferTaxDetailItem[];
+    bodyRows: (string | number)[][];
+    groupTotalMarketValue: number;
+    groupConsideration: number;
+    groupTaxBase: number;
+    groupTaxDue: number;
+    groupSurcharge: number;
+    groupInterest: number;
+    groupSubTotal: number;
+    summaryRow: (string | number)[];
+}
+
+export interface ProcessedTransactionResult {
+    groups: ProcessedTransactionGroup[];
+    txTotalTaxDue: number;
+    txTotalSurcharge: number;
+    txTotalInterest: number;
+    txGrandTotal: number;
+    txHasMinimumTaxApplied: boolean;
+    isVoided: boolean;
+}
+
+export function processTransactionComputation(
+    tx: any,
+    notarialDate?: string | Date | null
+): ProcessedTransactionResult {
+    const isVoided = tx.t_status?.toLowerCase() === 'voided';
+
+    const details: TransferTaxDetailItem[] = [...(tx.t_transfertaxdetails || [])].sort((a: any, b: any) => {
+        if (!a.id || !b.id) return 0;
+        return a.id.localeCompare(b.id);
+    });
+
+    const grouped: Record<string, TransferTaxDetailItem[]> = {};
+    details.forEach((dt: TransferTaxDetailItem) => {
+        const transferor = (dt.nt_transferror || '').trim().toUpperCase();
+        const transferee = (dt.nt_transferee || '').trim().toUpperCase();
+        const txType = (dt.nt_transactiontype || '').trim().toUpperCase();
+        const key = `${transferor}|${transferee}|${txType}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(dt);
+    });
+
+    let txTotalTaxDue = 0;
+    let txTotalSurcharge = 0;
+    let txTotalInterest = 0;
+    let txGrandTotal = 0;
+    let txHasMinimumTaxApplied = false;
+
+    const groups: ProcessedTransactionGroup[] = Object.values(grouped).map((groupDetails: TransferTaxDetailItem[]) => {
+        const firstDt = groupDetails[0];
+
+        let groupTotalMarketValue = 0;
+
+        // Sub Detail Table
+        const bodyRows: (string | number)[][] = groupDetails.map((dt: TransferTaxDetailItem) => {
+            const mv = Number(dt.nt_marketvalue || 0);
+            groupTotalMarketValue += mv;
+            const areaVal = Number(dt.nt_area || dt.realProperty?.area || 0);
+
+            return [
+                dt.realProperty?.taxdecnumber || dt.nt_taxdecnumber || "N/A",
+                dt.realProperty?.lotnumber || dt.nt_lotnumber || "N/A",
+                areaVal > 0 ? areaVal.toLocaleString('en-US') : "0",
+                formatCurrency(mv),
+                "", // Consideration
+                "", // Tax Base
+                "", // Tax Due
+                "", // Surcharge
+                "", // Interest
+                ""  // Sub Total
+            ];
+        });
+
+        // Determine Consideration for this transaction group from NewTransferTaxDetails
+        const isSaleType = (firstDt.nt_transactiontype || '').toUpperCase().includes('SALE');
+        const groupDetailsCons = groupDetails.map((dt: TransferTaxDetailItem) => Number(dt.nt_considerationvalue || 0));
+        const sumCons = groupDetailsCons.reduce((sum: number, c: number) => sum + c, 0);
+        const maxCons = Math.max(...groupDetailsCons, 0);
+
+        let groupConsideration = 0;
+        if (isSaleType) {
+            // If all items have the same non-zero consideration (unapportioned duplicate stored on rows), use maxCons, otherwise sumCons
+            const allSameNonZero = groupDetailsCons.length > 1 && groupDetailsCons.every(c => c > 0 && Math.abs(c - groupDetailsCons[0]) < 0.01);
+            groupConsideration = allSameNonZero ? maxCons : sumCons;
+        } else if (sumCons > 0) {
+            groupConsideration = sumCons;
+        } else {
+            groupConsideration = 0;
+        }
+
+        // Tax Base = Total Market Value or Consideration, whichever is higher
+        const groupTaxBase = Math.max(groupTotalMarketValue, groupConsideration);
+
+        // Tax Due = Total Market Value or Consideration whichever is higher x .0075 (statutory minimum Php 500.00 unless voided)
+        const rawCalculatedTax = groupTaxBase * TAX_RATES;
+        const groupTaxDue = isVoided ? 0 : Math.max(rawCalculatedTax, MIN_TAX_DUE);
+
+        if (!isVoided && rawCalculatedTax < MIN_TAX_DUE) {
+            txHasMinimumTaxApplied = true;
+        }
+
+        const notarialDateStr = notarialDate ? new Date(notarialDate).toISOString() : "";
+        const penalties = isVoided
+            ? { surcharge: 0, interest: 0, totalAmountDue: 0 }
+            : calculateTaxPenalties(groupTaxDue, notarialDateStr, tx.t_DateCompute ? new Date(tx.t_DateCompute) : new Date());
+
+        const groupSurcharge = penalties.surcharge;
+        const groupInterest = penalties.interest;
+        const groupSubTotal = isVoided ? 0 : (groupTaxDue + groupSurcharge + groupInterest);
+
+        txTotalTaxDue += groupTaxDue;
+        txTotalSurcharge += groupSurcharge;
+        txTotalInterest += groupInterest;
+        txGrandTotal += groupSubTotal;
+
+        // Add group TOTAL row presenting the computation
+        const summaryRow: (string | number)[] = [
+            "TOTAL:",
+            "",
+            "",
+            formatCurrency(groupTotalMarketValue),
+            formatCurrency(groupConsideration),
+            formatCurrency(groupTaxBase),
+            formatCurrency(groupTaxDue),
+            formatCurrency(groupSurcharge),
+            formatCurrency(groupInterest),
+            formatCurrency(groupSubTotal)
+        ];
+
+        bodyRows.push(summaryRow);
+
+        return {
+            key: `${(firstDt.nt_transferror || '').trim()}|${(firstDt.nt_transferee || '').trim()}|${(firstDt.nt_transactiontype || '').trim()}`,
+            transferor: firstDt.nt_transferror || "N/A",
+            transferee: firstDt.nt_transferee || "N/A",
+            transactionType: firstDt.nt_transactiontype || "N/A",
+            firstDt,
+            groupDetails,
+            bodyRows,
+            groupTotalMarketValue,
+            groupConsideration,
+            groupTaxBase,
+            groupTaxDue,
+            groupSurcharge,
+            groupInterest,
+            groupSubTotal,
+            summaryRow
+        };
+    });
+
+    return {
+        groups,
+        txTotalTaxDue,
+        txTotalSurcharge,
+        txTotalInterest,
+        txGrandTotal,
+        txHasMinimumTaxApplied,
+        isVoided
+    };
+}
 
 const loadBase64Image = async (url: string): Promise<string> => {
     try {
@@ -228,20 +406,28 @@ export function ReportTransferTaxCompSheet({
             pdf.setFontSize(9);
             pdf.setFont("helvetica", "normal");
 
-            pdf.text(`Document Name: ${data.documentName || ''}`, M, currentY);
+            const docName = data.documentName || data.notarialDocument?.documentName || '';
+            const docType = data.documentType || data.notarialDocument?.documentType || '';
+            const docNum = data.documentNumber || data.notarialDocument?.documentNumber || '';
+            const notarizedBy = data.notarizedBy || data.notarialDocument?.notarizedBy || '';
+            const notarialDate = data.notarialDate || data.notarialDocument?.notarialDate;
+
+            pdf.text(`Document Name: ${docName}`, M, currentY);
             currentY += 5;
 
-            pdf.text(`Document Type: ${data.documentType || ''}`, M, currentY);
-            pdf.text(`Document No: ${data.documentNumber || ''}`, M + 100, currentY);
+            pdf.text(`Document Type: ${docType}`, M, currentY);
+            pdf.text(`Document No: ${docNum}`, M + 100, currentY);
             currentY += 5;
 
-            pdf.text(`Notarized By: ${data.notarizedBy || ''}`, M, currentY);
-            pdf.text(`Notarial Date: ${formatDate(data.notarialDate)}`, M + 100, currentY);
+            pdf.text(`Notarized By: ${notarizedBy}`, M, currentY);
+            pdf.text(`Notarial Date: ${formatDate(notarialDate)}`, M + 100, currentY);
 
             currentY += 10;
 
             // Transactions Loop
-            const transactions = data.newTransferTaxes || [];
+            const transactions = Array.isArray(data.newTransferTaxes)
+                ? data.newTransferTaxes
+                : (data.t_controlNumber || data.t_transfertaxdetails ? [data] : []);
             let globalGrandTotal = 0;
 
             transactions.forEach((tx: any, index: number) => {
@@ -251,7 +437,15 @@ export function ReportTransferTaxCompSheet({
                     currentY = M + 10;
                 }
 
-                const isVoided = tx.t_status?.toLowerCase() === 'voided';
+                const {
+                    groups,
+                    txTotalTaxDue,
+                    txTotalSurcharge,
+                    txTotalInterest,
+                    txGrandTotal,
+                    txHasMinimumTaxApplied,
+                    isVoided
+                } = processTransactionComputation(tx, notarialDate);
 
                 // Header for NewTransferTax
                 pdf.setFontSize(10);
@@ -272,31 +466,7 @@ export function ReportTransferTaxCompSheet({
 
                 currentY += 4;
 
-                // Group Details for NewTransfertaxDetails to create Sub Header and Sub Detail Tables
-                const details = [...(tx.t_transfertaxdetails || [])].sort((a: any, b: any) => {
-                    if (!a.id || !b.id) return 0;
-                    return a.id.localeCompare(b.id);
-                });
-
-                const grouped: Record<string, any[]> = {};
-                details.forEach((dt: any) => {
-                    const transferor = (dt.nt_transferror || '').trim();
-                    const transferee = (dt.nt_transferee || '').trim();
-                    const txType = (dt.nt_transactiontype || '').trim();
-                    const key = `${transferor}|${transferee}|${txType}`;
-                    if (!grouped[key]) grouped[key] = [];
-                    grouped[key].push(dt);
-                });
-
-                let txTotalTaxDue = 0;
-                let txTotalSurcharge = 0;
-                let txTotalInterest = 0;
-                let txGrandTotal = 0;
-                let txHasMinimumTaxApplied = false;
-
-                Object.values(grouped).forEach((groupDetails: any) => {
-                    const firstDt = groupDetails[0];
-
+                groups.forEach((group) => {
                     // Check page break before sub-header table
                     if (currentY > FOLIO_HEIGHT - 50) {
                         pdf.addPage();
@@ -311,118 +481,39 @@ export function ReportTransferTaxCompSheet({
                         bodyStyles: { fontSize: 9, halign: 'center' },
                         head: [["Transferor", "Transferee", "Transaction Type"]],
                         body: [[
-                            firstDt.nt_transferror || "N/A",
-                            firstDt.nt_transferee || "N/A",
-                            firstDt.nt_transactiontype || "N/A"
+                            group.transferor,
+                            group.transferee,
+                            group.transactionType
                         ]],
                         theme: 'grid',
                     });
                     currentY = (pdf as any).lastAutoTable.finalY + 2;
 
-                    let groupTotalMarketValue = 0;
-
-                    // Sub Detail Table
-                    const bodyRows = groupDetails.map((dt: any) => {
-                        const mv = Number(dt.nt_marketvalue || 0);
-                        groupTotalMarketValue += mv;
-                        const areaVal = Number(dt.nt_area || 0);
-
-                        return [
-                            dt.nt_taxdecnumber || "N/A",
-                            dt.nt_lotnumber || "N/A",
-                            areaVal > 0 ? areaVal.toLocaleString('en-US') : "0",
-                            formatCurrency(mv),
-                            "", // Consideration
-                            "", // Tax Base
-                            "", // Tax Due
-                            "", // Surcharge
-                            "", // Interest
-                            ""  // Sub Total
-                        ];
-                    });
-
-                    // Safeguard against unapportioned duplicate consideration in legacy records
-                    const groupDetailsCons = groupDetails.map((dt: any) => Number(dt.nt_considerationvalue || 0));
-                    const sumCons = groupDetailsCons.reduce((sum: number, c: number) => sum + c, 0);
-                    const maxCons = Math.max(...groupDetailsCons, 0);
-                    const txStoredCons = Number(tx.t_TotalConsiderationValue || 0);
-
-                    let groupConsideration = 0;
-                    if (txStoredCons > 0 && Math.abs(sumCons - txStoredCons) < 1) {
-                        // Already apportioned across rows
-                        groupConsideration = sumCons;
-                    } else if (txStoredCons > 0 && Math.abs(maxCons - txStoredCons) < 1) {
-                        // Stored full consideration on each detail row
-                        groupConsideration = maxCons;
-                    } else if (txStoredCons > 0) {
-                        groupConsideration = txStoredCons;
-                    } else {
-                        groupConsideration = sumCons > 0 ? sumCons : maxCons;
-                    }
-
-                    // Next Row (Summary Row) - Tax base is total market value or consideration, whichever is higher
-                    const groupTaxBase = Math.max(groupTotalMarketValue, groupConsideration);
-
-                    // Enforce statutory minimum tax due of Php 500.00 unless voided
-                    const rawCalculatedTax = groupTaxBase * TAX_RATES;
-                    const groupTaxDue = isVoided ? 0 : Math.max(rawCalculatedTax, MIN_TAX_DUE);
-
-                    if (!isVoided && rawCalculatedTax < MIN_TAX_DUE) {
-                        txHasMinimumTaxApplied = true;
-                    }
-
-                    const notarialDateStr = data.notarialDate ? new Date(data.notarialDate).toISOString() : "";
-                    const penalties = isVoided
-                        ? { surcharge: 0, interest: 0, totalAmountDue: 0 }
-                        : calculateTaxPenalties(groupTaxDue, notarialDateStr, new Date(tx.t_DateCompute));
-
-                    const groupSurcharge = penalties.surcharge;
-                    const groupInterest = penalties.interest;
-                    const groupSubTotal = isVoided ? 0 : (groupTaxDue + groupSurcharge + groupInterest);
-
-                    txTotalTaxDue += groupTaxDue;
-                    txTotalSurcharge += groupSurcharge;
-                    txTotalInterest += groupInterest;
-                    txGrandTotal += groupSubTotal;
-
-                    bodyRows.push([
-                        "TOTAL:",
-                        "",
-                        "",
-                        formatCurrency(groupTotalMarketValue),
-                        formatCurrency(groupConsideration),
-                        formatCurrency(groupTaxBase),
-                        formatCurrency(groupTaxDue),
-                        formatCurrency(groupSurcharge),
-                        formatCurrency(groupInterest),
-                        formatCurrency(groupSubTotal)
-                    ]);
-
                     autoTable(pdf, {
                         startY: currentY,
                         margin: { left: M, right: M },
                         headStyles: { fillColor: [248, 249, 250], textColor: 0, fontSize: 6.5, halign: 'center', fontStyle: 'bold' },
-                        bodyStyles: { fontSize: 7.5 },
+                        bodyStyles: { fontSize: 7 },
                         columnStyles: {
-                            0: { halign: 'left' },
-                            1: { halign: 'left' },
-                            2: { halign: 'center' },
-                            3: { halign: 'right' },
-                            4: { halign: 'right' },
-                            5: { halign: 'right' },
-                            6: { halign: 'right' },
-                            7: { halign: 'right' },
-                            8: { halign: 'right' },
-                            9: { halign: 'right', fontStyle: 'bold' }
+                            0: { halign: 'left', cellWidth: 24 },
+                            1: { halign: 'left', cellWidth: 18 },
+                            2: { halign: 'center', cellWidth: 14 },
+                            3: { halign: 'right', cellWidth: 22 },
+                            4: { halign: 'right', cellWidth: 22 },
+                            5: { halign: 'right', cellWidth: 22 },
+                            6: { halign: 'right', cellWidth: 18 },
+                            7: { halign: 'right', cellWidth: 16 },
+                            8: { halign: 'right', cellWidth: 16 },
+                            9: { halign: 'right', fontStyle: 'bold', cellWidth: 18.5 }
                         },
                         didParseCell: (hookData) => {
-                            if (hookData.section === 'body' && hookData.row.index === bodyRows.length - 1) {
+                            if (hookData.section === 'body' && hookData.row.index === group.bodyRows.length - 1) {
                                 hookData.cell.styles.fontStyle = 'bold';
                                 hookData.cell.styles.fillColor = [240, 244, 248];
                             }
                         },
                         head: [["TD No", "Lot No", "Area", "Market Value", "Consideration", "Tax Base", "Tax Due", "Surcharge", "Interest", "Sub Total"]],
-                        body: bodyRows,
+                        body: group.bodyRows,
                         theme: 'grid',
                     });
                     currentY = (pdf as any).lastAutoTable.finalY + 4;

@@ -8,6 +8,7 @@ import { FileText, Calculator, ArrowLeft, ArrowRight, Save, CalendarDays, Receip
 import { toast } from "sonner";
 import { saveTransferTaxTransaction } from "@/lib/actions/transfertax-actions";
 import { calculateTaxPenalties } from "@/lib/tax-utils";
+import { transferTaxStorage } from "@/lib/transfertax-storage";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -38,36 +39,34 @@ export function TransferTaxComputation() {
     const [showNextTxDialog, setShowNextTxDialog] = useState(false);
 
     useEffect(() => {
-        try {
-            // Load Document
-            const docMatch = document.cookie.match(new RegExp('(^| )transferTaxDocument=([^;]+)'));
-            if (docMatch) setDocumentData(JSON.parse(decodeURIComponent(docMatch[2])));
-            else {
-                toast.error("Missing document data. Redirecting.");
-                router.push("/newTransferTax");
-                return;
-            }
+        // Load Document
+        const doc = transferTaxStorage.getDocument();
+        if (doc) {
+            setDocumentData(doc);
+        } else {
+            toast.error("Missing document data. Redirecting.");
+            router.push("/newTransferTax");
+            return;
+        }
 
-            // Load Cart
-            const cartMatch = document.cookie.match(new RegExp('(^| )rpt-cart=([^;]+)'));
-            if (cartMatch) setCart(JSON.parse(decodeURIComponent(cartMatch[2])));
-            else {
-                toast.error("Missing properties cart. Redirecting.");
-                router.push("/newTransferTax/search-property");
-                return;
-            }
+        // Load Cart
+        const storedCart = transferTaxStorage.getCart();
+        if (storedCart && storedCart.length > 0) {
+            setCart(storedCart);
+        } else {
+            toast.error("Missing properties cart. Redirecting.");
+            router.push("/newTransferTax/search-property");
+            return;
+        }
 
-            // Load Transaction
-            const txMatch = document.cookie.match(new RegExp('(^| )transferTaxTransaction=([^;]+)'));
-            if (txMatch) setTransactionData(JSON.parse(decodeURIComponent(txMatch[2])));
-            else {
-                toast.error("Missing transaction data. Redirecting.");
-                router.push("/newTransferTax/transaction");
-                return;
-            }
-
-        } catch (e) {
-            console.error("Failed to parse cookies", e);
+        // Load Transaction
+        const tx = transferTaxStorage.getTransaction();
+        if (tx) {
+            setTransactionData(tx);
+        } else {
+            toast.error("Missing transaction data. Redirecting.");
+            router.push("/newTransferTax/transaction");
+            return;
         }
     }, [router]);
 
@@ -183,10 +182,10 @@ export function TransferTaxComputation() {
 
             toast.success("Transfer Tax Transaction successfully saved!");
             
-            // If NotarialDocument was created newly, update its ID in the cookie so next tx can link to it
+            // If NotarialDocument was created newly, update its ID in storage so next tx can link to it
             if (result.notarialDocumentId && !documentData.id) {
                 const updatedDocData = { ...documentData, id: result.notarialDocumentId };
-                document.cookie = `transferTaxDocument=${encodeURIComponent(JSON.stringify(updatedDocData))}; path=/`;
+                transferTaxStorage.setDocument(updatedDocData);
                 setDocumentData(updatedDocData);
             }
 
@@ -201,17 +200,15 @@ export function TransferTaxComputation() {
 
     const handleContinueAnother = () => {
         // Clear transaction and cart, but keep the notarial document
-        document.cookie = "transferTaxTransaction=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        document.cookie = "rpt-cart=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        transferTaxStorage.clearTransaction();
+        transferTaxStorage.clearCart();
         router.push("/newTransferTax/search-property");
     };
 
     const handleFinish = () => {
         const notarialId = documentData?.id;
-        // Clear all cookies
-        document.cookie = "transferTaxDocument=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        document.cookie = "rpt-cart=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        document.cookie = "transferTaxTransaction=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        // Clear all storage
+        transferTaxStorage.clearAll();
         
         if (notarialId) {
             router.push(`/newTransferTax/summary/${notarialId}`);
