@@ -20,11 +20,13 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
+type UserRole = "USER" | "ADMIN" | "APPROVER" | "ISSUER" | "LIQUIDATOR" | "VALIDATOR";
+
 type User = {
   id: string;
   name: string;
   email: string;
-  role: "USER" | "ADMIN";
+  role: UserRole;
   createdAt: string;
 };
 
@@ -51,7 +53,7 @@ export function AdminUsersManager() {
     }
   };
 
-  const handleRoleChange = async (userId: string, newRole: "USER" | "ADMIN") => {
+  const handleRoleChange = async (userId: string, newRole: UserRole) => {
     setUpdatingId(userId);
     try {
       const res = await fetch("/api/admin/users", {
@@ -98,7 +100,7 @@ export function AdminUsersManager() {
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
                 <TableCell>
-                  <Badge variant={user.role === "ADMIN" ? "default" : "secondary"}>
+                  <Badge variant={user.role === "ADMIN" ? "default" : user.role === "APPROVER" ? "outline" : "secondary"} className={user.role === "APPROVER" ? "border-purple-500 text-purple-700 bg-purple-50 font-bold" : ""}>
                     {user.role}
                   </Badge>
                 </TableCell>
@@ -107,14 +109,18 @@ export function AdminUsersManager() {
                     <Select
                       disabled={updatingId === user.id}
                       value={user.role}
-                      onValueChange={(val: "USER" | "ADMIN") => handleRoleChange(user.id, val)}
+                      onValueChange={(val: UserRole) => handleRoleChange(user.id, val)}
                     >
-                      <SelectTrigger className="w-[120px]">
+                      <SelectTrigger className="w-[140px]">
                         <SelectValue placeholder="Role" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="USER">USER</SelectItem>
+                        <SelectItem value="APPROVER">APPROVER</SelectItem>
                         <SelectItem value="ADMIN">ADMIN</SelectItem>
+                        <SelectItem value="VALIDATOR">VALIDATOR</SelectItem>
+                        <SelectItem value="ISSUER">ISSUER</SelectItem>
+                        <SelectItem value="LIQUIDATOR">LIQUIDATOR</SelectItem>
                       </SelectContent>
                     </Select>
                     {updatingId === user.id && <span className="text-xs text-muted-foreground">Updating...</span>}

@@ -49,7 +49,8 @@ export async function PUT(req: Request) {
     }
     
     // Validate role against enum
-    if (role !== "USER" && role !== "ADMIN") {
+    const validRoles = ["USER", "ADMIN", "APPROVER", "ISSUER", "LIQUIDATOR", "VALIDATOR"];
+    if (!validRoles.includes(role)) {
        return NextResponse.json(
         { message: "Invalid role value." },
         { status: 400 }

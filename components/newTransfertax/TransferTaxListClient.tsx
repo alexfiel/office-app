@@ -9,7 +9,7 @@ import { uploadFile } from "@/lib/upload/upload-action";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Edit, Calculator, FileText, Clock, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Search, LayoutGrid, List, Paperclip, Loader2, Receipt, Ban } from "lucide-react";
+import { Trash2, Edit, Calculator, FileText, Clock, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Search, LayoutGrid, List, Paperclip, Loader2, Receipt, Ban, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import {
     AlertDialog,
@@ -22,11 +22,19 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TransferTaxEditDialog } from "./TransferTaxEditDialog";
 import { TransferTaxPaymentDialog } from "./TransferTaxPaymentDialog";
+import { TransferTaxApprovalDialog } from "./TransferTaxApprovalDialog";
 
 export function TransferTaxListClient({ user }: { user: any }) {
     const router = useRouter();
@@ -41,6 +49,8 @@ export function TransferTaxListClient({ user }: { user: any }) {
     const [isRecomputingId, setIsRecomputingId] = useState<string | null>(null);
     const [editingTax, setEditingTax] = useState<any | null>(null);
     const [paymentTax, setPaymentTax] = useState<any | null>(null);
+    const [approvingTax, setApprovingTax] = useState<any | null>(null);
+    const [statusFilter, setStatusFilter] = useState<string>("all");
     const [searchQuery, setSearchQuery] = useState("");
     const [viewMode, setViewMode] = useState<"list" | "cards">("list");
     
@@ -119,7 +129,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
     const loadTaxes = async () => {
         setIsLoading(true);
         try {
-            const res = await getPaginatedTransferTaxes(currentPage, ITEMS_PER_PAGE, searchQuery);
+            const res = await getPaginatedTransferTaxes(currentPage, ITEMS_PER_PAGE, searchQuery, statusFilter);
             if (res.error) {
                 toast.error(res.error);
             } else {
@@ -150,6 +160,15 @@ export function TransferTaxListClient({ user }: { user: any }) {
         return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchQuery]);
+
+    useEffect(() => {
+        if (currentPage !== 1) {
+            setCurrentPage(1);
+        } else {
+            loadTaxes();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [statusFilter]);
 
     useEffect(() => {
         loadTaxes();
@@ -261,19 +280,36 @@ export function TransferTaxListClient({ user }: { user: any }) {
                     </div>
 
                     <Card className="border shadow-sm rounded-xl overflow-hidden flex-1">
-                        <div className="p-4 border-b bg-white flex items-center justify-between">
-                            <div className="relative w-full max-w-md">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search by transferee, transferor, control no, amount due..."
-                                    className="pl-9 bg-gray-50/50"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    disabled={isLoading}
-                                />
+                        <div className="p-4 border-b bg-white flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex flex-1 items-center gap-3 min-w-[280px] max-w-2xl">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search by transferee, transferor, control no, amount due..."
+                                        className="pl-9 bg-gray-50/50"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        disabled={isLoading}
+                                    />
+                                </div>
+                                <Select
+                                    value={statusFilter}
+                                    onValueChange={(val) => setStatusFilter(val)}
+                                >
+                                    <SelectTrigger className="w-[175px] bg-gray-50/50 shrink-0">
+                                        <SelectValue placeholder="All Statuses" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Statuses</SelectItem>
+                                        <SelectItem value="pending approval">Pending Approval</SelectItem>
+                                        <SelectItem value="approved">Approved</SelectItem>
+                                        <SelectItem value="paid">Paid</SelectItem>
+                                        <SelectItem value="voided">Voided</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div className="flex bg-gray-100 p-1 rounded-md ml-4 shrink-0">
+                            <div className="flex bg-gray-100 p-1 rounded-md shrink-0">
                                 <Button
                                     variant={viewMode === "list" ? "default" : "ghost"}
                                     size="sm"
@@ -362,16 +398,24 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
                                                             {tax.t_status?.toLowerCase() === "paid" ? (
-                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                                                    <CheckCircle className="w-3 h-3 mr-1" />
                                                                     Paid
+                                                                </span>
+                                                            ) : tax.t_status?.toLowerCase() === "approved" ? (
+                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                                    <ShieldCheck className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                                                                    Approved
                                                                 </span>
                                                             ) : tax.t_status?.toLowerCase() === "voided" ? (
                                                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                                    <Ban className="w-3 h-3 mr-1 text-gray-500" />
                                                                     Voided
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                                                                    Unpaid
+                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                                                                    <Clock className="w-3 h-3 mr-1 text-amber-600 animate-pulse" />
+                                                                    Pending Approval
                                                                 </span>
                                                             )}
                                                         </td>
@@ -379,7 +423,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                             ₱{Number(tax.t_TotalAmountDue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
-                                                            <div className="flex items-center justify-center gap-2">
+                                                            <div className="flex items-center justify-center gap-1.5">
                                                                 <input 
                                                                     type="file" 
                                                                     accept=".pdf" 
@@ -390,7 +434,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    className="h-8 text-gray-600 hover:text-blue-700 hover:bg-blue-50 border-gray-200"
+                                                                    className="h-8 w-8 p-0 text-gray-600 hover:text-blue-700 hover:bg-blue-50 border-gray-200"
                                                                     disabled={uploadingDocId === tax.t_NotarialId}
                                                                     onClick={() => {
                                                                         if (tax.notarialDocument?.document_url) {
@@ -406,18 +450,33 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                                                                    className={`h-8 w-8 p-0 ${
+                                                                        tax.t_status?.toLowerCase() === 'approved'
+                                                                            ? 'text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-300 bg-emerald-50/50'
+                                                                            : (tax.t_status?.toLowerCase() === 'pending approval' || tax.t_status?.toLowerCase() === 'pending')
+                                                                            ? 'text-amber-700 hover:text-amber-800 hover:bg-amber-50 border-amber-300 bg-amber-50/40'
+                                                                            : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200'
+                                                                    }`}
+                                                                    onClick={() => setApprovingTax(tax)}
+                                                                    title={user?.role === 'APPROVER' || user?.role === 'ADMIN' ? "Review & Approve Assessment" : "View Assessment Details"}
+                                                                >
+                                                                    <ShieldCheck className="w-4 h-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                                                                     onClick={() => handleRecompute(tax.id)}
                                                                     disabled={recomputingId === tax.id || tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
                                                                     title="Recompute Penalties"
                                                                 >
                                                                     <RefreshCw className={`w-4 h-4 ${recomputingId === tax.id ? 'animate-spin' : ''}`} />
                                                                 </Button>
-                                                                {tax.t_status === "pending" && (
+                                                                {tax.t_status?.toLowerCase() === "approved" && (
                                                                     <Button 
                                                                         variant="outline" 
                                                                         size="sm" 
-                                                                        className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                                                                        className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-300 font-semibold"
                                                                         onClick={() => setPaymentTax(tax)}
                                                                         title="Capture Payment"
                                                                     >
@@ -427,7 +486,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                 <Button 
                                                                     variant="outline" 
                                                                     size="sm" 
-                                                                    className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                                                                    className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
                                                                     onClick={() => {
                                                                         if (user.role !== "ADMIN" && !hasApprovedOverride(tax, "EDIT")) {
                                                                             setOverrideAction({ taxId: tax.id, actionType: "EDIT" });
@@ -436,13 +495,14 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                         }
                                                                     }}
                                                                     disabled={tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
+                                                                    title="Edit Transaction"
                                                                 >
                                                                     <Edit className="w-4 h-4" />
                                                                 </Button>
                                                                 <Button 
                                                                     variant="outline" 
                                                                     size="sm" 
-                                                                    className="h-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200"
+                                                                    className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200"
                                                                     onClick={() => {
                                                                         if (user.role !== "ADMIN" && !hasApprovedOverride(tax, "VOID")) {
                                                                             setOverrideAction({ taxId: tax.id, actionType: "VOID" });
@@ -458,7 +518,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                 <Button 
                                                                     variant="outline" 
                                                                     size="sm" 
-                                                                    className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                                                                     onClick={() => {
                                                                         if (user.role !== "ADMIN" && !hasApprovedOverride(tax, "DELETE")) {
                                                                             setOverrideAction({ taxId: tax.id, actionType: "DELETE" });
@@ -467,6 +527,7 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                                         }
                                                                     }}
                                                                     disabled={tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
+                                                                    title="Delete Transaction"
                                                                 >
                                                                     <Trash2 className="w-4 h-4" />
                                                                 </Button>
@@ -515,8 +576,22 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                     <div className="absolute top-2 right-2 text-[8px] font-mono bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded shadow-sm font-bold">
                                                         {tax.t_controlNumber}
                                                     </div>
-                                                    <div className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm ${tax.t_status?.toLowerCase() === 'paid' ? 'bg-green-100 text-green-800' : tax.t_status?.toLowerCase() === 'voided' ? 'bg-gray-100 text-gray-800' : 'bg-amber-100 text-amber-800'}`}>
-                                                        {tax.t_status?.toLowerCase() === 'paid' ? 'PAID' : tax.t_status?.toLowerCase() === 'voided' ? 'VOIDED' : 'UNPAID'}
+                                                    <div className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm ${
+                                                        tax.t_status?.toLowerCase() === 'paid' 
+                                                            ? 'bg-green-100 text-green-800' 
+                                                            : tax.t_status?.toLowerCase() === 'approved'
+                                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                                            : tax.t_status?.toLowerCase() === 'voided' 
+                                                            ? 'bg-gray-100 text-gray-800' 
+                                                            : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                                    }`}>
+                                                        {tax.t_status?.toLowerCase() === 'paid' 
+                                                            ? 'PAID' 
+                                                            : tax.t_status?.toLowerCase() === 'approved'
+                                                            ? 'APPROVED'
+                                                            : tax.t_status?.toLowerCase() === 'voided' 
+                                                            ? 'VOIDED' 
+                                                            : 'PENDING APPROVAL'}
                                                     </div>
                                                 </div>
 
@@ -578,6 +653,21 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
+                                                            className={`h-8 px-2 ${
+                                                                tax.t_status?.toLowerCase() === 'approved'
+                                                                    ? 'text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50 border-emerald-300'
+                                                                    : (tax.t_status?.toLowerCase() === 'pending approval' || tax.t_status?.toLowerCase() === 'pending')
+                                                                    ? 'text-amber-700 bg-amber-50/40 hover:bg-amber-50 border-amber-300'
+                                                                    : 'text-blue-600 hover:bg-blue-50 border-blue-200'
+                                                            }`}
+                                                            onClick={() => setApprovingTax(tax)}
+                                                            title={user?.role === 'APPROVER' || user?.role === 'ADMIN' ? "Review & Approve Assessment" : "View Assessment Details"}
+                                                        >
+                                                            <ShieldCheck className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
                                                             className="h-8 px-2 text-emerald-600 hover:bg-emerald-50 border-emerald-200"
                                                             onClick={() => handleRecompute(tax.id)}
                                                             disabled={recomputingId === tax.id || tax.t_status?.toLowerCase() === "paid" || tax.t_status?.toLowerCase() === "voided"}
@@ -585,11 +675,11 @@ export function TransferTaxListClient({ user }: { user: any }) {
                                                         >
                                                             <RefreshCw className={`w-4 h-4 ${recomputingId === tax.id ? 'animate-spin' : ''}`} />
                                                         </Button>
-                                                        {tax.t_status === "pending" && (
+                                                        {tax.t_status?.toLowerCase() === "approved" && (
                                                             <Button 
                                                                 variant="outline" 
                                                                 size="sm" 
-                                                                className="h-8 px-2 text-emerald-600 hover:bg-emerald-50 border-emerald-200"
+                                                                className="h-8 px-2 text-emerald-600 hover:bg-emerald-50 border-emerald-300 font-semibold"
                                                                 onClick={() => setPaymentTax(tax)}
                                                                 title="Capture Payment"
                                                             >
@@ -796,6 +886,17 @@ export function TransferTaxListClient({ user }: { user: any }) {
                         tax={paymentTax}
                         onSuccess={() => {
                             setPaymentTax(null);
+                            loadTaxes();
+                        }}
+                    />
+
+                    <TransferTaxApprovalDialog
+                        isOpen={!!approvingTax}
+                        onOpenChange={(open) => !open && setApprovingTax(null)}
+                        tax={approvingTax}
+                        currentUser={user}
+                        onApprovalSuccess={() => {
+                            setApprovingTax(null);
                             loadTaxes();
                         }}
                     />

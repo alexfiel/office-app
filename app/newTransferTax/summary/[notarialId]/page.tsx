@@ -9,8 +9,9 @@ import { ArrowLeft, FileText, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { ReportTransferTaxCompSheet } from "@/components/newTransfertax/ReportTransferTaxCompSheet";
 import { TransferTaxPaymentDialog } from "@/components/newTransfertax/TransferTaxPaymentDialog";
+import { TransferTaxApprovalDialog } from "@/components/newTransfertax/TransferTaxApprovalDialog";
 import { useSession } from "next-auth/react";
-import { Receipt } from "lucide-react";
+import { Receipt, ShieldCheck, Clock, Ban } from "lucide-react";
 
 export default function NotarialDocumentSummary() {
     const { data: session } = useSession();
@@ -20,6 +21,7 @@ export default function NotarialDocumentSummary() {
     const [data, setData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [paymentTax, setPaymentTax] = useState<any>(null);
+    const [approvingTax, setApprovingTax] = useState<any>(null);
 
     const fetchSummary = async () => {
         if (!params.notarialId) return;
@@ -119,6 +121,7 @@ export default function NotarialDocumentSummary() {
                                     <th className="px-6 py-4">Transferor</th>
                                     <th className="px-6 py-4">Transferee</th>
                                     <th className="px-6 py-4">Properties (TD / Lot / Area)</th>
+                                    <th className="px-6 py-4 text-center">Status</th>
                                     <th className="px-6 py-4 text-right">Amount Due</th>
                                     <th className="px-6 py-4 text-center">Action</th>
                                 </tr>
@@ -154,31 +157,66 @@ export default function NotarialDocumentSummary() {
                                                 ))}
                                             </div>
                                         </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {tx.t_status?.toLowerCase() === "paid" ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                                    <CheckCircle className="w-3 h-3 mr-1" />
+                                                    Paid
+                                                </span>
+                                            ) : tx.t_status?.toLowerCase() === "approved" ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                    <ShieldCheck className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                                                    Approved
+                                                </span>
+                                            ) : tx.t_status?.toLowerCase() === "voided" ? (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                    <Ban className="w-3 h-3 mr-1 text-gray-500" />
+                                                    Voided
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                                                    <Clock className="w-3 h-3 mr-1 text-amber-600 animate-pulse" />
+                                                    Pending Approval
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4 text-right font-bold text-gray-900">
                                             ₱{Number(tx.t_TotalAmountDue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            {tx.t_status?.toLowerCase() === "paid" ? (
-                                                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">
-                                                    PAID
-                                                </span>
-                                            ) : (
+                                            <div className="flex items-center justify-center gap-2">
                                                 <Button 
                                                     variant="outline" 
                                                     size="sm" 
-                                                    onClick={() => setPaymentTax(tx)}
-                                                    className="h-8 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200"
+                                                    onClick={() => setApprovingTax(tx)}
+                                                    className={`h-8 text-xs ${
+                                                        tx.t_status?.toLowerCase() === 'approved'
+                                                            ? 'text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50 border-emerald-300'
+                                                            : 'text-amber-700 bg-amber-50/40 hover:bg-amber-50 border-amber-300'
+                                                    }`}
                                                 >
-                                                    <Receipt className="w-3 h-3 mr-1.5" />
-                                                    Payment
+                                                    <ShieldCheck className="w-3.5 h-3.5 mr-1" />
+                                                    {tx.t_status?.toLowerCase() === 'approved' ? 'Review' : 'Review & Approve'}
                                                 </Button>
-                                            )}
+
+                                                {tx.t_status?.toLowerCase() === "approved" && (
+                                                    <Button 
+                                                        variant="outline" 
+                                                        size="sm" 
+                                                        onClick={() => setPaymentTax(tx)}
+                                                        className="h-8 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200"
+                                                    >
+                                                        <Receipt className="w-3 h-3 mr-1.5" />
+                                                        Payment
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
                                 {data.newTransferTaxes.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                                             No transactions were found for this document.
                                         </td>
                                     </tr>
@@ -207,6 +245,17 @@ export default function NotarialDocumentSummary() {
                 tax={paymentTax}
                 onSuccess={() => {
                     setPaymentTax(null);
+                    fetchSummary();
+                }}
+            />
+
+            <TransferTaxApprovalDialog
+                isOpen={!!approvingTax}
+                onOpenChange={(open) => !open && setApprovingTax(null)}
+                tax={approvingTax}
+                currentUser={session?.user || {}}
+                onApprovalSuccess={() => {
+                    setApprovingTax(null);
                     fetchSummary();
                 }}
             />

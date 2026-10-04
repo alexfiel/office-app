@@ -16,7 +16,7 @@ import { transferTaxStorage } from "@/lib/transfertax-storage";
 const parseOwners = (ownerStr: string) => {
     if (!ownerStr) return [];
     let s = ownerStr.toUpperCase();
-    const delimiters = ["SPS.", "SPS", "M/T", "MARRIED TO", "MARRIED", " AND ", "&", ";", ","];
+    const delimiters = ["SPS.", "SPS", "SPOUSES", "M/T", "MARRIED TO", "MARRIED", " AND ", "&", ";", ","];
 
     delimiters.forEach(d => {
         s = s.split(d).join("|");
@@ -142,7 +142,7 @@ export function TransferTaxTransaction() {
                 const pData = propertyEjsData[property.id];
                 return !pData || !pData.saleScope;
             });
-            
+
             if (missingScope) {
                 toast.error("Please select a Sale Scope (Whole or Portion) for all properties to proceed.");
                 return;
@@ -441,8 +441,8 @@ export function TransferTaxTransaction() {
                                                 <div className="flex gap-4">
                                                     <div className="flex-1 space-y-2">
                                                         <Label className="text-sm font-medium text-gray-700">Adjudication Scope</Label>
-                                                        <Select 
-                                                            value={pData.adjudicationType || ""} 
+                                                        <Select
+                                                            value={pData.adjudicationType || ""}
                                                             onValueChange={(val: "Whole" | "Portion") => {
                                                                 setPropertyEjsData(prev => ({
                                                                     ...prev,
@@ -471,8 +471,8 @@ export function TransferTaxTransaction() {
                                                     <div className="flex flex-col sm:flex-row gap-4 p-4 border border-emerald-100 bg-emerald-50/30 rounded-lg">
                                                         <div className="flex-1 space-y-2">
                                                             <Label className="text-sm font-medium text-gray-700">Compute By</Label>
-                                                            <Select 
-                                                                value={pData.portionType || ""} 
+                                                            <Select
+                                                                value={pData.portionType || ""}
                                                                 onValueChange={(val: "Percent" | "Area") => {
                                                                     setPropertyEjsData(prev => ({
                                                                         ...prev,
@@ -574,8 +574,8 @@ export function TransferTaxTransaction() {
                                                 <div className="flex gap-4">
                                                     <div className="flex-1 space-y-2">
                                                         <Label className="text-sm font-medium text-gray-700">Sale Scope</Label>
-                                                        <Select 
-                                                            value={pData.saleScope || ""} 
+                                                        <Select
+                                                            value={pData.saleScope || ""}
                                                             onValueChange={(val: "Whole" | "Portion") => {
                                                                 setPropertyEjsData(prev => ({
                                                                     ...prev,

@@ -141,13 +141,16 @@ model NewTransferTax {
   t_DateCompute             DateTime
   t_validity                DateTime
   t_daysElapsed             Int      @default(0)
-  t_status                  String   @default("pending")
+  t_status                  String   @default("pending approval")
   t_paymentStatus           String   @default("unpaid")
   t_paymentReference        String   @unique
   t_remarks                 String
   t_userId                  String
   t_voidedDate              DateTime?
   t_voidedBy                String?
+  t_approvedDate            DateTime?
+  t_approvedBy              String?
+  t_approvalRemarks         String?
 
   t_transfertaxdetails NewTransferTaxDetails[] @relation("transferTaxDetails")
 
@@ -599,6 +602,7 @@ enum Role {
   ISSUER
   LIQUIDATOR
   VALIDATOR
+  APPROVER
 }
 
 model OverrideRequest {

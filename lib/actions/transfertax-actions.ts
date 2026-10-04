@@ -73,7 +73,7 @@ export async function saveTransferTaxTransaction(data: any) {
         let newTransferTax = await prisma.newTransferTax.findFirst({
             where: {
                 t_NotarialId: notarialId,
-                t_status: "pending"
+                t_status: { in: ["pending approval", "pending"] }
             }
         });
 
@@ -121,7 +121,7 @@ export async function saveTransferTaxTransaction(data: any) {
                     t_DateCompute: new Date(),
                     t_validity: computationData.validityDate === "MAXIMUM INTEREST REACHED" ? new Date("2099-12-31") : new Date(computationData.validityDate || new Date().setDate(new Date().getDate() + 30)),
                     t_daysElapsed: computationData.daysElapsed,
-                    t_status: "pending",
+                    t_status: "pending approval",
                     t_paymentStatus: "unpaid",
                     t_paymentReference: `PR-${Date.now()}`, 
                     t_remarks: "Processed via portal",
@@ -404,7 +404,12 @@ export async function getTransactionsByNotarialId(notarialId: string) {
 
 // Removed getAllTransferTaxes to prevent heap space out of memory issues.
 
-export async function getPaginatedTransferTaxes(page: number = 1, limit: number = 10, searchQuery: string = "") {
+export async function getPaginatedTransferTaxes(
+    page: number = 1, 
+    limit: number = 10, 
+    searchQuery: string = "",
+    statusFilter: string = "all"
+) {
     try {
         const session = await auth();
         if (!session?.user?.id) {
@@ -413,22 +418,33 @@ export async function getPaginatedTransferTaxes(page: number = 1, limit: number 
 
         const skip = (page - 1) * limit;
 
-        const whereClause: any = {};
+        const conditions: any[] = [];
+        if (statusFilter && statusFilter !== "all") {
+            if (statusFilter === "pending approval") {
+                conditions.push({ t_status: { in: ["pending approval", "pending"] } });
+            } else {
+                conditions.push({ t_status: { equals: statusFilter, mode: 'insensitive' } });
+            }
+        }
         if (searchQuery) {
-            whereClause.OR = [
-                { t_controlNumber: { contains: searchQuery, mode: 'insensitive' } },
-                {
-                    t_transfertaxdetails: {
-                        some: {
-                            OR: [
-                                { nt_transferee: { contains: searchQuery, mode: 'insensitive' } },
-                                { nt_transferror: { contains: searchQuery, mode: 'insensitive' } },
-                            ]
+            conditions.push({
+                OR: [
+                    { t_controlNumber: { contains: searchQuery, mode: 'insensitive' } },
+                    {
+                        t_transfertaxdetails: {
+                            some: {
+                                OR: [
+                                    { nt_transferee: { contains: searchQuery, mode: 'insensitive' } },
+                                    { nt_transferror: { contains: searchQuery, mode: 'insensitive' } },
+                                ]
+                            }
                         }
                     }
-                }
-            ];
+                ]
+            });
         }
+
+        const whereClause: any = conditions.length > 0 ? { AND: conditions } : {};
 
         const [taxes, total] = await Promise.all([
             prisma.newTransferTax.findMany({
@@ -437,11 +453,20 @@ export async function getPaginatedTransferTaxes(page: number = 1, limit: number 
                 take: limit,
                 include: {
                     notarialDocument: true,
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            designation: true
+                        }
+                    },
                     t_transfertaxdetails: {
                         include: {
                             realProperty: true
                         }
-                    }
+                    },
+                    capturedPayment: true
                 },
                 orderBy: {
                     t_DateCompute: 'desc'
@@ -896,7 +921,11 @@ export async function updateBasicTransferTax(transactionId: string, detailsPaylo
                     t_TaxBase: updatedTaxBase,
                     t_TotalSurcharge: updatedTotalSurcharge,
                     t_TotalInterest: updatedTotalInterest,
-                    t_TotalAmountDue: updatedTotalAmountDue
+                    t_TotalAmountDue: updatedTotalAmountDue,
+                    t_status: "pending approval",
+                    t_approvedDate: null,
+                    t_approvedBy: null,
+                    t_approvalRemarks: "Assessment updated - requires re-approval"
                 }
             });
         });
@@ -960,6 +989,14 @@ export async function captureTransferTaxPayment(
         
         if (!tx || !tx.notarialDocument) {
             return { error: "Transaction not found." };
+        }
+
+        if (tx.t_status?.toLowerCase() === "voided") {
+            return { error: "Cannot capture payment for a voided transaction." };
+        }
+
+        if (tx.t_status?.toLowerCase() !== "approved") {
+            return { error: `Transaction must be approved by an authorized Approver before payment can be accepted. Current status: ${tx.t_status}` };
         }
         
         const pDate = new Date(paymentDate);
@@ -1255,3 +1292,160 @@ export async function updateOverrideAction(requestId: string, actionupdate: "don
         return { error: "Failed to update override action" };
     }
 }
+
+export async function approveTransferTaxTransaction(id: string, remarks?: string) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized. Please log in." };
+        }
+
+        const userRole = (session.user as any).role;
+        if (userRole !== "APPROVER" && userRole !== "ADMIN") {
+            return { error: "Unauthorized. Approving rights require an APPROVER role." };
+        }
+
+        const dbUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { name: true, designation: true }
+        });
+
+        const approverName = dbUser?.name || session.user.name || "Authorized Approver";
+
+        const existingTax = await prisma.newTransferTax.findUnique({
+            where: { id }
+        });
+
+        if (!existingTax) {
+            return { error: "Transaction not found." };
+        }
+
+        if (existingTax.t_status === "voided") {
+            return { error: "Cannot approve a voided transaction." };
+        }
+
+        if (existingTax.t_status === "paid") {
+            return { error: "Transaction is already paid and completed." };
+        }
+
+        const updated = await prisma.newTransferTax.update({
+            where: { id },
+            data: {
+                t_status: "approved",
+                t_approvedDate: new Date(),
+                t_approvedBy: approverName,
+                t_approvalRemarks: remarks?.trim() || "Approved computation assessment"
+            }
+        });
+
+        revalidatePath("/viewTransferTaxList");
+        revalidatePath("/newTransferTax");
+        revalidatePath(`/newTransferTax/summary/${existingTax.t_NotarialId}`);
+
+        return { 
+            success: true, 
+            message: `Control No. ${existingTax.t_controlNumber} approved successfully. Ready for payment capture.`,
+            tax: JSON.parse(JSON.stringify(updated)) 
+        };
+    } catch (error) {
+        console.error("Error approving transaction:", error);
+        return { error: "Failed to approve transfer tax transaction." };
+    }
+}
+
+export async function rejectTransferTaxTransaction(id: string, reason: string) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized. Please log in." };
+        }
+
+        const userRole = (session.user as any).role;
+        if (userRole !== "APPROVER" && userRole !== "ADMIN") {
+            return { error: "Unauthorized. Approving rights require an APPROVER role." };
+        }
+
+        const dbUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { name: true, designation: true }
+        });
+
+        const approverName = dbUser?.name || session.user.name || "Authorized Approver";
+
+        const existingTax = await prisma.newTransferTax.findUnique({
+            where: { id }
+        });
+
+        if (!existingTax) {
+            return { error: "Transaction not found." };
+        }
+
+        if (existingTax.t_status === "voided" || existingTax.t_status === "paid") {
+            return { error: `Cannot reject a ${existingTax.t_status} transaction.` };
+        }
+
+        const updated = await prisma.newTransferTax.update({
+            where: { id },
+            data: {
+                t_status: "pending approval",
+                t_approvedDate: null,
+                t_approvedBy: null,
+                t_approvalRemarks: `Returned for revision by ${approverName}: ${reason}`
+            }
+        });
+
+        revalidatePath("/viewTransferTaxList");
+        revalidatePath("/newTransferTax");
+        revalidatePath(`/newTransferTax/summary/${existingTax.t_NotarialId}`);
+
+        return { 
+            success: true, 
+            message: `Control No. ${existingTax.t_controlNumber} returned for revision.`,
+            tax: JSON.parse(JSON.stringify(updated)) 
+        };
+    } catch (error) {
+        console.error("Error rejecting transaction:", error);
+        return { error: "Failed to return transaction for revision." };
+    }
+}
+
+export async function getTransferTaxById(id: string) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: "Unauthorized. Please log in." };
+        }
+
+        const tax = await prisma.newTransferTax.findUnique({
+            where: { id },
+            include: {
+                notarialDocument: {
+                    include: {
+                        user: {
+                            select: { name: true, designation: true, email: true }
+                        }
+                    }
+                },
+                user: {
+                    select: { name: true, designation: true, email: true }
+                },
+                t_transfertaxdetails: {
+                    include: {
+                        realProperty: true
+                    }
+                },
+                capturedPayment: true
+            }
+        });
+
+        if (!tax) {
+            return { error: "Transfer tax record not found." };
+        }
+
+        return { success: true, tax: JSON.parse(JSON.stringify(tax)) };
+    } catch (error) {
+        console.error("Error fetching transfer tax by ID:", error);
+        return { error: "Failed to fetch transfer tax record." };
+    }
+}
+
